@@ -29,9 +29,6 @@ RECIPE -->|on change| GHA
 
 
 %% Style
-style ADC_K8S fill:#FFFFFF;
-style RECIPE_REPO fill:#FFFFFF;
-style GHA_SELFHOSTED fill:#FFFFFF;
 style OGDC_RUNNER stroke:#ff6666,stroke-width:2px;
 ```
 
