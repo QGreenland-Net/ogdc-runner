@@ -5,12 +5,22 @@ description of best practices for developing scientific packages.
 
 [spc-dev-intro]: https://learn.scientific-python.org/development/
 
-## Quick development
+## Setting up a development environment manually
 
-The fastest way to start with development is to use nox. If you don't have nox,
-you can use `pipx run nox` to run it without installing, or `pipx install nox`.
-If you don't have pipx, then you can install with `pip install pipx`. If you use
-macOS, use `brew install pipx nox`. To use:
+You can set up a development environment by running:
+
+```bash
+python3 -m venv .venv
+source ./.venv/bin/activate
+pip install -v --editable .[dev]
+```
+
+## Testing, linting, rendering docs with `nox`
+
+The fastest way to start is to use nox. If you don't have nox, you can use
+`pipx run nox` to run it without installing, or `pipx install nox`. If you don't
+have pipx, then you can install with `pip install pipx`. If you use macOS, use
+`brew install pipx nox`. To use:
 
 ```
 nox
@@ -28,16 +38,6 @@ $ nox -s build  # Make an SDist and wheel
 
 Nox handles everything for you, including setting up an temporary virtual
 environment for each run.
-
-## Setting up a development environment manually
-
-You can set up a development environment by running:
-
-```bash
-python3 -m venv .venv
-source ./.venv/bin/activate
-pip install -v -e .[dev]
-```
 
 ## Automated pre-commit checks
 
