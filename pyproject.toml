@@ -39,14 +39,12 @@ test = [
   "mypy",
   "pytest >=6",
   "pytest-cov >=3",
-  "types-click",
   "types-pyyaml",
 ]
 dev = [
   "mypy",
   "pytest >=6",
   "pytest-cov >=3",
-  "types-click",
   "types-pyyaml",
   "nox",
 ]
