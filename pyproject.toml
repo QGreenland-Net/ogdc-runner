@@ -48,6 +48,7 @@ dev = [
   "pytest-cov >=3",
   "types-click",
   "types-pyyaml",
+  "nox",
 ]
 docs = [
   "sphinx>=7.0",
