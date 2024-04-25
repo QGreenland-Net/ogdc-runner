@@ -10,7 +10,7 @@ description of best practices for developing scientific packages.
 You can set up a development environment by running:
 
 ```bash
-python3 -m venv .venv
+python -m venv .venv
 source ./.venv/bin/activate
 pip install -v --editable .[dev]
 ```
