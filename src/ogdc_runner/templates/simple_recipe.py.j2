@@ -1,0 +1,6 @@
+recipe = (
+  {{input_constructor}}({{input_constructor_arg}})
+{%- for cmd in commands %}
+  | CommandPTransform("""{{cmd}}""")
+{%- endfor %}
+)

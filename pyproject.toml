@@ -27,16 +27,27 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = []
+dependencies = [
+  "click >=8",
+  "pyyaml",
+  "jinja2",
+]
 
 [project.optional-dependencies]
+# NOTE: "test" and "dev" are duplicated; why do we need both?
 test = [
+  "mypy",
   "pytest >=6",
   "pytest-cov >=3",
+  "types-click",
+  "types-pyyaml",
 ]
 dev = [
+  "mypy",
   "pytest >=6",
   "pytest-cov >=3",
+  "types-click",
+  "types-pyyaml",
 ]
 docs = [
   "sphinx>=7.0",
@@ -51,6 +62,10 @@ Homepage = "https://github.com/qgreenland-net/ogdc-runner"
 "Bug Tracker" = "https://github.com/qgreenland-net/ogdc-runner/issues"
 Discussions = "https://github.com/qgreenland-net/ogdc-runner/discussions"
 Changelog = "https://github.com/qgreenland-net/ogdc-runner/releases"
+
+
+[project.scripts]
+ogdc-runner = "ogdc_runner.__main__:cli"
 
 
 [build-system]
@@ -101,6 +116,12 @@ disallow_incomplete_defs = false
 module = "ogdc_runner.*"
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+  "jinja2.*",
+]
+ignore_missing_imports = true
 
 
 [tool.ruff]
