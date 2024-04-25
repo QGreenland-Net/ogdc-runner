@@ -1,6 +1,7 @@
 from __future__ import annotations
-from typing import Any, cast
+
 from pathlib import Path
+from typing import Any, cast
 
 import yaml
 
