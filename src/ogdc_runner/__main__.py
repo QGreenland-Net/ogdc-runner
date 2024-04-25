@@ -27,7 +27,6 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
     pass
 
-
 @cli.command
 @recipe_path
 def render(recipe_path: Path) -> None:

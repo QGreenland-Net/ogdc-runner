@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any
 
 from pathlib import Path
 
@@ -26,7 +27,7 @@ def _get_commands(simple_recipe_path: Path) -> list[str]:
     return commands
 
 
-def _get_input_constructor_and_arg(config: dict) -> tuple[type, any]:
+def _get_input_constructor_and_arg(config: dict[Any, Any]) -> tuple[str, Any]:
     acceptable_values = f"Acceptable values: {input_subkeys.keys()}"
     if num_keys := len(config["input"].keys()) > 1:
         raise RuntimeError(
@@ -47,7 +48,7 @@ def _get_input_constructor_and_arg(config: dict) -> tuple[type, any]:
     return clss, val
 
 
-def render_simple_recipe(recipe_directory: Path):
+def render_simple_recipe(recipe_directory: Path) -> None:
     commands = _get_commands(recipe_directory / SIMPLE_RECIPE_FILENAME)
     config = get_recipe_config(recipe_directory)
 
