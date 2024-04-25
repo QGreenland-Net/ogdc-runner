@@ -1,6 +1,8 @@
-recipe = (
-  {{input_constructor}}({{input_constructor_arg}})
+{% extends "parsl_config.py.j2" %}
+
+{% block recipe %}
 {%- for cmd in commands %}
-  | CommandPTransform("""{{cmd}}""")
+        run_cmd("{{cmd}}").result()
 {%- endfor %}
 )
+{% endblock %}
