@@ -15,29 +15,46 @@ source ./.venv/bin/activate
 pip install -v --editable .[dev]
 ```
 
-## Testing, linting, rendering docs with `nox`
+## Testing, linting, rendering docs with Nox
 
-The fastest way to start is to use nox. If you don't have nox, you can use
+The fastest way to start is to use Nox. If you don't have Nox, you can use
 `pipx run nox` to run it without installing, or `pipx install nox`. If you don't
 have pipx, then you can install with `pip install pipx`. If you use macOS, use
 `brew install pipx nox`. To use:
 
-```
+```console
 nox
 ```
 
-This will lint and test using every installed version of Python on your system,
-skipping ones that are not installed. You can also run specific jobs:
+This will test using every installed version of Python on your system, skipping
+ones that are not installed.
+
+### Running specific tasks with Nox
 
 ```console
-$ nox -s lint  # Lint only
-$ nox -s tests  # Python tests
-$ nox -s docs -- --serve  # Build and serve the docs
-$ nox -s build  # Make an SDist and wheel
+nox -s {job-name}
+```
+
+To view available jobs:
+
+```console
+nox -l
 ```
 
 Nox handles everything for you, including setting up an temporary virtual
 environment for each run.
+
+### Re-using Nox virtual environments
+
+**By default, Nox deletes and recreates virtual environments for every run.**
+Because this is slow, you may want to skip that step with `-R` flag:
+
+```console
+nox -R  # MUCH faster!
+```
+
+Please read more in the
+[official docs](https://nox.thea.codes/en/stable/usage.html#re-using-virtualenvs)
 
 ## Automated pre-commit checks
 
