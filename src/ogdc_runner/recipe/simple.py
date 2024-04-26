@@ -6,6 +6,7 @@ from typing import Any
 from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
 from ogdc_runner.jinja import j2_environment
 from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.models.recipe_config import RecipeConfig
 
 # TODO: get from envvar
 MOUNT_DIR = Path("/data")
@@ -15,12 +16,12 @@ def _get_workdir(*, mount_dir: Path, id: str) -> Path:
     return mount_dir / id
 
 
-def _get_commands(*, simple_recipe_path: Path, config: dict[str, Any]) -> list[str]:
+def _get_commands(*, simple_recipe_path: Path, config: RecipeConfig) -> list[str]:
     """Extract commands from a simple recipe file."""
     # read_lines is going to be more efficient I assume...
     lines = simple_recipe_path.read_text().split("\n")
 
-    work_dir = _get_workdir(mount_dir=MOUNT_DIR, id=config["id"])
+    work_dir = _get_workdir(mount_dir=MOUNT_DIR, id=config.id)
 
     # Omit comments and empty lines
     commands = [line for line in lines if line and not line.startswith("#")]
@@ -28,7 +29,7 @@ def _get_commands(*, simple_recipe_path: Path, config: dict[str, Any]) -> list[s
     interpolated_commands = []
     previous_subdir = work_dir / "fetch"
     interpolated_commands.append(f"mkdir {previous_subdir}")
-    fetch_cmd = f"curl -o {previous_subdir} {config['input']['url']}"
+    fetch_cmd = f"curl -o {previous_subdir} {config.input.url}"
     interpolated_commands.append(fetch_cmd)
     for idx, command in enumerate(commands):
         output_dir = work_dir / str(idx)

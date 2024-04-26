@@ -4,19 +4,18 @@ import yaml
 from kubernetes import client, config, utils
 
 from ogdc_runner.recipe.simple import render_simple_recipe
+from ogdc_runner import get_recipe_config
 
 
 def submit_recipe(recipe_path: Path) -> None:
     """Render the recipe and submit to kubernetes."""
     # TODO: Support other recipe API
     driver_script = render_simple_recipe(recipe_path)
-
-    with (recipe_path / RECIPE_CONFIG_FILENAME).open() as config_file:
-        recipe_config = yaml.safe_load(config_file)
+    recipe_config = get_recipe_config(recipe_directory=recipe_path)
 
     config.load_kube_config()
     k8s_client = client.ApiClient()
-    recipe_id = recipe_config["id"]
+    recipe_id = recipe_config.id
 
     # A ConfigMap provides the driver script to the cluster
     # TODO: Move to YAML template for consistency with job manifest template
