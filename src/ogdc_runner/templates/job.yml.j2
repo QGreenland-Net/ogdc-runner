@@ -2,6 +2,7 @@ apiVersion: "batch/v1"
 kind: "Job"
 metadata:
   name: "ogdc-runner.{{ recipe_id }}"
+  namespace: "qgnet"
 spec:
   # TODO: when completions is 1, parallelism must be 1, but do we need to specify it?
   parallelism: 1
@@ -18,7 +19,7 @@ spec:
         # This is how the Parsl "driver" script gets to the cluster
         - name: "parsl-driver-script-volume"
           configMap:
-            name: "parsl-driver-script"
+            name: "ogdc-recipe.{{ recipe_id }}"
       containers:
         - name: "parsl-init"
           image: "ghcr.io/qgreenland-net/parsl-exploration:v0.1.1"

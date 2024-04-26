@@ -4,8 +4,7 @@ from pathlib import Path
 
 import click
 import yaml
-from kubernetes import config, dynamic
-from kubernetes.client import api_client
+from kubernetes import client, config, utils
 
 from ogdc_runner.constants import RECIPE_CONFIG_FILENAME
 from ogdc_runner.jinja import j2_environment
@@ -54,16 +53,19 @@ def submit(recipe_path: Path) -> None:
     with (recipe_path / RECIPE_CONFIG_FILENAME).open() as config_file:
         recipe_config = yaml.safe_load(config_file)
 
-    k8s_client = dynamic.DynamicClient(
-        api_client.ApiClient(configuration=config.load_kube_config())
-    )
+    config.load_kube_config()
+    k8s_client = client.ApiClient()
     recipe_id = recipe_config["id"]
 
     # A ConfigMap provides the driver script to the cluster
+    # TODO: Move to YAML template for consistency with job manifest template
     configmap_manifest = {
         "kind": "ConfigMap",
         "apiVersion": "v1",
-        "metadata": {"name": f"ogdc-recipe.{recipe_id}"},
+        "metadata": {
+            "name": f"ogdc-recipe.{recipe_id}",
+            "namespace": "qgnet",
+        },
         "data": {"parsl_driver_script.py": driver_script},
     }
 
@@ -71,17 +73,8 @@ def submit(recipe_path: Path) -> None:
     job_manifest_template = j2_environment.get_template("job.yml.j2")
     job_manifest = yaml.safe_load(job_manifest_template.render(recipe_id=recipe_id))
 
-    # TODO: This feels like an unnecessary step...
-    configmap_api = k8s_client.resources.get(
-        api_version=configmap_manifest["apiVersion"],
-        kind=configmap_manifest["kind"],
-    )
-    job_api = k8s_client.resources.get(
-        api_version=job_manifest["apiVersion"],
-        kind=job_manifest["kind"],
-    )
-
-    # TODO: Do we need to specify the namespace? Does it use the namespace from the
-    # active context if not?
-    configmap_api.apply(configmap_manifest, namespace="qgnet")
-    job_api.apply(job_manifest, namespace="qgnet")
+    # TODO: There is no `apply_from_yaml`, but we really want to apply (i.e. declarative
+    # config instead of imperative; shouldn't have to delete a configmap and create it
+    # if it already exists).
+    utils.create_from_yaml(k8s_client, yaml_objects=[configmap_manifest])
+    utils.create_from_yaml(k8s_client, yaml_objects=[job_manifest])
