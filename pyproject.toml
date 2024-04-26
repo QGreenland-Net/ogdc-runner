@@ -28,18 +28,19 @@ dependencies = [
   "click >=8",
   "pyyaml",
   "jinja2",
+  "kubernetes ~=29.0.0",
 ]
 
 [project.optional-dependencies]
 # NOTE: "test" and "dev" are duplicated; why do we need both?
 test = [
-  "mypy",
+  "mypy ~=1.10.0",
   "pytest >=6",
   "pytest-cov >=3",
   "types-pyyaml",
 ]
 dev = [
-  "mypy",
+  "mypy ~=1.10.0",
   "pytest >=6",
   "pytest-cov >=3",
   "types-pyyaml",

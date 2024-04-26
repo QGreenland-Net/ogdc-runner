@@ -3,16 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment, PackageLoader
-
 from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
+from ogdc_runner.jinja import j2_environment
 from ogdc_runner.recipe import get_recipe_config
 
-environment = Environment(loader=PackageLoader("ogdc_runner"))
-template = environment.get_template("simple_recipe.py.j2")
-
-# TODO: get these from envvars
-PVC_NAME = "qgnet-pvc-test-1"
+# TODO: get from envvar
 MOUNT_DIR = Path("/data")
 
 
@@ -37,23 +32,23 @@ def _get_commands(*, simple_recipe_path: Path, config: dict[str, Any]) -> list[s
     interpolated_commands.append(fetch_cmd)
     for idx, command in enumerate(commands):
         output_dir = work_dir / str(idx)
-        interpolated_command = command.format(input_dir=previous_subdir, output_dir=output_dir)
+        interpolated_command = command.format(
+            input_dir=previous_subdir,
+            output_dir=output_dir,
+        )
         interpolated_commands.append(f"mkdir {output_dir}")
         interpolated_commands.append(interpolated_command)
         previous_subdir = output_dir
-        
+
     return interpolated_commands
 
 
-def render_simple_recipe(recipe_directory: Path) -> None:
+def render_simple_recipe(recipe_directory: Path) -> str:
     config = get_recipe_config(recipe_directory)
-    commands = _get_commands(simple_recipe_path=recipe_directory / SIMPLE_RECIPE_FILENAME, config=config)
-
-    print(
-        template.render(
-            commands=commands,
-            recipe_id=config["id"],
-            pvc_name=PVC_NAME,
-            mount_dir=MOUNT_DIR,
-        )
+    commands = _get_commands(
+        simple_recipe_path=recipe_directory / SIMPLE_RECIPE_FILENAME,
+        config=config,
     )
+
+    template = j2_environment.get_template("simple_recipe.py.j2")
+    return template.render(commands=commands)
