@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import shutil
 from pathlib import Path
+import os
 
 import nox
 
@@ -11,6 +12,12 @@ DIR = Path(__file__).parent.resolve()
 nox.needs_version = ">=2024.3.2"
 nox.options.sessions = ["typecheck", "tests"]
 nox.options.default_venv_backend = "uv|virtualenv"
+if os.environ.get("ENVIRONMENT") == "dev":
+    # Use existing venvs where possible in dev
+    nox.options.reuse_existing_virtualenvs = "yes"
+else:
+    # All other envs should have the nox venvs recreated.
+    nox.options.reuse_existing_virtualenvs = "no"
 
 
 @nox.session
