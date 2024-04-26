@@ -21,16 +21,12 @@ def submit_recipe(recipe_path: Path) -> None:
     recipe_id = recipe_config.id
 
     # A ConfigMap provides the driver script to the cluster
-    # TODO: Move to YAML template for consistency with job manifest template
-    configmap_manifest = {
-        "kind": "ConfigMap",
-        "apiVersion": "v1",
-        "metadata": {
-            "name": f"ogdc-recipe.{recipe_id}",
-            "namespace": "qgnet",
-        },
-        "data": {"parsl_driver_script.py": driver_script},
-    }
+    configmap_manifest_template = j2_environment.get_template("configmap.yml.j2")
+    configmap_manifest_yaml = configmap_manifest_template.render(
+        recipe_id=recipe_id,
+        driver_script=driver_script,
+    )
+    configmap_manifest = yaml.safe_load(configmap_manifest_yaml)
 
     # A Job executes the driver script on the cluster
     job_manifest_template = j2_environment.get_template("job.yml.j2")
