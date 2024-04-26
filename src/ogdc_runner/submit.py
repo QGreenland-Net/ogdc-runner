@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import yaml
 from kubernetes import client, config, utils
 
 from ogdc_runner.recipe.simple import render_simple_recipe
-from ogdc_runner import get_recipe_config
+from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.jinja import j2_environment
 
 
 def submit_recipe(recipe_path: Path) -> None:
