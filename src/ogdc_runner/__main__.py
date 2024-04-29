@@ -25,7 +25,6 @@ recipe_path = click.argument(
 @click.group
 def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
-    pass
 
 
 @cli.command
