@@ -28,7 +28,7 @@ def _get_commands(*, simple_recipe_path: Path, config: RecipeConfig) -> list[str
 
     interpolated_commands = []
     previous_subdir = work_dir / "fetch"
-    interpolated_commands.append(f"mkdir {previous_subdir}")
+    interpolated_commands.append(f"mkdir -p {previous_subdir}")
     fetch_cmd = f"curl -o {previous_subdir} {config.input.url}"
     interpolated_commands.append(fetch_cmd)
     for idx, command in enumerate(commands):
@@ -37,7 +37,7 @@ def _get_commands(*, simple_recipe_path: Path, config: RecipeConfig) -> list[str
             input_dir=previous_subdir,
             output_dir=output_dir,
         )
-        interpolated_commands.append(f"mkdir {output_dir}")
+        interpolated_commands.append(f"mkdir -p {output_dir}")
         interpolated_commands.append(interpolated_command)
         previous_subdir = output_dir
 
