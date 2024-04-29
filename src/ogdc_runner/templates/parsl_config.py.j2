@@ -4,9 +4,8 @@ from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
 from parsl.providers import KubernetesProvider
 from parsl.addresses import address_by_route
-from parsl import python_app, bash_app
+from parsl import bash_app
 import parsl
-from parsl.data_provider.files import File
 import kubernetes
 
 
@@ -43,14 +42,6 @@ def get_parsl_config():
                     # Docker image url to use for pods
                     # TODO: support custom images
                     image="ghcr.io/qgreenland-net/parsl-exploration:v0.2.0",
-                    # Command to be run upon pod start, such as:
-                    # "module load Anaconda; source activate parsl_env".
-                    # or "pip install parsl"
-                    # NOTE: parsl needs to be installed or the pod will fail to
-                    # start properly and the process will hang.
-                    worker_init="",
-                    # The secret key to download the image
-                    # secret="YOUR_KUBE_SECRET",
                     # Should follow the Kubernetes naming rules
                     pod_name="{{ recipe_id }}",
                     nodes_per_block=1,
