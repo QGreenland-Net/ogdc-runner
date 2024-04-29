@@ -10,6 +10,7 @@ from ogdc_runner.models.recipe_config import RecipeConfig
 
 # TODO: get from envvar
 MOUNT_DIR = Path("/data")
+PVC_NAME = "qgnet-pvc-test-1"
 
 
 def _get_workdir(*, mount_dir: Path, id: str) -> Path:
@@ -52,4 +53,9 @@ def render_simple_recipe(recipe_directory: Path) -> str:
     )
 
     template = j2_environment.get_template("simple_recipe.py.j2")
-    return template.render(commands=commands)
+    return template.render(
+        commands=commands,
+        recipe_id=config.id,
+        pvc_name=PVC_NAME,
+        mount_dir=MOUNT_DIR,
+    )
