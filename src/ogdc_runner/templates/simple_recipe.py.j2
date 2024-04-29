@@ -2,6 +2,6 @@
 
 {% block recipe %}
 {%- for cmd in commands %}
-        run_cmd("{{cmd.replace('"', '\\"')}}").result()
+        run_cmd(cmd="{{cmd.replace('"', '\\"')}}").result()
 {%- endfor %}
 {% endblock %}
