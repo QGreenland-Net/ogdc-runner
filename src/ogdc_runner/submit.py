@@ -8,12 +8,17 @@ from kubernetes import client, config, utils
 
 from ogdc_runner.constants import K8S_NAMESPACE
 from ogdc_runner.jinja import j2_environment
+from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.recipe import get_recipe_config
 from ogdc_runner.recipe.simple import render_simple_recipe
-from ogdc_runner.models.recipe_config import RecipeConfig
 
 
-def apply_configmap(*, recipe_config: RecipeConfig, k8s_client: client.ApiClient, configmap_manifest: dict[str, Any]) -> None:
+def apply_configmap(
+    *,
+    recipe_config: RecipeConfig,
+    k8s_client: client.ApiClient,
+    configmap_manifest: dict[str, Any],
+) -> None:
     api = client.CoreV1Api(k8s_client)
     listing = api.list_namespaced_config_map(namespace=K8S_NAMESPACE)
     matching_configmaps = [
@@ -61,7 +66,11 @@ def submit_recipe(recipe_path: Path) -> None:
     # Load k8s config and create an API client instance.
     config.load_kube_config()
     k8s_client = client.ApiClient()
-    apply_configmap(recipe_config=recipe_config, k8s_client=k8s_client, configmap_manifest=configmap_manifest)
+    apply_configmap(
+        recipe_config=recipe_config,
+        k8s_client=k8s_client,
+        configmap_manifest=configmap_manifest,
+    )
 
     utils.create_from_yaml(k8s_client, yaml_objects=[job_manifest])
 
