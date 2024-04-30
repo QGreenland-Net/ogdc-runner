@@ -27,7 +27,7 @@ def test_recipe_meta_failure_bad_id():
     recipe_output = RecipeOutput(dataone_id="12345")
     name = "Test Recipe"
 
+    recipe_id = "test_recipe"
     with pytest.raises(ValidationError):
         # Underscores are not allowed, this should trigger the validation error.
-        recipe_id = "test_recipe"
         RecipeConfig(name=name, id=recipe_id, input=recipe_input, output=recipe_output)
