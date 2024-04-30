@@ -38,7 +38,7 @@ def render(recipe_path: Path) -> None:
 
     Useful for testing.
     """
-    print(render_simple_recipe(recipe_path))  # noqa: T201
+    print(render_simple_recipe(recipe_path))
 
 
 @cli.command
