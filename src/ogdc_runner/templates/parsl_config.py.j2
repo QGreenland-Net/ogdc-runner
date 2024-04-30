@@ -71,8 +71,17 @@ def run_cmd(
     return cmd
 
 
+# TODO: consider runner behavior that loads some user recipe (a python func w/
+  parsl code) and executes it after loading the ADC k8s-specific config used by
+  the runner.
+def run():
+    user_recipe_func = load_user_recipe()
+    user_config = load_user_config()
+    with parsl.load(get_config(load_user_config)):
+        user_recipe_func()
+
+
 if __name__ == "__main__":
     config = get_parsl_config()
     with parsl.load(config):
-        {%- block recipe %}
-        {%- endblock %}
+         
