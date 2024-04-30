@@ -4,7 +4,7 @@ from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
 from parsl.providers import KubernetesProvider
 from parsl.addresses import address_by_route
-from parsl import bash_app
+from parsl import bash_app, python_app
 import parsl
 import kubernetes
 
@@ -64,11 +64,17 @@ def run_cmd(
     *,
     cmd: str,
     # TODO: figure out persistent logging
-    stdout="stdout.txt",  # Requests Parsl to return the stdout
-    stderr="stderr.txt",  # Requests Parsl to return the stderr
+    stdout="/data/stdout.txt",  # Requests Parsl to return the stdout
+    stderr="/data/stderr.txt",  # Requests Parsl to return the stderr
 ):
 
-    return cmd
+    return "micromamba run -n base " + cmd
+
+
+@python_app
+def read_and_return(fp):
+    with open(fp, "r") as f:
+        return f.read()
 
 
 if __name__ == "__main__":
