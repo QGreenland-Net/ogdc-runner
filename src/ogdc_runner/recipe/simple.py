@@ -29,7 +29,7 @@ def _get_commands(*, simple_recipe_path: Path, config: RecipeConfig) -> list[str
     interpolated_commands = []
     previous_subdir = work_dir / "fetch"
     interpolated_commands.append(f"mkdir -p {previous_subdir}")
-    fetch_cmd = f"wget -P {previous_subdir} {config.input.url}"
+    fetch_cmd = f"wget --content-disposition -P {previous_subdir} {config.input.url}"
     interpolated_commands.append(fetch_cmd)
     for idx, command in enumerate(commands):
         output_dir = work_dir / str(idx)
