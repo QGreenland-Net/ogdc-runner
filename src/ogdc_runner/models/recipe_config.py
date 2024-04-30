@@ -17,7 +17,7 @@ class RecipeConfig(BaseModel):
     name: str
 
     # Allow lower-case alphanumeric characters, `.`, and `,`. These are the only
-    # allowable caracters in k8s object names. `id` to construct such names.
+    # allowable characters in k8s object names. `id` to construct such names.
     id: str = Field(..., pattern=r"^[a-z0-9.-]+$")
 
     input: RecipeInput
