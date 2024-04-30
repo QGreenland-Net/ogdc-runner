@@ -11,6 +11,21 @@ from ogdc_runner.jinja import j2_environment
 from ogdc_runner.constants import K8S_NAMESPACE
 
 
+def apply_configmap(*, k8s_client, configmap_manifest) -> None:
+    api = client.CoreV1Api(k8s_client)
+    listing = api.list_namespaced_config_map(namespace=K8S_NAMESPACE)
+    matching_configmaps = [configmap for configmap in listing.items if recipe_config.id in configmap.metadata.name]
+    if len(matching_configmaps) == 1:
+        matching_configmap_name = matching_configmaps[0].metadata.name
+        print(f"Deleting existing configmap {matching_configmap_name}")
+        result = api.delete_namespaced_config_map(name=matching_configmap_name, namespace=K8S_NAMESPACE)
+        if result.status != "Success":
+            raise RuntimeError(f"Attempt to delete configmap {matching_configmap_name} failed: {result.reason}")
+    elif len(matching_configmaps) > 1:
+        raise RuntimeError(f"Found more than the expected number of configmaps for {recipe_config.id}")
+    utils.create_from_yaml(k8s_client, yaml_objects=[configmap_manifest])
+
+
 def submit_recipe(recipe_path: Path) -> None:
     """Render the recipe and submit to kubernetes."""
     # TODO: Support other recipe API
@@ -32,22 +47,8 @@ def submit_recipe(recipe_path: Path) -> None:
     # Load k8s config and create an API client instance.
     config.load_kube_config()
     k8s_client = client.ApiClient()
-    api = client.CoreV1Api(k8s_client)
-    listing = api.list_namespaced_config_map(namespace=K8S_NAMESPACE)
-    matching_configmaps = [configmap for configmap in listing.items if recipe_config.id in configmap.metadata.name]
-    if len(matching_configmaps) == 1:
-        matching_configmap_name = matching_configmaps[0].metadata.name
-        print(f"Deleting existing configmap {matching_configmap_name}")
-        result = api.delete_namespaced_config_map(name=matching_configmap_name, namespace=K8S_NAMESPACE)
-        if result.status != "Success":
-            raise RuntimeError(f"Attempt to delete configmap {matching_configmap_name} failed: {result.reason}")
-    elif len(matching_configmaps) > 1:
-        raise RuntimeError(f"Found more than the expected number of configmaps for {recipe_config.id}")
+    apply_configmap(k8s_client=k8s_client, configmap_manifest=configmap_manifest)
 
-    # TODO: There is no `apply_from_yaml`, but we really want to apply (i.e. declarative
-    # config instead of imperative; shouldn't have to delete a configmap and create it
-    # if it already exists).
-    utils.create_from_yaml(k8s_client, yaml_objects=[configmap_manifest])
     utils.create_from_yaml(k8s_client, yaml_objects=[job_manifest])
 
     print("Successfully submitted job.")
