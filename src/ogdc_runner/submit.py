@@ -5,24 +5,34 @@ from pathlib import Path
 import yaml
 from kubernetes import client, config, utils
 
-from ogdc_runner.recipe.simple import render_simple_recipe
-from ogdc_runner.recipe import get_recipe_config
-from ogdc_runner.jinja import j2_environment
 from ogdc_runner.constants import K8S_NAMESPACE
+from ogdc_runner.jinja import j2_environment
+from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.recipe.simple import render_simple_recipe
 
 
 def apply_configmap(*, k8s_client, configmap_manifest) -> None:
     api = client.CoreV1Api(k8s_client)
     listing = api.list_namespaced_config_map(namespace=K8S_NAMESPACE)
-    matching_configmaps = [configmap for configmap in listing.items if recipe_config.id in configmap.metadata.name]
+    matching_configmaps = [
+        configmap
+        for configmap in listing.items
+        if recipe_config.id in configmap.metadata.name
+    ]
     if len(matching_configmaps) == 1:
         matching_configmap_name = matching_configmaps[0].metadata.name
         print(f"Deleting existing configmap {matching_configmap_name}")
-        result = api.delete_namespaced_config_map(name=matching_configmap_name, namespace=K8S_NAMESPACE)
+        result = api.delete_namespaced_config_map(
+            name=matching_configmap_name, namespace=K8S_NAMESPACE
+        )
         if result.status != "Success":
-            raise RuntimeError(f"Attempt to delete configmap {matching_configmap_name} failed: {result.reason}")
+            raise RuntimeError(
+                f"Attempt to delete configmap {matching_configmap_name} failed: {result.reason}"
+            )
     elif len(matching_configmaps) > 1:
-        raise RuntimeError(f"Found more than the expected number of configmaps for {recipe_config.id}")
+        raise RuntimeError(
+            f"Found more than the expected number of configmaps for {recipe_config.id}"
+        )
     utils.create_from_yaml(k8s_client, yaml_objects=[configmap_manifest])
 
 
@@ -42,7 +52,9 @@ def submit_recipe(recipe_path: Path) -> None:
 
     # A Job executes the driver script on the cluster
     job_manifest_template = j2_environment.get_template("job.yml.j2")
-    job_manifest = yaml.safe_load(job_manifest_template.render(recipe_id=recipe_config.id))
+    job_manifest = yaml.safe_load(
+        job_manifest_template.render(recipe_id=recipe_config.id)
+    )
 
     # Load k8s config and create an API client instance.
     config.load_kube_config()

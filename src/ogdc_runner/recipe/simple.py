@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
 from ogdc_runner.jinja import j2_environment
-from ogdc_runner.recipe import get_recipe_config
 from ogdc_runner.models.recipe_config import RecipeConfig
+from ogdc_runner.recipe import get_recipe_config
 
 # TODO: get from envvar
 MOUNT_DIR = Path("/data")
