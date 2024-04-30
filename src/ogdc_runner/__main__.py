@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 
 from ogdc_runner.recipe.simple import render_simple_recipe
+from ogdc_runner.submit import submit_recipe
 
 # TODO: How do we handle e.g. GitHub URL to recipe?
 recipe_path = click.argument(
@@ -25,7 +26,9 @@ recipe_path = click.argument(
 @click.group
 def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
-    pass
+
+
+# TODO: config_cluster() subcommand?
 
 
 @cli.command
@@ -35,11 +38,11 @@ def render(recipe_path: Path) -> None:
 
     Useful for testing.
     """
-    render_simple_recipe(recipe_path)
+    print(render_simple_recipe(recipe_path))
 
 
 @cli.command
 @recipe_path
 def submit(recipe_path: Path) -> None:
     """Render and submit a recipe to OGDC for execution."""
-    raise NotImplementedError("Not yet!")
+    submit_recipe(recipe_path)

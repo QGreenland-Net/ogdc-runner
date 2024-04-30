@@ -1,6 +1,13 @@
-recipe = (
-  {{input_constructor}}({{input_constructor_arg}})
+{% extends "parsl_config.py.j2" %}
+
+{% block recipe %}
 {%- for cmd in commands %}
-  | CommandPTransform("""{{cmd}}""")
+        thing{{ loop.index }} = run_cmd(cmd="{{cmd.replace('"', '\\"')}}", stdout="/data/stdout{{ loop.index }}.txt", stderr="/data/stderr{{ loop.index }}.txt")
+        thing{{ loop.index }}.result()
+        print(f"Reading stdout{{ loop.index }} ({thing{{ loop.index }}.stdout}) from remote")
+        print(read_and_return(thing{{ loop.index }}.stdout).result())
+        print()
+        print(f"Reading stderr{{ loop.index }} ({thing{{ loop.index }}.stderr}) from remote")
+        print(read_and_return(thing{{ loop.index }}.stderr).result())
 {%- endfor %}
-)
+{% endblock %}

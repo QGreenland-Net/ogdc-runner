@@ -1,0 +1,84 @@
+import os
+
+from parsl.config import Config
+from parsl.executors import HighThroughputExecutor
+from parsl.providers import KubernetesProvider
+from parsl.addresses import address_by_route
+from parsl import bash_app, python_app
+import parsl
+import kubernetes
+
+
+def get_current_namespace():
+    """From: https://github.com/kubernetes-client/python/issues/363#issuecomment-1122471443"""
+    ns_path = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+    if os.path.exists(ns_path):
+        with open(ns_path) as f:
+            return f.read().strip()
+    try:
+        _, active_context = kubernetes.config.list_kube_config_contexts()
+        return active_context["context"]["namespace"]
+    except KeyError:
+        return "default"
+
+
+def get_parsl_config():
+    k8s_namespace = get_current_namespace()
+    print(f"Current namespace: {k8s_namespace}")
+
+    config = Config(
+        executors=[
+            HighThroughputExecutor(
+                # "htex" = high throughput executor
+                label="kube-htex",
+                cores_per_worker=1,
+                max_workers_per_node=1,
+                worker_logdir_root="/tmp/",
+                # Address for the pod worker to connect back to the "interchange"
+                address=address_by_route(),
+                # https://parsl.readthedocs.io/en/stable/stubs/parsl.providers.KubernetesProvider.html#parsl.providers.KubernetesProvider
+                provider=KubernetesProvider(
+                    namespace=k8s_namespace,
+                    # Docker image url to use for pods
+                    # TODO: support custom images
+                    image="ghcr.io/qgreenland-net/parsl-exploration:v0.2.0",
+                    # Should follow the Kubernetes naming rules
+                    pod_name="{{ recipe_id }}",
+                    nodes_per_block=1,
+                    init_blocks=1,
+                    # Maximum number of pods to scale up
+                    max_blocks=1,
+                    # list of tuples w/ the format: (PVC Name, Mount Directory)
+                    persistent_volumes=[("{{ pvc_name }}", "{{ mount_dir }}")],
+                ),
+            ),
+        ]
+    )
+
+    return config
+
+
+# App that writes a variable to a file
+@bash_app
+def run_cmd(
+    *,
+    cmd: str,
+    # TODO: figure out persistent logging
+    stdout="/data/stdout.txt",  # Requests Parsl to return the stdout
+    stderr="/data/stderr.txt",  # Requests Parsl to return the stderr
+):
+
+    return "micromamba run -n base " + cmd
+
+
+@python_app
+def read_and_return(fp):
+    with open(fp, "r") as f:
+        return f.read()
+
+
+if __name__ == "__main__":
+    config = get_parsl_config()
+    with parsl.load(config):
+        {%- block recipe %}
+        {%- endblock %}
