@@ -11,7 +11,7 @@ from ogdc_runner.recipe import get_recipe_config
 from ogdc_runner.recipe.simple import render_simple_recipe
 
 
-def apply_configmap(*, k8s_client, configmap_manifest) -> None:
+def apply_configmap(*, recipe_config, k8s_client, configmap_manifest) -> None:
     api = client.CoreV1Api(k8s_client)
     listing = api.list_namespaced_config_map(namespace=K8S_NAMESPACE)
     matching_configmaps = [
@@ -59,7 +59,7 @@ def submit_recipe(recipe_path: Path) -> None:
     # Load k8s config and create an API client instance.
     config.load_kube_config()
     k8s_client = client.ApiClient()
-    apply_configmap(k8s_client=k8s_client, configmap_manifest=configmap_manifest)
+    apply_configmap(recipe_config=recipe_config, k8s_client=k8s_client, configmap_manifest=configmap_manifest)
 
     utils.create_from_yaml(k8s_client, yaml_objects=[job_manifest])
 
