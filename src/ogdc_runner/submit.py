@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 from kubernetes import client, config, utils
@@ -9,9 +10,10 @@ from ogdc_runner.constants import K8S_NAMESPACE
 from ogdc_runner.jinja import j2_environment
 from ogdc_runner.recipe import get_recipe_config
 from ogdc_runner.recipe.simple import render_simple_recipe
+from ogdc_runner.models.recipe_config import RecipeConfig
 
 
-def apply_configmap(*, recipe_config, k8s_client, configmap_manifest) -> None:
+def apply_configmap(*, recipe_config: RecipeConfig, k8s_client: client.ApiClient, configmap_manifest: dict[str, Any]) -> None:
     api = client.CoreV1Api(k8s_client)
     listing = api.list_namespaced_config_map(namespace=K8S_NAMESPACE)
     matching_configmaps = [
