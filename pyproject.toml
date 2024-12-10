@@ -26,10 +26,8 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
   "click >=8",
-  "pyyaml",
-  "jinja2",
-  "kubernetes ~=29.0.0",
-  "pydantic ~=2.7.1",
+  "pydantic >=2.7.1",
+  "hera >=5.18.0",
 ]
 
 [project.optional-dependencies]
@@ -159,6 +157,7 @@ ignore = [
   "T201",     # `print` found
   "EM102",    # Exception must not use an f-string literal, assign to variable first
   "RET504",   # Unnecessary assignment before return statement
+  "SIM117",   # Use a single `with` statement with multiple contexts instead of nested `with` statements
 ]
 isort.required-imports = ["from __future__ import annotations"]
 # Uncomment if using a _compat.typing backport
