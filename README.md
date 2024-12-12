@@ -51,13 +51,13 @@ This component:
 - accepts a recipe as input and submits it to the OGDC for execution
 
 ```bash
-ogdc-runner /path/to/ogdc-recipes/my-recipe
+ogdc-runner submit /path/to/ogdc-recipes/my-recipe
 ```
 
 Or:
 
 ```bash
-ogdc-runner https://github.com/QGreenland-Net/ogdc-recipes/ my-recipe
+ogdc-runner submit https://github.com/QGreenland-Net/ogdc-recipes/ my-recipe
 ```
 
 ## Implementation notes

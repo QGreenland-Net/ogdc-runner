@@ -17,12 +17,12 @@ ARGO_WORKFLOW_SERVICE_URL = "http://localhost:2746"
 global_config.namespace = ARGO_NAMESPACE
 global_config.service_account_name = ARGO_SERVICE_ACCOUNT_NAME
 
-# TODO: this is dev-specific config.
+# TODO: this is dev-specific config!
 global_config.set_class_defaults(
     Container,
     image_pull_policy="Never",
 )
-global_config.image = "ogdc-gdal-runner"
+global_config.image = "ogdc-runner"
 
 ARGO_WORKFLOW_SERVICE = WorkflowsService(host=ARGO_WORKFLOW_SERVICE_URL)
 
