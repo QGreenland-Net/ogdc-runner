@@ -26,8 +26,9 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
   "click >=8",
-  "pydantic >=2.7.1",
   "hera >=5.18.0",
+  "pydantic >=2.7.1",
+  "pyyaml",
 ]
 
 [project.optional-dependencies]
