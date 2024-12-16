@@ -3,6 +3,7 @@ from __future__ import annotations
 from hera.shared import global_config
 from hera.workflows import (
     Container,
+    Workflow,
     WorkflowsService,
 )
 
@@ -34,3 +35,19 @@ def get_workflow_status(workflow_name: str) -> str | None:
     status: str | None = workflow.status.phase  # type: ignore[union-attr]
 
     return status
+
+
+def submit_workflow(workflow: Workflow) -> str:
+    """Submit the given workflow and return its name as a str."""
+    workflow.create()
+
+    workflow_name = workflow.name
+
+    # mypy seems to think that the workflow name might be `None`. I have not
+    # encountered this case, but maybe it would indicate a problem we should be
+    # aware of?
+    if workflow_name is None:
+        err_msg = "Problem with submitting workflow."
+        raise RuntimeError(err_msg)
+
+    return workflow_name
