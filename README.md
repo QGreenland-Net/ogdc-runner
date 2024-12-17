@@ -51,13 +51,13 @@ This component:
 - accepts a recipe as input and submits it to the OGDC for execution
 
 ```bash
-ogdc-runner /path/to/ogdc-recipes/my-recipe
+ogdc-runner submit /path/to/ogdc-recipes/my-recipe
 ```
 
 Or:
 
 ```bash
-ogdc-runner https://github.com/QGreenland-Net/ogdc-recipes/ my-recipe
+ogdc-runner submit https://github.com/QGreenland-Net/ogdc-recipes/ my-recipe
 ```
 
 ## Implementation notes
@@ -65,6 +65,11 @@ ogdc-runner https://github.com/QGreenland-Net/ogdc-recipes/ my-recipe
 - `ogdc-runner` could be a Python program
 - The trigger/status interface could be handled (transparently?) by a GitHub
   Actions self-hosted runner.
+
+## Contributing
+
+See [./docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md) for information about
+developing `ogdc-runner`.
 
 <!-- prettier-ignore-start -->
 [actions-badge]:            https://github.com/qgreenland-net/ogdc-runner/workflows/CI/badge.svg

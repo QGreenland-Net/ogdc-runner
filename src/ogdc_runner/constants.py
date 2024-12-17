@@ -4,6 +4,3 @@ from __future__ import annotations
 SIMPLE_RECIPE_FILENAME = "recipe.sh"
 # .yaml and .yml?
 RECIPE_CONFIG_FILENAME = "meta.yml"
-
-# Kubernetes namespace for workflows
-K8S_NAMESPACE = "qgnet"

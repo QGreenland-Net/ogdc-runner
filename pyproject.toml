@@ -26,10 +26,9 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
   "click >=8",
+  "hera >=5.18.0",
+  "pydantic >=2.7.1",
   "pyyaml",
-  "jinja2",
-  "kubernetes ~=29.0.0",
-  "pydantic ~=2.7.1",
 ]
 
 [project.optional-dependencies]

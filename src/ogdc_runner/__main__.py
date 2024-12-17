@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import click
 
-from ogdc_runner.recipe.simple import render_simple_recipe
-from ogdc_runner.submit import submit_recipe
+from ogdc_runner.argo import get_workflow_status
+from ogdc_runner.recipe.simple import run_simple_workflow
 
 # TODO: How do we handle e.g. GitHub URL to recipe?
 recipe_path = click.argument(
@@ -28,21 +29,44 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
-# TODO: config_cluster() subcommand?
-
-
-@cli.command
-@recipe_path
-def render(recipe_path: Path) -> None:
-    """Render a recipe, but don't submit it.
-
-    Useful for testing.
-    """
-    print(render_simple_recipe(recipe_path))
+def _submit_workflow(recipe_path: Path) -> str:
+    workflow_name = run_simple_workflow(
+        recipe_dir=recipe_path,
+    )
+    print(f"Successfully submitted recipe with workflow name {workflow_name}")
+    return workflow_name
 
 
 @cli.command
 @recipe_path
 def submit(recipe_path: Path) -> None:
+    """Submit a recipe to OGDC for execution."""
+    _submit_workflow(recipe_path)
+
+
+@cli.command
+@click.argument(
+    "workflow_name",
+    required=True,
+    type=str,
+)
+def check_workflow_status(workflow_name: str) -> None:
     """Render and submit a recipe to OGDC for execution."""
-    submit_recipe(recipe_path)
+    status = get_workflow_status(workflow_name)
+    print(f"Workflow {workflow_name} has status {status}.")
+
+
+@cli.command
+@recipe_path
+def submit_and_wait(recipe_path: Path) -> None:
+    """Submit a recipe to OGDC for execution and wait until completion."""
+    workflow_name = _submit_workflow(recipe_path)
+
+    while True:
+        status = get_workflow_status(workflow_name)
+        if status:
+            print(f"Workflow status: {status}")
+            # Terminal states
+            if status in ("Succeeded", "Failed"):
+                break
+        time.sleep(5)

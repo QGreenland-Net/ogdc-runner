@@ -1,8 +1,0 @@
-kind: "ConfigMap"
-apiVersion: "v1"
-metadata:
-  name: "ogdc-recipe.{{ recipe_id }}"
-  namespace: "qgnet"
-data:
-  parsl_driver_script.py: |
-{{ driver_script | indent(width=4, first=True) }}
