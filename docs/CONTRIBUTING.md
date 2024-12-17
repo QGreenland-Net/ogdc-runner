@@ -7,7 +7,12 @@ description of best practices for developing scientific packages.
 
 ## Setting up a development environment manually
 
-You can set up a development environment by running:
+First, ensure you have [ogdc-argo](https://github.com/QGreenland-Net/ogdc-argo)
+setup for development. The argo server ports are expected to be forwarded for
+access via localhost.
+
+Now you can set up a python development environment for `ogdc-runner` by
+running:
 
 ```bash
 python -m venv .venv
