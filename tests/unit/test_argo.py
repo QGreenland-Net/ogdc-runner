@@ -18,9 +18,9 @@ def test__configure_argo_settings_envvar_override(monkeypatch):
 
     workflow_service = _configure_argo_settings()
 
-    assert workflow_service.host[0] == "argo_workflows_service_url_test"
-    assert global_config.namespace[0] == "argo_namespace_test"
-    assert global_config.service_account_name[0] == "argo_service_account_name_test"
+    assert workflow_service.host == "argo_workflows_service_url_test"
+    assert global_config.namespace == "argo_namespace_test"
+    assert global_config.service_account_name == "argo_service_account_name_test"
     assert (
         global_config.image
         == "ghcr.io/qgreenland-net/ogdc-runner:ogdc_runner_image_tag_test"

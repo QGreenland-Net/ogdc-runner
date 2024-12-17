@@ -31,12 +31,12 @@ def _configure_argo_settings() -> WorkflowsService:
     """
 
     # set argo constants from envvars, falling back on dev settings
-    argo_namespace = (os.environ.get("ARGO_NAMESPACE", "argo-helm"),)
-    argo_service_account_name = (
-        os.environ.get("ARGO_SERVICE_ACCOUNT_NAME", "argo-workflow"),
+    argo_namespace = os.environ.get("ARGO_NAMESPACE", "argo-helm")
+    argo_service_account_name = os.environ.get(
+        "ARGO_SERVICE_ACCOUNT_NAME", "argo-workflow"
     )
-    argo_workflows_service_url = (
-        os.environ.get("ARGO_WORKFLOWS_SERVICE_URL", "http://localhost:2746"),
+    argo_workflows_service_url = os.environ.get(
+        "ARGO_WORKFLOWS_SERVICE_URL", "http://localhost:2746"
     )
     ogdc_runner_image_tag = os.environ.get("OGDC_RUNNER_IMAGE_TAG", "latest")
 
