@@ -25,6 +25,23 @@ pip install -v --editable .[dev]
 To use the CLI to run simple ogdc recipes with argo:
 
 ```
+$ ogdc-runner submit-and-wait ~/code/ogdc-recipes/recipes/seal-tags/
+Successfully submitted recipe with workflow name seal-tags-6gxfw
+Workflow status: Running
+Workflow status: Running
+Workflow status: Running
+Workflow status: Succeeded
+```
+
+### Using a local docker image for workflow execution
+
+The `ogdc-runner` supports using a local `ogdc-runner` image for development
+purposes (e.g., you want to change and test something about the image without
+needing to release it to the GHCR).
+
+First, build a local image:
+
+```
 docker build . -t ogdc-runner
 ```
 
@@ -32,15 +49,11 @@ docker build . -t ogdc-runner
 > that it is available to the Argo deployment on the developer's local machine.
 > Check that you have the correct context selected with `docker context ls`.
 
-Now use the CLI to submit a simple ogdc recipe:
+Next, set the `ENVIRONMENT` envvar to `dev`. This will tell `ogdc-runner` to use
+the locally built image instead of the one hosted on the GHCR:
 
 ```
-$ ogdc-runner submit-and-wait ~/code/ogdc-recipes/recipes/seal-tags/
-Successfully submitted recipe with workflow name seal-tags-6gxfw
-Workflow status: Running
-Workflow status: Running
-Workflow status: Running
-Workflow status: Succeeded
+export ENNVIRONMENT=dev
 ```
 
 ## Testing, linting, rendering docs with Nox
