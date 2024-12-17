@@ -66,6 +66,11 @@ ogdc-runner submit https://github.com/QGreenland-Net/ogdc-recipes/ my-recipe
 - The trigger/status interface could be handled (transparently?) by a GitHub
   Actions self-hosted runner.
 
+## Contributing
+
+See [./docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md) for information about
+developing `ogdc-runner`.
+
 <!-- prettier-ignore-start -->
 [actions-badge]:            https://github.com/qgreenland-net/ogdc-runner/workflows/CI/badge.svg
 [actions-link]:             https://github.com/qgreenland-net/ogdc-runner/actions
