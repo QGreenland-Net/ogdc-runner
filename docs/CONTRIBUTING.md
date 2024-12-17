@@ -24,9 +24,6 @@ pip install -v --editable .[dev]
 
 To use the CLI to run simple ogdc recipes with argo:
 
-- Build the `ogdc-runner` docker image (TODO: add GHA for building and pushing
-  to ghcr!):
-
 ```
 docker build . -t ogdc-runner
 ```
