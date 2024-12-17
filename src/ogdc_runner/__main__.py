@@ -5,8 +5,8 @@ from pathlib import Path
 
 import click
 
-from ogdc_runner.argo import get_workflow_status
-from ogdc_runner.recipe.simple import run_simple_workflow
+from ogdc_runner.argo import get_workflow_status, submit_workflow
+from ogdc_runner.recipe.simple import make_simple_workflow
 
 # TODO: How do we handle e.g. GitHub URL to recipe?
 recipe_path = click.argument(
@@ -30,9 +30,10 @@ def cli() -> None:
 
 
 def _submit_workflow(recipe_path: Path) -> str:
-    workflow_name = run_simple_workflow(
+    workflow = make_simple_workflow(
         recipe_dir=recipe_path,
     )
+    workflow_name = submit_workflow(workflow)
     print(f"Successfully submitted recipe with workflow name {workflow_name}")
     return workflow_name
 

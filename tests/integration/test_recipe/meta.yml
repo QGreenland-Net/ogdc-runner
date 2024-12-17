@@ -1,0 +1,6 @@
+name: "Test argo workflow"
+id: "test-wargo-workflow"
+input:
+  url: "https://raw.githubusercontent.com/nsidc/qgreenland/refs/heads/main/qgreenland/assets/arctic_circle.geojson"
+output:
+  dataone_id: "TODO"

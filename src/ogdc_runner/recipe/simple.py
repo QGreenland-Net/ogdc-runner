@@ -64,7 +64,7 @@ def _cmds_from_simple_recipe(recipe_dir: Path) -> list[str]:
     return commands
 
 
-def run_simple_workflow(recipe_dir: Path) -> str:
+def make_simple_workflow(recipe_dir: Path) -> Workflow:
     """Run the workflow and return its name as a str."""
     commands = _cmds_from_simple_recipe(recipe_dir)
     recipe_config = get_recipe_config(recipe_dir)
@@ -87,14 +87,4 @@ def run_simple_workflow(recipe_dir: Path) -> str:
                     arguments=step.get_artifact("output-dir").with_name("input-dir"),  # type: ignore[union-attr]
                 )
 
-    w.create()
-
-    workflow_name = w.name
-
-    # mypy seems to think that the workflow name might be `None`. I have not
-    # encountered this case, but maybe it would indicate a problem we should be
-    # aware of?
-    if workflow_name is None:
-        raise RuntimeError(f"Problem with submitting workflow for recipe {recipe_dir}.")
-
-    return workflow_name
+    return w
