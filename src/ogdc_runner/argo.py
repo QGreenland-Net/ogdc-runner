@@ -31,7 +31,7 @@ def _configure_argo_settings() -> WorkflowsService:
     """
 
     # set argo constants from envvars, falling back on dev settings
-    argo_namespace = os.environ.get("ARGO_NAMESPACE", "argo-helm")
+    argo_namespace = os.environ.get("ARGO_NAMESPACE", "qgnet")
     argo_service_account_name = os.environ.get(
         "ARGO_SERVICE_ACCOUNT_NAME", "argo-workflow"
     )
