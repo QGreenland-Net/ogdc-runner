@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import tempfile
+import subprocess
 import time
 from pathlib import Path
 
@@ -9,6 +12,10 @@ from ogdc_runner.argo import get_workflow_status, submit_workflow
 from ogdc_runner.recipe.simple import make_simple_workflow
 
 # TODO: How do we handle e.g. GitHub URL to recipe?
+# handling github by
+# checking ig path is a URL
+# fetch the file into a temporary directory
+# use that as a local path for submission
 recipe_path = click.argument(
     "recipe_path",
     required=True,
