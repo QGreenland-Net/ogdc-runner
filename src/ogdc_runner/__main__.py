@@ -13,13 +13,13 @@ from ogdc_runner.argo import get_workflow_status, submit_workflow
 from ogdc_runner.recipe.simple import make_simple_workflow
 
 
-# TODO: How do we handle e.g. GitHub URL to recipe?
 # handling github by
 # checking if path is a URL
 def is_url(recipe_path):
     """ Check if the path is a valid URL."""
     parsed = urlparse(recipe_path)
     return parsed.scheme in ('http', 'https') and parsed.netloc != ''
+
 
 def convert_url_to_ssh(recipe_path):
     """ Convert https github url to ssh format."""
@@ -29,6 +29,7 @@ def convert_url_to_ssh(recipe_path):
     # extract just the repo path
     repo_path = parsed.path.lstrip("/")  
     return f"git@github.com:{repo_path}.git"
+
 
 def clone_repo(ssh_url):
     """Clone the repository into a temporary directory."""
@@ -57,7 +58,8 @@ recipe_path = click.argument(
 recipe_name = click.argument(
     "recipe_name",
     required=False,
-    type = str)
+    type = str
+)
 
 
 @click.group
@@ -101,7 +103,8 @@ def check_workflow_status(workflow_name: str) -> None:
 
 @cli.command
 @recipe_path
-def submit_and_wait(recipe_path: Path) -> None:
+@recipe_name
+def submit_and_wait(recipe_path, recipe_name=None) -> None:
     """Submit a recipe to OGDC for execution and wait until completion."""
     workflow_name = _submit_workflow(recipe_path)
 
