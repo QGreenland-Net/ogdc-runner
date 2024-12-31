@@ -40,6 +40,16 @@ def clone_repo(ssh_url):
     except subprocess.CalledProcessError as e:
         print(f"Error cloning repository: {e}")
 
+def get_recipe_path_from_name(temp_dir, recipe_name) -> Path:
+    """Constructs the path to the recipe folder in the temporary directory."""
+    breakpoint()
+    recipe_path = os.path.join(temp_dir, 'ogdc-recipes', 'recipes', recipe_name)
+    breakpoint()
+    if os.path.exists(recipe_path):
+        return recipe_path
+    else: 
+        raise FileNotFoundError(f"Recipe folder '{recipe_path}' does not exist.")
+
 # use that as a local path for submission
 # need to figure out how to best do this for if its a url - this is a temporary solution
 recipe_path = click.argument(
@@ -67,11 +77,13 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
-def _submit_workflow(recipe_path) -> str:
+def _submit_workflow(recipe_path, recipe_name=None) -> str:
     if is_url(recipe_path):
         print(f"Detected URL: {recipe_path}. Cloning repository...")
         ssh_url = convert_url_to_ssh(recipe_path)
-        clone_repo(ssh_url)
+        temp_dir = clone_repo(ssh_url)
+        recipe_path = get_recipe_path_from_name(temp_dir, recipe_name)
+        breakpoint()
     else: 
         workflow = make_simple_workflow(
             recipe_dir=recipe_path,
