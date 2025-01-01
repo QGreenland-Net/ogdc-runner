@@ -22,14 +22,14 @@ jobs:
         "${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}"
     steps:
       - name: "Check out repository"
-        uses: "actions/checkout@v3"
+        uses: "actions/checkout@v4"
 
       - name: "Build container image"
         run: |
           docker build --tag "ghcr.io/qgreenland-net/${IMAGE_NAME}:${IMAGE_TAG}" .
 
       - name: "GHCR login"
-        uses: "docker/login-action@v2"
+        uses: "docker/login-action@v3"
         with:
           registry: "ghcr.io"
           username: "${{ github.repository_owner }}"
