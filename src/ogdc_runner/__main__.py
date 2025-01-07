@@ -26,7 +26,7 @@ def format_url(recipe_path):
     base_url = recipe_path.replace("https://github.com/", "")
 
     components = base_url.split("/")
-    owner = f"{components[0]}/{components[1]}"
+    owner = (f"{components[0]}:{components[1]}".lower())
     branch = components[3]
     file_path = "/".join(components[4:])
 
