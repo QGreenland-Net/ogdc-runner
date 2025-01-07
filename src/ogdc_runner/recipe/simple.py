@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import fsspec
 from pathlib import Path
 
+import fsspec
 from hera.workflows import (
     Artifact,
     Container,
@@ -56,12 +56,15 @@ def _cmds_from_simple_recipe(recipe_dir: str) -> list[str]:
         * `/output_dir/`: output written by each command. It is expected that
           each command in a simple recipe will place data in `/output_dir/`.
     """
-    recipe_path = recipe_dir + '/' + SIMPLE_RECIPE_FILENAME
+    recipe_path = recipe_dir + "/" + SIMPLE_RECIPE_FILENAME
     # read the commands from the recipe
-    if 'github' in recipe_path:
-        fs = fsspec.filesystem("github", org='QGreenland-Net', repo='ogdc-recipes')
-        with fs.open(recipe_path, "rt") as f:
-            lines = f.read().split("\n")
+    if "github" in recipe_path:
+        fs = fsspec.filesystem("github", org="QGreenland-Net", repo="ogdc-recipes")
+        try:
+            with fs.open(recipe_path, "rt") as f:
+                lines = f.read().split("\n")
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File not found at: {recipe_path}")
     else:
         lines = (Path(recipe_path)).read_text().split("\n")
     # Filter out comments. We assume all other lines are bash commands.
@@ -71,7 +74,7 @@ def _cmds_from_simple_recipe(recipe_dir: str) -> list[str]:
     return commands
 
 
-def make_simple_workflow(recipe_dir: str) -> Workflow:
+def make_simple_workflow(recipe_dir: str | Path) -> Workflow:
     """Run the workflow and return its name as a str."""
     commands = _cmds_from_simple_recipe(recipe_dir)
     recipe_config = get_recipe_config(recipe_dir)

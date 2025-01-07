@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import subprocess
-import tempfile
 import time
-import fsspec
+from pathlib import Path
 from urllib.parse import urlparse
 
 import click
@@ -14,19 +12,20 @@ from ogdc_runner.recipe.simple import make_simple_workflow
 
 # handling github by
 # checking if path is a URL
-def is_url(recipe_path):
+def is_url(recipe_path: str):
     """Check if the path is a valid URL."""
     parsed = urlparse(recipe_path)
     return parsed.scheme in ("http", "https") and parsed.netloc != ""
 
-def format_url(recipe_path):
+
+def format_url(recipe_path: str):
     if "https://github.com/" not in recipe_path:
         return "Invalid GitHub URL"
     # remove first part of URL
     base_url = recipe_path.replace("https://github.com/", "")
 
     components = base_url.split("/")
-    owner = (f"{components[0]}:{components[1]}".lower())
+    owner = f"{components[0]}:{components[1]}".lower()
     branch = components[3]
     file_path = "/".join(components[4:])
 
@@ -50,7 +49,6 @@ recipe_path = click.argument(
     #     path_type=Path,
     # ),
 )
-# recipe_name = click.argument("recipe_name", required=False, type=str)
 
 
 @click.group
@@ -58,7 +56,7 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
-def _submit_workflow(recipe_path) -> str:
+def _submit_workflow(recipe_path: str | Path) -> str:
     if is_url(recipe_path):
         recipe_path = format_url(recipe_path)
 
@@ -72,7 +70,7 @@ def _submit_workflow(recipe_path) -> str:
 
 @cli.command
 @recipe_path
-def submit(recipe_path) -> None:
+def submit(recipe_path: str | Path) -> None:
     """Submit a recipe to OGDC for execution."""
     _submit_workflow(recipe_path)
 
@@ -91,7 +89,7 @@ def check_workflow_status(workflow_name: str) -> None:
 
 @cli.command
 @recipe_path
-def submit_and_wait(recipe_path) -> None:
+def submit_and_wait(recipe_path: str | Path) -> None:
     """Submit a recipe to OGDC for execution and wait until completion."""
     workflow_name = _submit_workflow(recipe_path)
 
