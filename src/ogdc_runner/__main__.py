@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from typing import Union
 from urllib.parse import urlparse
 
 import click
@@ -56,10 +57,9 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
-def _submit_workflow(recipe_path: str | Path) -> str:
+def _submit_workflow(recipe_path: str) -> str:
     if is_url(recipe_path):
         recipe_path = format_url(recipe_path)
-
     workflow = make_simple_workflow(
         recipe_dir=recipe_path,
     )
@@ -70,7 +70,7 @@ def _submit_workflow(recipe_path: str | Path) -> str:
 
 @cli.command
 @recipe_path
-def submit(recipe_path: str | Path) -> None:
+def submit(recipe_path: str) -> None:
     """Submit a recipe to OGDC for execution."""
     _submit_workflow(recipe_path)
 
@@ -89,7 +89,7 @@ def check_workflow_status(workflow_name: str) -> None:
 
 @cli.command
 @recipe_path
-def submit_and_wait(recipe_path: str | Path) -> None:
+def submit_and_wait(recipe_path: str) -> None:
     """Submit a recipe to OGDC for execution and wait until completion."""
     workflow_name = _submit_workflow(recipe_path)
 

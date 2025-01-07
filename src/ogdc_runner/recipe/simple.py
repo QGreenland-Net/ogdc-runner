@@ -69,12 +69,11 @@ def _cmds_from_simple_recipe(recipe_dir: str) -> list[str]:
         lines = (Path(recipe_path)).read_text().split("\n")
     # Filter out comments. We assume all other lines are bash commands.
     commands = [line for line in lines if line and not line.startswith("#")]
-    print(commands)
 
     return commands
 
 
-def make_simple_workflow(recipe_dir: str | Path) -> Workflow:
+def make_simple_workflow(recipe_dir: str) -> Workflow:
     """Run the workflow and return its name as a str."""
     commands = _cmds_from_simple_recipe(recipe_dir)
     recipe_config = get_recipe_config(recipe_dir)
