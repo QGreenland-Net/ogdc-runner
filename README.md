@@ -57,7 +57,7 @@ ogdc-runner submit /path/to/ogdc-recipes/my-recipe
 Or:
 
 ```bash
-ogdc-runner submit https://github.com/QGreenland-Net/ogdc-recipes/ my-recipe
+ogdc-runner submit https://github.com/QGreenland-Net/ogdc-recipes/my-recipe
 ```
 
 ## Implementation notes

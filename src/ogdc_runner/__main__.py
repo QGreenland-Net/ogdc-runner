@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import os
-import tempfile
 import subprocess
+import tempfile
 import time
-from pathlib import Path
+import fsspec
 from urllib.parse import urlparse
 
 import click
@@ -16,42 +15,14 @@ from ogdc_runner.recipe.simple import make_simple_workflow
 # handling github by
 # checking if path is a URL
 def is_url(recipe_path):
-    """ Check if the path is a valid URL."""
+    """Check if the path is a valid URL."""
     parsed = urlparse(recipe_path)
-    return parsed.scheme in ('http', 'https') and parsed.netloc != ''
+    return parsed.scheme in ("http", "https") and parsed.netloc != ""
 
-
-def convert_url_to_ssh(recipe_path):
-    """ Convert https github url to ssh format."""
-    parsed = urlparse(recipe_path)
-    if parsed.scheme != "https" or "github.com" not in parsed.netloc:
-        raise ValueError("Invalid GitHub HTTPS URL")
-    # extract just the repo path
-    repo_path = parsed.path.lstrip("/")  
-    return f"git@github.com:{repo_path}.git"
-
-
-def clone_repo(ssh_url):
-    """Clone the repository into a temporary directory."""
-    temp_dir = tempfile.mkdtemp()
-    try:
-        subprocess.run(['git', 'clone', ssh_url, temp_dir], check=True)
-        return temp_dir
-    except subprocess.CalledProcessError as e:
-        print(f"Error cloning repository: {e}")
-
-def get_recipe_path_from_name(temp_dir, recipe_name) -> Path:
-    """Constructs the path to the recipe folder in the temporary directory."""
-    breakpoint()
-    recipe_path = os.path.join(temp_dir, 'ogdc-recipes', 'recipes', recipe_name)
-    breakpoint()
-    if os.path.exists(recipe_path):
-        return recipe_path
-    else: 
-        raise FileNotFoundError(f"Recipe folder '{recipe_path}' does not exist.")
 
 # use that as a local path for submission
 # need to figure out how to best do this for if its a url - this is a temporary solution
+# will likely change this to string
 recipe_path = click.argument(
     "recipe_path",
     required=True,
@@ -65,11 +36,7 @@ recipe_path = click.argument(
     #     path_type=Path,
     # ),
 )
-recipe_name = click.argument(
-    "recipe_name",
-    required=False,
-    type = str
-)
+# recipe_name = click.argument("recipe_name", required=False, type=str)
 
 
 @click.group
@@ -77,14 +44,7 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
-def _submit_workflow(recipe_path, recipe_name=None) -> str:
-    if is_url(recipe_path):
-        print(f"Detected URL: {recipe_path}. Cloning repository...")
-        ssh_url = convert_url_to_ssh(recipe_path)
-        temp_dir = clone_repo(ssh_url)
-        recipe_path = get_recipe_path_from_name(temp_dir, recipe_name)
-        breakpoint()
-    else: 
+def _submit_workflow(recipe_path) -> str:
         workflow = make_simple_workflow(
             recipe_dir=recipe_path,
         )
@@ -95,8 +55,7 @@ def _submit_workflow(recipe_path, recipe_name=None) -> str:
 
 @cli.command
 @recipe_path
-@recipe_name
-def submit(recipe_path, recipe_name=None) -> None:
+def submit(recipe_path) -> None:
     """Submit a recipe to OGDC for execution."""
     _submit_workflow(recipe_path)
 
@@ -115,8 +74,7 @@ def check_workflow_status(workflow_name: str) -> None:
 
 @cli.command
 @recipe_path
-@recipe_name
-def submit_and_wait(recipe_path, recipe_name=None) -> None:
+def submit_and_wait(recipe_path) -> None:
     """Submit a recipe to OGDC for execution and wait until completion."""
     workflow_name = _submit_workflow(recipe_path)
 
