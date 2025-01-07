@@ -46,7 +46,7 @@ def _make_fetch_url_template(recipe_config: RecipeConfig) -> Container:
     return template
 
 
-def _cmds_from_simple_recipe(recipe_dir: Path) -> list[str]:
+def _cmds_from_simple_recipe(recipe_dir: str) -> list[str]:
     """Read commands from a 'simple' OGDC recipe.
 
     'simple' OGDC recipes are `.sh` files containing bash commands. Commands can
@@ -55,7 +55,8 @@ def _cmds_from_simple_recipe(recipe_dir: Path) -> list[str]:
         * `/output_dir/`: output written by each command. It is expected that
           each command in a simple recipe will place data in `/output_dir/`.
     """
-    recipe_path = recipe_dir / SIMPLE_RECIPE_FILENAME
+    recipe_path = recipe_dir + '/' + SIMPLE_RECIPE_FILENAME
+    print(recipe_path)
     # read the commands from the recipe
     lines = recipe_path.read_text().split("\n")
     # Filter out comments. We assume all other lines are bash commands.

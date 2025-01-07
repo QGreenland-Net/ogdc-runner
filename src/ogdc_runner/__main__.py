@@ -19,6 +19,20 @@ def is_url(recipe_path):
     parsed = urlparse(recipe_path)
     return parsed.scheme in ("http", "https") and parsed.netloc != ""
 
+def format_url(recipe_path):
+    if "https://github.com/" not in recipe_path:
+        return "Invalid GitHub URL"
+    # remove first part of URL
+    base_url = recipe_path.replace("https://github.com/", "")
+
+    components = base_url.split("/")
+    owner = f"{components[0]}/{components[1]}"
+    branch = components[3]
+    file_path = "/".join(components[4:])
+
+    fsspec_format = f"github://{owner}@{branch}/{file_path}"
+    return fsspec_format
+
 
 # use that as a local path for submission
 # need to figure out how to best do this for if its a url - this is a temporary solution
@@ -45,12 +59,15 @@ def cli() -> None:
 
 
 def _submit_workflow(recipe_path) -> str:
-        workflow = make_simple_workflow(
-            recipe_dir=recipe_path,
-        )
-        workflow_name = submit_workflow(workflow)
-        print(f"Successfully submitted recipe with workflow name {workflow_name}")
-        return workflow_name
+    if is_url(recipe_path):
+        recipe_path = format_url(recipe_path)
+
+    workflow = make_simple_workflow(
+        recipe_dir=recipe_path,
+    )
+    workflow_name = submit_workflow(workflow)
+    print(f"Successfully submitted recipe with workflow name {workflow_name}")
+    return workflow_name
 
 
 @cli.command
