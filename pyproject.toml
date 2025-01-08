@@ -4,6 +4,7 @@ authors = [
   { name = "Matt Fisher", email = "mfisher87@gmail.com" },
   { name = "Rushiraj Nenuji", email = "nenuji@nceas.ucsb.edu" },
   { name = "Trey Stafford", email = "trey.stafford@colorado.edu" },
+  { name = "Robyn Marowitz", email = "robyn.marowitz@colorado.edu" },
 ]
 description = "Defines OGDC recipe API(s) and submits recipes to OGDC for execution"
 readme = "README.md"

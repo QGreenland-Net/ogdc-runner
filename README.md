@@ -57,7 +57,7 @@ ogdc-runner submit /path/to/ogdc-recipes/my-recipe
 Or:
 
 ```bash
-ogdc-runner submit https://github.com/QGreenland-Net/ogdc-recipes/my-recipe
+ogdc-runner submit github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags
 ```
 
 ## Implementation notes
