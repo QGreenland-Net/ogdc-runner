@@ -1,26 +1,17 @@
 from __future__ import annotations
 
 import time
-from pathlib import Path
 
 import click
 
 from ogdc_runner.argo import get_workflow_status, submit_workflow
 from ogdc_runner.recipe.simple import make_simple_workflow
 
-# TODO: How do we handle e.g. GitHub URL to recipe?
 recipe_path = click.argument(
     "recipe_path",
     required=True,
-    metavar="PATH",
-    type=click.Path(
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-        readable=True,
-        resolve_path=True,
-        path_type=Path,
-    ),
+    metavar="RECIPE-PATH",
+    type=str,
 )
 
 
@@ -29,7 +20,7 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
-def _submit_workflow(recipe_path: Path) -> str:
+def _submit_workflow(recipe_path: str) -> str:
     workflow = make_simple_workflow(
         recipe_dir=recipe_path,
     )
@@ -40,8 +31,13 @@ def _submit_workflow(recipe_path: Path) -> str:
 
 @cli.command
 @recipe_path
-def submit(recipe_path: Path) -> None:
-    """Submit a recipe to OGDC for execution."""
+def submit(recipe_path: str) -> None:
+    """
+    Submit a recipe to OGDC for execution.
+
+    RECIPE-PATH: Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
+    or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
+    """
     _submit_workflow(recipe_path)
 
 
@@ -59,8 +55,13 @@ def check_workflow_status(workflow_name: str) -> None:
 
 @cli.command
 @recipe_path
-def submit_and_wait(recipe_path: Path) -> None:
-    """Submit a recipe to OGDC for execution and wait until completion."""
+def submit_and_wait(recipe_path: str) -> None:
+    """
+    Submit a recipe to OGDC for execution and wait until completion.
+
+    RECIPE-PATH: Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
+    or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
+    """
     workflow_name = _submit_workflow(recipe_path)
 
     while True:

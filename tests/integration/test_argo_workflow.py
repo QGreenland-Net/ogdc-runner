@@ -11,7 +11,7 @@ from pathlib import Path
 from ogdc_runner.argo import ARGO_WORKFLOW_SERVICE
 from ogdc_runner.recipe.simple import make_simple_workflow
 
-SIMPLE_RECIPE_TEST_PATH = Path(__file__).parent / "test_recipe"
+SIMPLE_RECIPE_TEST_PATH = str(Path(__file__).parent / "test_recipe")
 
 
 def test_simple_argo_workflow():

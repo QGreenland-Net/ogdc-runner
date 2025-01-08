@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-
+import fsspec
 from hera.workflows import (
     Artifact,
     Container,
@@ -46,7 +45,7 @@ def _make_fetch_url_template(recipe_config: RecipeConfig) -> Container:
     return template
 
 
-def _cmds_from_simple_recipe(recipe_dir: Path) -> list[str]:
+def _cmds_from_simple_recipe(recipe_dir: str) -> list[str]:
     """Read commands from a 'simple' OGDC recipe.
 
     'simple' OGDC recipes are `.sh` files containing bash commands. Commands can
@@ -55,16 +54,17 @@ def _cmds_from_simple_recipe(recipe_dir: Path) -> list[str]:
         * `/output_dir/`: output written by each command. It is expected that
           each command in a simple recipe will place data in `/output_dir/`.
     """
-    recipe_path = recipe_dir / SIMPLE_RECIPE_FILENAME
-    # read the commands from the recipe
-    lines = recipe_path.read_text().split("\n")
-    # Filter out comments. We assume all other lines are bash commands.
+    recipe_path = f"{recipe_dir}/{SIMPLE_RECIPE_FILENAME}"
+    print(f"Reading recipe from {recipe_path}")
+
+    with fsspec.open(recipe_path, "rt") as f:
+        lines = f.read().split("\n")
     commands = [line for line in lines if line and not line.startswith("#")]
 
     return commands
 
 
-def make_simple_workflow(recipe_dir: Path) -> Workflow:
+def make_simple_workflow(recipe_dir: str) -> Workflow:
     """Run the workflow and return its name as a str."""
     commands = _cmds_from_simple_recipe(recipe_dir)
     recipe_config = get_recipe_config(recipe_dir)
