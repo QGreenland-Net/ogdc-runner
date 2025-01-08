@@ -5,6 +5,8 @@ description of best practices for developing scientific packages.
 
 [spc-dev-intro]: https://learn.scientific-python.org/development/
 
+> [!NOTE] Add yourself as an author in [pyproject.toml](./pyproject.toml)
+
 ## Setting up a development environment manually
 
 First, ensure you have [ogdc-helm](https://github.com/QGreenland-Net/ogdc-helm)

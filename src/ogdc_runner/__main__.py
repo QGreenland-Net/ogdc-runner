@@ -12,6 +12,8 @@ recipe_path = click.argument(
     required=True,
     metavar="PATH",
     type=str,
+    help="Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags') "
+    "or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').",
 )
 
 
