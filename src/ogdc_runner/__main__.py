@@ -11,15 +11,14 @@ from ogdc_runner.argo import get_workflow_status, submit_workflow
 from ogdc_runner.recipe.simple import make_simple_workflow
 
 
-# handling github by
 # checking if path is a URL
-def is_url(recipe_path: str):
+def is_url(recipe_path: str) -> bool:
     """Check if the path is a valid URL."""
     parsed = urlparse(recipe_path)
     return parsed.scheme in ("http", "https") and parsed.netloc != ""
 
 
-def format_url(recipe_path: str):
+def format_url(recipe_path: str) -> str:
     if "https://github.com/" not in recipe_path:
         return "Invalid GitHub URL"
     # remove first part of URL
