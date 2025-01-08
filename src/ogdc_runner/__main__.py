@@ -10,10 +10,8 @@ from ogdc_runner.recipe.simple import make_simple_workflow
 recipe_path = click.argument(
     "recipe_path",
     required=True,
-    metavar="PATH",
+    metavar="RECIPE-PATH",
     type=str,
-    help="Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags') "
-    "or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').",
 )
 
 
@@ -34,7 +32,12 @@ def _submit_workflow(recipe_path: str) -> str:
 @cli.command
 @recipe_path
 def submit(recipe_path: str) -> None:
-    """Submit a recipe to OGDC for execution."""
+    """
+    Submit a recipe to OGDC for execution.
+
+    RECIPE-PATH: Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
+    or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
+    """
     _submit_workflow(recipe_path)
 
 
@@ -53,7 +56,12 @@ def check_workflow_status(workflow_name: str) -> None:
 @cli.command
 @recipe_path
 def submit_and_wait(recipe_path: str) -> None:
-    """Submit a recipe to OGDC for execution and wait until completion."""
+    """
+    Submit a recipe to OGDC for execution and wait until completion.
+
+    RECIPE-PATH: Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
+    or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
+    """
     workflow_name = _submit_workflow(recipe_path)
 
     while True:

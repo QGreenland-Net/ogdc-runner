@@ -57,13 +57,8 @@ def _cmds_from_simple_recipe(recipe_dir: str) -> list[str]:
     recipe_path = f"{recipe_dir}/{SIMPLE_RECIPE_FILENAME}"
     print(f"Reading recipe from {recipe_path}")
 
-    try:
-        with fsspec.open(recipe_path, "rt") as f:
-            lines = f.read().split("\n")
-    except FileNotFoundError as err:
-        raise FileNotFoundError(f"File not found at: {recipe_path}") from err
-
-    # Filter out comments. We assume all other lines are bash commands.
+    with fsspec.open(recipe_path, "rt") as f:
+        lines = f.read().split("\n")
     commands = [line for line in lines if line and not line.startswith("#")]
 
     return commands
