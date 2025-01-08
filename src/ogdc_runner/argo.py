@@ -7,6 +7,7 @@ from hera.workflows import (
     Container,
     Workflow,
     WorkflowsService,
+    models,
 )
 
 
@@ -57,6 +58,15 @@ def _configure_argo_settings() -> WorkflowsService:
             f"ghcr.io/qgreenland-net/ogdc-runner:{ogdc_runner_image_tag}"
         )
 
+    # Setup artifact garbage collection. This will tell argo to remove artifacts
+    # on workflow deletion.
+    global_config.set_class_defaults(
+        Workflow,
+        artifact_gc=models.ArtifactGC(
+            strategy="OnWorkflowDeletion",
+            service_account_name=argo_service_account_name,
+        ),
+    )
     workflows_service = WorkflowsService(host=argo_workflows_service_url)
 
     return workflows_service
