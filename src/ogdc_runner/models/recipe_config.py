@@ -22,3 +22,5 @@ class RecipeConfig(BaseModel):
 
     input: RecipeInput
     output: RecipeOutput
+
+    recipe_dir: str
