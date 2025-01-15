@@ -27,7 +27,7 @@ pip install -v --editable .[dev]
 To use the CLI to run simple ogdc recipes with argo:
 
 ```
-$ ogdc-runner submit-and-wait ~/code/ogdc-recipes/recipes/seal-tags/
+$ ogdc-runner submit --wait ~/code/ogdc-recipes/recipes/seal-tags/
 Successfully submitted recipe with workflow name seal-tags-6gxfw
 Workflow status: Running
 Workflow status: Running
