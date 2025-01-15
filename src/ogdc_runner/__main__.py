@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import time
-
 import click
 
 from ogdc_runner.argo import get_workflow_status, submit_workflow
@@ -20,15 +18,6 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
-def _submit_workflow(recipe_path: str) -> str:
-    workflow = make_simple_workflow(
-        recipe_dir=recipe_path,
-    )
-    workflow_name = submit_workflow(workflow)
-    print(f"Successfully submitted recipe with workflow name {workflow_name}")
-    return workflow_name
-
-
 @cli.command
 @recipe_path
 def submit(recipe_path: str) -> None:
@@ -38,7 +27,10 @@ def submit(recipe_path: str) -> None:
     RECIPE-PATH: Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
     or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
     """
-    _submit_workflow(recipe_path)
+    workflow = make_simple_workflow(
+        recipe_dir=recipe_path,
+    )
+    submit_workflow(workflow)
 
 
 @cli.command
@@ -62,13 +54,7 @@ def submit_and_wait(recipe_path: str) -> None:
     RECIPE-PATH: Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
     or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
     """
-    workflow_name = _submit_workflow(recipe_path)
-
-    while True:
-        status = get_workflow_status(workflow_name)
-        if status:
-            print(f"Workflow status: {status}")
-            # Terminal states
-            if status in ("Succeeded", "Failed"):
-                break
-        time.sleep(5)
+    workflow = make_simple_workflow(
+        recipe_dir=recipe_path,
+    )
+    submit_workflow(workflow, wait=True)

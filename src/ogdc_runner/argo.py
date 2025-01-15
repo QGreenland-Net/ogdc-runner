@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 
 from hera.shared import global_config
 from hera.workflows import (
@@ -74,7 +75,20 @@ def get_workflow_status(workflow_name: str) -> str | None:
     return status
 
 
-def submit_workflow(workflow: Workflow) -> str:
+def wait_for_workflow_completion(workflow_name: str) -> None:
+    while True:
+        status = get_workflow_status(workflow_name)
+        if status:
+            print(f"Workflow status: {status}")
+            # Terminal states
+            if status == "Failed":
+                raise RuntimeError(f"Workflow with name {workflow_name} failed.")
+            if status == "Succeeded":
+                return
+        time.sleep(5)
+
+
+def submit_workflow(workflow: Workflow, *, wait: bool = False) -> str:
     """Submit the given workflow and return its name as a str."""
     workflow.create()
 
@@ -86,5 +100,10 @@ def submit_workflow(workflow: Workflow) -> str:
     if workflow_name is None:
         err_msg = "Problem with submitting workflow."
         raise RuntimeError(err_msg)
+
+    print(f"Successfully submitted workflow with name {workflow_name}")
+
+    if wait:
+        wait_for_workflow_completion(workflow_name)
 
     return workflow_name
