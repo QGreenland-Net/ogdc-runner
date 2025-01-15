@@ -6,6 +6,7 @@ from hera.workflows import (
     Container,
     Steps,
     Workflow,
+    models,
 )
 
 from ogdc_runner.argo import ARGO_WORKFLOW_SERVICE
@@ -45,6 +46,28 @@ def _make_fetch_url_template(recipe_config: RecipeConfig) -> Container:
     return template
 
 
+def _make_publish_template(recipe_id: str) -> Container:
+    """Creates a container template that will move final output data into the
+    OGDC data storage volume under a subpath named for the recipe_id."""
+    template = Container(
+        name="publish-data",
+        command=["sh", "-c"],
+        args=[
+            "rsync --progress /input_dir/* /output_dir/",
+        ],
+        inputs=[Artifact(name="input-dir", path="/input_dir/")],
+        volume_mounts=[
+            models.VolumeMount(
+                name="workflow-volume",
+                mount_path="/output_dir/",
+                sub_path=recipe_id,
+            )
+        ],
+    )
+
+    return template
+
+
 def _cmds_from_simple_recipe(recipe_dir: str) -> list[str]:
     """Read commands from a 'simple' OGDC recipe.
 
@@ -73,12 +96,23 @@ def make_simple_workflow(recipe_dir: str) -> Workflow:
         generate_name=f"{recipe_config.id}-",
         entrypoint="steps",
         workflows_service=ARGO_WORKFLOW_SERVICE,
+        volumes=[
+            models.Volume(
+                name="workflow-volume",
+                # TODO: parameterize this!
+                persistent_volume_claim={"claim_name": "qgnet-ogdc-workflow-pvc"},
+            )
+        ],
     ) as w:
         cmd_templates = []
         for idx, command in enumerate(commands):
             cmd_template = _make_cmd_template(name=f"run-cmd-{idx}", command=command)
             cmd_templates.append(cmd_template)
         fetch_template = _make_fetch_url_template(recipe_config)
+
+        # create publication template
+        publish_template = _make_publish_template(recipe_config.id)
+
         with Steps(name="steps"):
             step = fetch_template()
             for idx, cmd_template in enumerate(cmd_templates):
@@ -86,5 +120,10 @@ def make_simple_workflow(recipe_dir: str) -> Workflow:
                     name=f"step-{idx}",
                     arguments=step.get_artifact("output-dir").with_name("input-dir"),  # type: ignore[union-attr]
                 )
+            # publish final data
+            publish_template(
+                name="publish-data",
+                arguments=step.get_artifact("output-dir").with_name("input-dir"),  # type: ignore[union-attr]
+            )
 
     return w

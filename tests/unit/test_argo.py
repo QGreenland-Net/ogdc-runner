@@ -16,6 +16,7 @@ def test__configure_argo_settings_envvar_override(monkeypatch):
     ):
         monkeypatch.setenv(envvar, f"{envvar.lower()}_test")
 
+    monkeypatch.setenv("ENVIRONMENT", "prod")
     workflow_service = _configure_argo_settings()
 
     assert workflow_service.host == "argo_workflows_service_url_test"
