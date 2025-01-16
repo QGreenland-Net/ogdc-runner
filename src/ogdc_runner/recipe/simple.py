@@ -163,7 +163,7 @@ def make_simple_workflow(recipe_dir: str) -> Workflow:
     # error or overwrite if requested.
     if data_already_published(recipe_config):
         # TODO: better error handling (raise `OGDCRecipeError` or something similar)
-        err_msg = "Data for recipe {recipe_config.id} have already been published."
+        err_msg = f"Data for recipe {recipe_config.id} have already been published."
         raise RuntimeError(err_msg)
 
     with Workflow(
