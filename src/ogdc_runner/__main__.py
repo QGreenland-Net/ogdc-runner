@@ -44,6 +44,6 @@ def submit(recipe_path: str, wait: bool) -> None:
     type=str,
 )
 def check_workflow_status(workflow_name: str) -> None:
-    """Render and submit a recipe to OGDC for execution."""
+    """Check an argo workflow's status."""
     status = get_workflow_status(workflow_name)
     print(f"Workflow {workflow_name} has status {status}.")
