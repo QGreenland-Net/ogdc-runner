@@ -22,3 +22,7 @@ class RecipeConfig(BaseModel):
 
     input: RecipeInput
     output: RecipeOutput
+
+    # ffspec-compatible recipe directory string.
+    # This is where the rest of the config was set from.
+    recipe_directory: str

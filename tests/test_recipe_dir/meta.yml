@@ -1,5 +1,5 @@
 name: "Test argo workflow"
-id: "test-wargo-workflow"
+id: "test-argo-workflow"
 input:
   url: "https://raw.githubusercontent.com/nsidc/qgreenland/refs/heads/main/qgreenland/assets/arctic_circle.geojson"
 output:
