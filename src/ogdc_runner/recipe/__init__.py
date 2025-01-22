@@ -13,6 +13,6 @@ def get_recipe_config(recipe_directory: str) -> RecipeConfig:
     with fsspec.open(recipe_path, "rt") as config_file:
         config_dict = yaml.safe_load(config_file)
 
-    config = RecipeConfig(**config_dict)
+    config = RecipeConfig(**config_dict, recipe_directory=recipe_directory)
 
     return config

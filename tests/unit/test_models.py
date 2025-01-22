@@ -13,7 +13,11 @@ def test_recipe_meta():
     recipe_id = "test-recipe"
 
     recipe_meta = RecipeConfig(
-        name=name, id=recipe_id, input=recipe_input, output=recipe_output
+        name=name,
+        id=recipe_id,
+        input=recipe_input,
+        output=recipe_output,
+        recipe_directory="/foo/",
     )
 
     assert recipe_meta.name == name
@@ -30,4 +34,10 @@ def test_recipe_meta_failure_bad_id():
     recipe_id = "test_recipe"
     with pytest.raises(ValidationError):
         # Underscores are not allowed, this should trigger the validation error.
-        RecipeConfig(name=name, id=recipe_id, input=recipe_input, output=recipe_output)
+        RecipeConfig(
+            name=name,
+            id=recipe_id,
+            input=recipe_input,
+            output=recipe_output,
+            recipe_directory="/foo/",
+        )
