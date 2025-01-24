@@ -88,7 +88,7 @@ def _cmds_from_simple_recipe(recipe_dir: str) -> list[str]:
     return commands
 
 
-def data_already_published(recipe_config: RecipeConfig) -> bool:
+def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> bool:
     """Workflow that checks for the existence of published data for the given
     recipe."""
     with Workflow(
@@ -127,11 +127,37 @@ def data_already_published(recipe_config: RecipeConfig) -> bool:
             ],
         )
 
+        overwrite_template = Container(
+            name="overwrite-already-published",
+            command=["sh", "-c"],
+            args=[
+                f"rm -rf /mnt/{recipe_config.id}",
+            ],
+            volume_mounts=[
+                models.VolumeMount(
+                    name="workflow-volume",
+                    mount_path="/mnt/",
+                ),
+            ],
+        )
+
         with Steps(name="steps"):
-            check_dir_template()
+            check_exists = check_dir_template()
+            if overwrite:
+                overwrite_template(
+                    when=f'{check_exists.get_parameter("data-published")} == "yes"'
+                )
 
     # wait for the workflow to complete.
     workflow_name = submit_workflow(workflow=w, wait=True)
+    # If `overwrite` was given, then return False - the data no longer exist
+    # TODO: maybe we should determine which steps are run above based on
+    # overwrite. If overwrite is given, always try to delete the published data
+    # location?  Another thought: perhaps in the context of a "workflow of
+    # workflows" we can just have the next workflow dependent on the output of
+    # this one, instead of doing the check below.
+    if overwrite:
+        return False
 
     # Check the result. Get an updated instance of the workflow, with the latest
     # states for all notdes. Then, iterate through the nodes and find the
@@ -192,10 +218,10 @@ def make_simple_workflow(recipe_config: RecipeConfig) -> Workflow:
     return w
 
 
-def submit_ogdc_recipe(recipe_dir: str, wait: bool):
+def submit_ogdc_recipe(recipe_dir: str, wait: bool, overwrite: bool):
     recipe_config = get_recipe_config(recipe_dir)
     # Check if the user-submitted workflow has already been published
-    if data_already_published(recipe_config):
+    if data_already_published(recipe_config=recipe_config, overwrite=overwrite):
         # TODO: better error handling (raise `OGDCRecipeError` or something similar)
         err_msg = f"Data for recipe {recipe_config.id} have already been published."
         raise RuntimeError(err_msg)
