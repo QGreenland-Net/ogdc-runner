@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import click
 
-from ogdc_runner.argo import get_workflow_status, submit_workflow
-from ogdc_runner.recipe.simple import make_simple_workflow
+from ogdc_runner.argo import get_workflow_status
+from ogdc_runner.recipe.simple import submit_ogdc_recipe
 
 
 @click.group
@@ -31,10 +31,7 @@ def submit(recipe_path: str, wait: bool) -> None:
     RECIPE-PATH: Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
     or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
     """
-    workflow = make_simple_workflow(
-        recipe_dir=recipe_path,
-    )
-    submit_workflow(workflow, wait=wait)
+    submit_ogdc_recipe(recipe_dir=recipe_path, wait=wait)
 
 
 @cli.command

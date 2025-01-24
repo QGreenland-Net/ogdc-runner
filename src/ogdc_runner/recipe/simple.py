@@ -151,20 +151,9 @@ def data_already_published(recipe_config: RecipeConfig) -> bool:
     return result == "yes"
 
 
-def make_simple_workflow(recipe_dir: str) -> Workflow:
-    """Run the workflow and return its name as a str."""
-    commands = _cmds_from_simple_recipe(recipe_dir)
-    recipe_config = get_recipe_config(recipe_dir)
-
-    # TODO: consider moving this into a higher-level function. This should just
-    # make a simple workflow from a simple recipe, and not submit workflows of
-    # its own.
-    # First, check if the data are already published. If so, we should raise an
-    # error or overwrite if requested.
-    if data_already_published(recipe_config):
-        # TODO: better error handling (raise `OGDCRecipeError` or something similar)
-        err_msg = f"Data for recipe {recipe_config.id} have already been published."
-        raise RuntimeError(err_msg)
+def make_simple_workflow(recipe_config: RecipeConfig) -> Workflow:
+    """Create an argo workflow based on a simple recipe and return it."""
+    commands = _cmds_from_simple_recipe(recipe_config.recipe_directory)
 
     with Workflow(
         generate_name=f"{recipe_config.id}-",
@@ -201,3 +190,19 @@ def make_simple_workflow(recipe_dir: str) -> Workflow:
             )
 
     return w
+
+
+def submit_ogdc_recipe(recipe_dir: str, wait: bool):
+    recipe_config = get_recipe_config(recipe_dir)
+    # Check if the user-submitted workflow has already been published
+    if data_already_published(recipe_config):
+        # TODO: better error handling (raise `OGDCRecipeError` or something similar)
+        err_msg = f"Data for recipe {recipe_config.id} have already been published."
+        raise RuntimeError(err_msg)
+
+    # We currently expect all recipes to be "simple"
+    argo_workflow = make_simple_workflow(
+        recipe_config=recipe_config,
+    )
+
+    submit_workflow(argo_workflow, wait=wait)
