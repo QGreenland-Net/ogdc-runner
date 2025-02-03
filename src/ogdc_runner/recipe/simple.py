@@ -89,9 +89,42 @@ def _cmds_from_simple_recipe(recipe_dir: str) -> list[str]:
     return commands
 
 
-def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> bool:
-    """Workflow that checks for the existence of published data for the given
-    recipe."""
+def _remove_existing_published_data(*, recipe_config: RecipeConfig) -> None:
+    """Executes an argo workflow that removes published data for a recipe if it
+    exists."""
+    with Workflow(
+        generate_name=f"{recipe_config.id}-remove-existing-data",
+        entrypoint="steps",
+        workflows_service=ARGO_WORKFLOW_SERVICE,
+    ) as w:
+        overwrite_template = Container(
+            name="overwrite-already-published",
+            command=["sh", "-c"],
+            args=[
+                f"rm -rf /mnt/{recipe_config.id}",
+            ],
+            volume_mounts=[
+                models.VolumeMount(
+                    name=OGDC_WORKFLOW_PVC.name,
+                    mount_path="/mnt/",
+                ),
+            ],
+        )
+        with Steps(name="steps"):
+            overwrite_template()
+
+    workflow_name = submit_workflow(workflow=w, wait=True)
+
+    # Cleanup this workflow, it is no longer needed
+    ARGO_WORKFLOW_SERVICE.delete_workflow(workflow_name)
+
+
+def _check_for_existing_published_data(*, recipe_config: RecipeConfig) -> bool:
+    """Execute argo workflow that checks if the given recipe has published data.
+
+    Returns `True` if data have already been published for the given recipe,
+    otherwise `False`.
+    """
     with Workflow(
         generate_name=f"{recipe_config.id}-check-published",
         entrypoint="steps",
@@ -121,33 +154,11 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
             ],
         )
 
-        overwrite_template = Container(
-            name="overwrite-already-published",
-            command=["sh", "-c"],
-            args=[
-                f"rm -rf /mnt/{recipe_config.id}",
-            ],
-            volume_mounts=[
-                models.VolumeMount(
-                    name=OGDC_WORKFLOW_PVC.name,
-                    mount_path="/mnt/",
-                ),
-            ],
-        )
-
         with Steps(name="steps"):
-            check_exists = check_dir_template()
-            if overwrite:
-                overwrite_template(
-                    when=f'{check_exists.get_parameter("data-published")} == "yes"'  # type: ignore[union-attr]
-                )
+            check_dir_template()
 
     # wait for the workflow to complete.
     workflow_name = submit_workflow(workflow=w, wait=True)
-
-    # If `overwrite` was given, then return False - the data no longer exist
-    if overwrite:
-        return False
 
     # If overwrite is not True, we need to check the result of the
     # `check-already-published` step to see if the data have been published or
@@ -171,6 +182,28 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
     ARGO_WORKFLOW_SERVICE.delete_workflow(workflow_name)
 
     return result == "yes"
+
+
+def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> bool:
+    """Check for the existence of published data for the given
+    recipe and optionally remove it.
+
+    If `overwrite=True`, this function will remove any existing published data
+    for the provided recipe.
+
+    Returns `True` if data have already been published for the given recipe,
+    otherwise `False`.
+    """
+    if overwrite:
+        # If `overwrite` is True, remove the existing data and return `False`.
+        _remove_existing_published_data(
+            recipe_config=recipe_config,
+        )
+        return False
+
+    return _check_for_existing_published_data(
+        recipe_config=recipe_config,
+    )
 
 
 def make_and_submit_simple_workflow(
