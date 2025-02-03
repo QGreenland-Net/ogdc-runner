@@ -248,8 +248,11 @@ def make_and_submit_simple_workflow(
     return workflow_name
 
 
-def submit_ogdc_recipe(*, recipe_dir: str, wait: bool, overwrite: bool) -> None:
-    """Submit an OGDC recipe for processing via argo workflows."""
+def submit_ogdc_recipe(*, recipe_dir: str, wait: bool, overwrite: bool) -> str:
+    """Submit an OGDC recipe for processing via argo workflows.
+
+    Returns the name of the OGDC simple recipe submitted to Argo.
+    """
     recipe_config = get_recipe_config(recipe_dir)
     # Check if the user-submitted workflow has already been published
     if data_already_published(recipe_config=recipe_config, overwrite=overwrite):
@@ -258,7 +261,9 @@ def submit_ogdc_recipe(*, recipe_dir: str, wait: bool, overwrite: bool) -> None:
         raise OgdcDataAlreadyPublished(err_msg)
 
     # We currently expect all recipes to be "simple"
-    make_and_submit_simple_workflow(
+    simple_recipe_workflow_name = make_and_submit_simple_workflow(
         recipe_config=recipe_config,
         wait=wait,
     )
+
+    return simple_recipe_workflow_name
