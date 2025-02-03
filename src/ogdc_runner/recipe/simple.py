@@ -176,8 +176,14 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
     return result == "yes"
 
 
-def make_simple_workflow(recipe_config: RecipeConfig) -> Workflow:
-    """Create an argo workflow based on a simple recipe and return it."""
+def make_and_submit_simple_workflow(
+    recipe_config: RecipeConfig,
+    wait: bool,
+) -> str:
+    """Create and submit an argo workflow based on a simple recipe.
+
+    Returns the name of the workflow as a str.
+    """
     commands = _cmds_from_simple_recipe(recipe_config.recipe_directory)
 
     with Workflow(
@@ -214,7 +220,9 @@ def make_simple_workflow(recipe_config: RecipeConfig) -> Workflow:
                 arguments=step.get_artifact("output-dir").with_name("input-dir"),  # type: ignore[union-attr]
             )
 
-    return w
+    workflow_name = submit_workflow(w, wait=wait)
+
+    return workflow_name
 
 
 def submit_ogdc_recipe(recipe_dir: str, wait: bool, overwrite: bool):
@@ -226,8 +234,7 @@ def submit_ogdc_recipe(recipe_dir: str, wait: bool, overwrite: bool):
         raise RuntimeError(err_msg)
 
     # We currently expect all recipes to be "simple"
-    argo_workflow = make_simple_workflow(
+    make_and_submit_simple_workflow(
         recipe_config=recipe_config,
+        wait=wait,
     )
-
-    submit_workflow(argo_workflow, wait=wait)
