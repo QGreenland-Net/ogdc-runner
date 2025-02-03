@@ -150,15 +150,14 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
 
     # wait for the workflow to complete.
     workflow_name = submit_workflow(workflow=w, wait=True)
+
     # If `overwrite` was given, then return False - the data no longer exist
-    # TODO: maybe we should determine which steps are run above based on
-    # overwrite. If overwrite is given, always try to delete the published data
-    # location?  Another thought: perhaps in the context of a "workflow of
-    # workflows" we can just have the next workflow dependent on the output of
-    # this one, instead of doing the check below.
     if overwrite:
         return False
 
+    # If overwrite is not True, we need to check the result of the
+    # `check-already-published` step to see if the data have been published or
+    # not.
     # Check the result. Get an updated instance of the workflow, with the latest
     # states for all notdes. Then, iterate through the nodes and find the
     # template we define above ("check-already-published") and extract its
