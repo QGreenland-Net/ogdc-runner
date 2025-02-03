@@ -12,6 +12,7 @@ from hera.workflows import (
 
 from ogdc_runner.argo import ARGO_WORKFLOW_SERVICE, submit_workflow
 from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
+from ogdc_runner.exceptions import OgdcDataAlreadyPublished, OgdcWorkflowExecutionError
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.recipe import get_recipe_config
 
@@ -169,7 +170,7 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
             result = node.outputs.parameters[0].value
     if not result:
         err_msg = "Failed to check if data have been published"
-        raise RuntimeError(err_msg)
+        raise OgdcWorkflowExecutionError(err_msg)
 
     assert result in ("yes", "no")
 
@@ -231,7 +232,7 @@ def submit_ogdc_recipe(recipe_dir: str, wait: bool, overwrite: bool):
     if data_already_published(recipe_config=recipe_config, overwrite=overwrite):
         # TODO: better error handling (raise `OGDCRecipeError` or something similar)
         err_msg = f"Data for recipe {recipe_config.id} have already been published."
-        raise RuntimeError(err_msg)
+        raise OgdcDataAlreadyPublished(err_msg)
 
     # We currently expect all recipes to be "simple"
     make_and_submit_simple_workflow(

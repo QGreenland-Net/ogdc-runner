@@ -11,6 +11,8 @@ from hera.workflows import (
     models,
 )
 
+from ogdc_runner.exceptions import OgdcWorkflowExecutionError
+
 
 def _configure_argo_settings() -> WorkflowsService:
     """Configure argo settings for the OGDC and return an argo WorkflowsService instance.
@@ -92,7 +94,9 @@ def wait_for_workflow_completion(workflow_name: str) -> None:
             print(f"Workflow status: {status}")
             # Terminal states
             if status == "Failed":
-                raise RuntimeError(f"Workflow with name {workflow_name} failed.")
+                raise OgdcWorkflowExecutionError(
+                    f"Workflow with name {workflow_name} failed."
+                )
             if status == "Succeeded":
                 return
         time.sleep(5)
@@ -109,7 +113,7 @@ def submit_workflow(workflow: Workflow, *, wait: bool = False) -> str:
     # aware of?
     if workflow_name is None:
         err_msg = "Problem with submitting workflow."
-        raise RuntimeError(err_msg)
+        raise OgdcWorkflowExecutionError(err_msg)
 
     print(f"Successfully submitted workflow with name {workflow_name}")
 
