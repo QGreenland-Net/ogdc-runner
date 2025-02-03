@@ -174,6 +174,9 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
 
     assert result in ("yes", "no")
 
+    # Cleanup this workflow, it is no longer needed
+    ARGO_WORKFLOW_SERVICE.delete_workflow(workflow_name)
+
     return result == "yes"
 
 
