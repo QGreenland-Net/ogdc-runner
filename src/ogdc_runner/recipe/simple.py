@@ -10,7 +10,7 @@ from hera.workflows import (
     models,
 )
 
-from ogdc_runner.argo import ARGO_WORKFLOW_SERVICE, submit_workflow
+from ogdc_runner.argo import ARGO_WORKFLOW_SERVICE, OGDC_WORKFLOW_PVC, submit_workflow
 from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished, OgdcWorkflowExecutionError
 from ogdc_runner.models.recipe_config import RecipeConfig
@@ -60,7 +60,7 @@ def _make_publish_template(recipe_id: str) -> Container:
         inputs=[Artifact(name="input-dir", path="/input_dir/")],
         volume_mounts=[
             models.VolumeMount(
-                name="workflow-volume",
+                name=OGDC_WORKFLOW_PVC.name,
                 mount_path="/output_dir/",
                 sub_path=recipe_id,
             )
@@ -96,15 +96,6 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
         generate_name=f"{recipe_config.id}-check-published",
         entrypoint="steps",
         workflows_service=ARGO_WORKFLOW_SERVICE,
-        volumes=[
-            models.Volume(
-                name="workflow-volume",
-                # TODO: parameterize this!
-                persistent_volume_claim=models.PersistentVolumeClaimVolumeSource(
-                    claim_name="qgnet-ogdc-workflow-pvc",
-                ),
-            )
-        ],
     ) as w:
         check_dir_template = Container(
             name="check-already-published",
@@ -124,7 +115,7 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
             ],
             volume_mounts=[
                 models.VolumeMount(
-                    name="workflow-volume",
+                    name=OGDC_WORKFLOW_PVC.name,
                     mount_path="/mnt/",
                 ),
             ],
@@ -138,7 +129,7 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
             ],
             volume_mounts=[
                 models.VolumeMount(
-                    name="workflow-volume",
+                    name=OGDC_WORKFLOW_PVC.name,
                     mount_path="/mnt/",
                 ),
             ],
@@ -196,15 +187,6 @@ def make_and_submit_simple_workflow(
         generate_name=f"{recipe_config.id}-",
         entrypoint="steps",
         workflows_service=ARGO_WORKFLOW_SERVICE,
-        volumes=[
-            models.Volume(
-                name="workflow-volume",
-                # TODO: parameterize this!
-                persistent_volume_claim=models.PersistentVolumeClaimVolumeSource(
-                    claim_name="qgnet-ogdc-workflow-pvc",
-                ),
-            )
-        ],
     ) as w:
         cmd_templates = []
         for idx, command in enumerate(commands):
