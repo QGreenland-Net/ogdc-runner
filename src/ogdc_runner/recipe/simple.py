@@ -100,7 +100,9 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
             models.Volume(
                 name="workflow-volume",
                 # TODO: parameterize this!
-                persistent_volume_claim={"claim_name": "qgnet-ogdc-workflow-pvc"},
+                persistent_volume_claim=models.PersistentVolumeClaimVolumeSource(
+                    claim_name="qgnet-ogdc-workflow-pvc",
+                ),
             )
         ],
     ) as w:
@@ -146,7 +148,7 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
             check_exists = check_dir_template()
             if overwrite:
                 overwrite_template(
-                    when=f'{check_exists.get_parameter("data-published")} == "yes"'
+                    when=f'{check_exists.get_parameter("data-published")} == "yes"'  # type: ignore[union-attr]
                 )
 
     # wait for the workflow to complete.
@@ -165,9 +167,9 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
     # output parameter.
     completed_workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=workflow_name)
     result = None
-    for node in completed_workflow.status.nodes.values():
+    for node in completed_workflow.status.nodes.values():  # type: ignore[union-attr]
         if node.template_name == "check-already-published":
-            result = node.outputs.parameters[0].value
+            result = node.outputs.parameters[0].value  # type: ignore[union-attr, index]
     if not result:
         err_msg = "Failed to check if data have been published"
         raise OgdcWorkflowExecutionError(err_msg)
@@ -198,7 +200,9 @@ def make_and_submit_simple_workflow(
             models.Volume(
                 name="workflow-volume",
                 # TODO: parameterize this!
-                persistent_volume_claim={"claim_name": "qgnet-ogdc-workflow-pvc"},
+                persistent_volume_claim=models.PersistentVolumeClaimVolumeSource(
+                    claim_name="qgnet-ogdc-workflow-pvc",
+                ),
             )
         ],
     ) as w:
