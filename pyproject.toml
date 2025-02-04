@@ -39,6 +39,7 @@ test = [
   "mypy ~=1.10.0",
   "pytest >=6",
   "pytest-cov >=3",
+  "pytest-order",
   "types-pyyaml",
 ]
 dev = [
