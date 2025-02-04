@@ -87,7 +87,7 @@ nox -l
 Nox handles everything for you, including setting up an temporary virtual
 environment for each run.
 
-### Re-using Nox virtual environments
+### Reusing Nox virtual environments
 
 **By default, Nox deletes and recreates virtual environments for every run.**
 Because this is slow, you may want to skip that step with `-R` flag:
