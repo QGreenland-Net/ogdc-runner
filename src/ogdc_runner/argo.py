@@ -10,6 +10,7 @@ from hera.workflows import (
     WorkflowsService,
     models,
 )
+from loguru import logger
 
 
 def _configure_argo_settings() -> WorkflowsService:
@@ -89,7 +90,7 @@ def wait_for_workflow_completion(workflow_name: str) -> None:
     while True:
         status = get_workflow_status(workflow_name)
         if status:
-            print(f"Workflow status: {status}")
+            logger.info(f"Workflow status: {status}")
             # Terminal states
             if status == "Failed":
                 raise RuntimeError(f"Workflow with name {workflow_name} failed.")
@@ -111,7 +112,7 @@ def submit_workflow(workflow: Workflow, *, wait: bool = False) -> str:
         err_msg = "Problem with submitting workflow."
         raise RuntimeError(err_msg)
 
-    print(f"Successfully submitted workflow with name {workflow_name}")
+    logger.success(f"Successfully submitted workflow with name {workflow_name}")
 
     if wait:
         wait_for_workflow_completion(workflow_name)
