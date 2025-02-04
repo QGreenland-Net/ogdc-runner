@@ -256,7 +256,6 @@ def submit_ogdc_recipe(*, recipe_dir: str, wait: bool, overwrite: bool) -> str:
     recipe_config = get_recipe_config(recipe_dir)
     # Check if the user-submitted workflow has already been published
     if data_already_published(recipe_config=recipe_config, overwrite=overwrite):
-        # TODO: better error handling (raise `OGDCRecipeError` or something similar)
         err_msg = f"Data for recipe {recipe_config.id} have already been published."
         raise OgdcDataAlreadyPublished(err_msg)
 
