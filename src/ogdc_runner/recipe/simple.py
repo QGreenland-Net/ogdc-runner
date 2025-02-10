@@ -7,6 +7,7 @@ from hera.workflows import (
     Steps,
     Workflow,
 )
+from loguru import logger
 
 from ogdc_runner.argo import ARGO_WORKFLOW_SERVICE
 from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
@@ -55,7 +56,7 @@ def _cmds_from_simple_recipe(recipe_dir: str) -> list[str]:
           each command in a simple recipe will place data in `/output_dir/`.
     """
     recipe_path = f"{recipe_dir}/{SIMPLE_RECIPE_FILENAME}"
-    print(f"Reading recipe from {recipe_path}")
+    logger.info(f"Reading recipe from {recipe_path}")
 
     with fsspec.open(recipe_path, "rt") as f:
         lines = f.read().split("\n")
