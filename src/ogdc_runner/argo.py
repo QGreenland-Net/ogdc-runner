@@ -12,6 +12,15 @@ from hera.workflows import (
 )
 from loguru import logger
 
+from ogdc_runner.exceptions import OgdcWorkflowExecutionError
+
+OGDC_WORKFLOW_PVC = models.Volume(
+    name="workflow-volume",
+    persistent_volume_claim=models.PersistentVolumeClaimVolumeSource(
+        claim_name="qgnet-ogdc-workflow-pvc",
+    ),
+)
+
 
 def _configure_argo_settings() -> WorkflowsService:
     """Configure argo settings for the OGDC and return an argo WorkflowsService instance.
@@ -60,14 +69,17 @@ def _configure_argo_settings() -> WorkflowsService:
             f"ghcr.io/qgreenland-net/ogdc-runner:{ogdc_runner_image_tag}"
         )
 
-    # Setup artifact garbage collection. This will tell argo to remove artifacts
-    # on workflow deletion.
     global_config.set_class_defaults(
         Workflow,
+        # Setup artifact garbage collection. This will tell argo to remove artifacts
+        # on workflow deletion.
         artifact_gc=models.ArtifactGC(
             strategy="OnWorkflowDeletion",
             service_account_name=argo_service_account_name,
         ),
+        # Setup default OGDC workflow pvc, which is where final outputs are
+        # written.
+        volumes=[OGDC_WORKFLOW_PVC],
     )
     workflows_service = WorkflowsService(host=argo_workflows_service_url)
 
@@ -93,7 +105,9 @@ def wait_for_workflow_completion(workflow_name: str) -> None:
             logger.info(f"Workflow status: {status}")
             # Terminal states
             if status == "Failed":
-                raise RuntimeError(f"Workflow with name {workflow_name} failed.")
+                raise OgdcWorkflowExecutionError(
+                    f"Workflow with name {workflow_name} failed."
+                )
             if status == "Succeeded":
                 return
         time.sleep(5)
@@ -110,7 +124,7 @@ def submit_workflow(workflow: Workflow, *, wait: bool = False) -> str:
     # aware of?
     if workflow_name is None:
         err_msg = "Problem with submitting workflow."
-        raise RuntimeError(err_msg)
+        raise OgdcWorkflowExecutionError(err_msg)
 
     logger.success(f"Successfully submitted workflow with name {workflow_name}")
 

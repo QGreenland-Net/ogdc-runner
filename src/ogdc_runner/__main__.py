@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import click
 
-from ogdc_runner.argo import get_workflow_status, submit_workflow
-from ogdc_runner.recipe.simple import make_simple_workflow
+from ogdc_runner.argo import get_workflow_status
+from ogdc_runner.recipe.simple import submit_ogdc_recipe
 
 
 @click.group
@@ -24,17 +24,20 @@ def cli() -> None:
     default=False,
     help="Wait for recipe execution to complete.",
 )
-def submit(recipe_path: str, wait: bool) -> None:
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    default=False,
+    help="Overwrite existing outputs of the given recipe if it has already run before.",
+)
+def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     """
     Submit a recipe to OGDC for execution.
 
     RECIPE-PATH: Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
     or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
     """
-    workflow = make_simple_workflow(
-        recipe_dir=recipe_path,
-    )
-    submit_workflow(workflow, wait=wait)
+    submit_ogdc_recipe(recipe_dir=recipe_path, wait=wait, overwrite=overwrite)
 
 
 @cli.command
