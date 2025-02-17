@@ -1,6 +1,11 @@
+import os
+import sys
+from pathlib import Path
 from __future__ import annotations
 
 import importlib.metadata
+
+sys.path.insert(0, str(Path('../').resolve()))
 
 project = "ogdc-runner"
 copyright = "2024, NSIDC & ADC"
