@@ -94,7 +94,7 @@ def _remove_existing_published_data(*, recipe_config: RecipeConfig) -> None:
     """Executes an argo workflow that removes published data for a recipe if it
     exists."""
     with Workflow(
-        generate_name=f"{recipe_config.id}-remove-existing-data",
+        generate_name=f"{recipe_config.id}-remove-existing-data-",
         entrypoint="steps",
         workflows_service=ARGO_WORKFLOW_SERVICE,
     ) as w:
@@ -127,7 +127,7 @@ def _check_for_existing_published_data(*, recipe_config: RecipeConfig) -> bool:
     otherwise `False`.
     """
     with Workflow(
-        generate_name=f"{recipe_config.id}-check-published",
+        generate_name=f"{recipe_config.id}-check-published-",
         entrypoint="steps",
         workflows_service=ARGO_WORKFLOW_SERVICE,
     ) as w:
