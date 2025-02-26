@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+from typing import Optional
 
 from hera.shared import global_config
 from hera.workflows import (
@@ -22,71 +23,221 @@ OGDC_WORKFLOW_PVC = models.Volume(
 )
 
 
-def _configure_argo_settings() -> WorkflowsService:
-    """Configure argo settings for the OGDC and return an argo WorkflowsService instance.
+class ArgoConfig:
+    """Configuration for Argo workflows."""
+    
+    def __init__(
+        self,
+        namespace: str,
+        service_account_name: str,
+        workflows_service_url: str,
+        runner_image: str,
+        runner_image_tag: str,
+        image_pull_policy: str
+    ):
+        self._namespace = namespace
+        self._service_account_name = service_account_name
+        self._workflows_service_url = workflows_service_url
+        self._runner_image = runner_image
+        self._runner_image_tag = runner_image_tag
+        self._image_pull_policy = image_pull_policy
+    
+    @property
+    def namespace(self) -> str:
+        """Get the namespace."""
+        return self._namespace
+    
+    @namespace.setter
+    def namespace(self, value: str) -> None:
+        """Set the namespace."""
+        self._namespace = value
+    
+    @property
+    def service_account_name(self) -> str:
+        """Get the service account name."""
+        return self._service_account_name
+    
+    @service_account_name.setter
+    def service_account_name(self, value: str) -> None:
+        """Set the service account name."""
+        self._service_account_name = value
+    
+    @property
+    def workflows_service_url(self) -> str:
+        """Get the workflows service URL."""
+        return self._workflows_service_url
+    
+    @workflows_service_url.setter
+    def workflows_service_url(self, value: str) -> None:
+        """Set the workflows service URL."""
+        self._workflows_service_url = value
+    
+    @property
+    def runner_image(self) -> str:
+        """Get the runner image."""
+        return self._runner_image
+    
+    @runner_image.setter
+    def runner_image(self, value: str) -> None:
+        """Set the runner image."""
+        self._runner_image = value
+    
+    @property
+    def runner_image_tag(self) -> str:
+        """Get the runner image tag."""
+        return self._runner_image_tag
+    
+    @runner_image_tag.setter
+    def runner_image_tag(self, value: str) -> None:
+        """Set the runner image tag."""
+        self._runner_image_tag = value
+    
+    @property
+    def image_pull_policy(self) -> str:
+        """Get the image pull policy."""
+        return self._image_pull_policy
+    
+    @image_pull_policy.setter
+    def image_pull_policy(self, value: str) -> None:
+        """Set the image pull policy."""
+        self._image_pull_policy = value
+    
+    @property
+    def full_image_path(self) -> str:
+        """Return the full image path with tag."""
+        return f"{self._runner_image}:{self._runner_image_tag}"
 
-    Environment variables can be used to override common defaults:
 
-    * ARGO_NAMESPACE: defines the kubernetes namespace the OGDC argo instance is deployed to.
-    * ARGO_SERVICE_ACCOUNT_NAME: defines the Argo service account with permissions to execute workflows.
-    * ARGO_WORKFLOWS_SERVICE_URL: the OGDC Argo workflows service URL.
-    * OGDC_RUNNER_IMAGE_TAG: the docker image tag to use for `ogdc-runner` in
-      non-development environments. Defaults to "latest".
-    * ENVIRONMENT: if set to `dev`, a local `ogdc-runner` image will be used
-      instead of pulling a version from GHCR. Build with `docker build -t
-      ogdc-runner .` in the `rancher-desktop` docker context.
-
-    Returns a `WorkflowsService` instance.
-
-    Note that this function is expected to be run only once (automatically) at
-    module import time.
-    """
-
-    # set argo constants from envvars, falling back on dev settings
-    argo_namespace = os.environ.get("ARGO_NAMESPACE", "qgnet")
-    argo_service_account_name = os.environ.get(
-        "ARGO_SERVICE_ACCOUNT_NAME", "argo-workflow"
-    )
-    argo_workflows_service_url = os.environ.get(
-        "ARGO_WORKFLOWS_SERVICE_URL", "http://localhost:2746"
-    )
-    ogdc_runner_image_tag = os.environ.get("OGDC_RUNNER_IMAGE_TAG", "latest")
-
-    # Set global defaults for argo
-    # https://hera.readthedocs.io/en/stable/examples/workflows/misc/global_config/
-    global_config.namespace = argo_namespace
-    global_config.service_account_name = argo_service_account_name
-
-    # If the environment is explicitly set to "dev", then use a locally-built image.
-    if os.environ.get("ENVIRONMENT") == "dev":
-        global_config.image = "ogdc-runner"
+class ArgoManager:
+    """Manager for Argo workflow configurations and services."""
+    
+    def __init__(self):
+        self._config = self._initialize_config()
+        self._workflow_service = self._setup_workflow_service()
+        self._apply_global_config()
+    
+    def _initialize_config(self) -> ArgoConfig:
+        """Initialize Argo configuration from environment variables with defaults."""
+        is_dev_environment = os.environ.get("ENVIRONMENT") == "dev"
+        
+        # Default runner image configuration
+        runner_image = "ogdc-runner" if is_dev_environment else "ghcr.io/qgreenland-net/ogdc-runner"
+        runner_image_tag = os.environ.get("OGDC_RUNNER_IMAGE_TAG", "latest")
+        image_pull_policy = "Never" if is_dev_environment else "IfNotPresent"
+        
+        return ArgoConfig(
+            namespace=os.environ.get("ARGO_NAMESPACE", "qgnet"),
+            service_account_name=os.environ.get("ARGO_SERVICE_ACCOUNT_NAME", "argo-workflow"),
+            workflows_service_url=os.environ.get("ARGO_WORKFLOWS_SERVICE_URL", "http://localhost:2746"),
+            runner_image=runner_image,
+            runner_image_tag=runner_image_tag,
+            image_pull_policy=image_pull_policy
+        )
+    
+    def _setup_workflow_service(self) -> WorkflowsService:
+        """Set up and return the Argo WorkflowsService with namespace set."""
+        return WorkflowsService(
+            host=self._config.workflows_service_url,
+            namespace=self._config.namespace
+        )
+    
+    def _apply_global_config(self) -> None:
+        """Apply the current configuration to Hera's global config."""
+        global_config.namespace = self._config.namespace
+        global_config.service_account_name = self._config.service_account_name
+        global_config.image = self._config.full_image_path
+        
         global_config.set_class_defaults(
             Container,
-            image_pull_policy="Never",
+            image_pull_policy=self._config.image_pull_policy,
         )
-    else:
-        global_config.image = (
-            f"ghcr.io/qgreenland-net/ogdc-runner:{ogdc_runner_image_tag}"
+        
+        global_config.set_class_defaults(
+            Workflow,
+            # Setup artifact garbage collection
+            artifact_gc=models.ArtifactGC(
+                strategy="OnWorkflowDeletion",
+                service_account_name=self._config.service_account_name,
+            ),
+            # Setup default OGDC workflow pvc
+            volumes=[OGDC_WORKFLOW_PVC],
         )
+    
+    @property
+    def workflow_service(self) -> WorkflowsService:
+        """Get the current workflow service."""
+        return self._workflow_service
+    
+    @property
+    def config(self) -> ArgoConfig:
+        """Get the current configuration."""
+        return self._config
+    
+    def update_image(self, image: Optional[str] = None, tag: Optional[str] = None, 
+                     pull_policy: Optional[str] = None) -> None:
+        """
+        Update the runner image configuration and re-apply global config.
+        
+        Args:
+            image: New image path (without tag)
+            tag: New image tag
+            pull_policy: New image pull policy
+        """
+        if image is not None:
+            self._config.runner_image = image
+        
+        if tag is not None:
+            self._config.runner_image_tag = tag
+            
+        if pull_policy is not None:
+            self._config.image_pull_policy = pull_policy
+            
+        # Re-apply global config with updated values
+        self._apply_global_config()
+        logger.info(f"Updated runner image to {self._config.full_image_path} with pull policy {self._config.image_pull_policy}")
 
-    global_config.set_class_defaults(
-        Workflow,
-        # Setup artifact garbage collection. This will tell argo to remove artifacts
-        # on workflow deletion.
-        artifact_gc=models.ArtifactGC(
-            strategy="OnWorkflowDeletion",
-            service_account_name=argo_service_account_name,
-        ),
-        # Setup default OGDC workflow pvc, which is where final outputs are
-        # written.
-        volumes=[OGDC_WORKFLOW_PVC],
-    )
-    workflows_service = WorkflowsService(host=argo_workflows_service_url)
+    def update_namespace(self, namespace: str) -> None:
+        """
+        Update the namespace for Argo workflows and recreate the workflow service.
+        
+        Args:
+            namespace: New namespace for workflows
+        """
+        self._config.namespace = namespace
+        # Recreate the workflow service with the new namespace
+        self._workflow_service = self._setup_workflow_service()
+        # Re-apply global config with updated values
+        self._apply_global_config()
+        logger.info(f"Updated namespace to {namespace}")
+    
+    def update_service_account(self, service_account_name: str) -> None:
+        """
+        Update the service account name for Argo workflows.
+        
+        Args:
+            service_account_name: New service account name
+        """
+        self._config.service_account_name = service_account_name
+        # Re-apply global config with updated values
+        self._apply_global_config()
+        logger.info(f"Updated service account to {service_account_name}")
+    
+    def update_workflow_service_url(self, url: str) -> None:
+        """
+        Update the workflow service URL and recreate the workflow service.
+        
+        Args:
+            url: New workflow service URL
+        """
+        self._config.workflows_service_url = url
+        # Recreate the workflow service with the new URL
+        self._workflow_service = self._setup_workflow_service()
+        logger.info(f"Updated workflow service URL to {url}")
 
-    return workflows_service
 
-
-ARGO_WORKFLOW_SERVICE = _configure_argo_settings()
+# Initialize the ArgoManager as a singleton
+argo_manager = ArgoManager()
+ARGO_WORKFLOW_SERVICE = argo_manager.workflow_service
 
 
 def get_workflow_status(workflow_name: str) -> str | None:
