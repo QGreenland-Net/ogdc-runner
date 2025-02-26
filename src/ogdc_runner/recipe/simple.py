@@ -38,7 +38,7 @@ def _make_cmd_template(
 def _make_fetch_url_template(recipe_config: RecipeConfig) -> Container:
     fetch_url = str(recipe_config.input.url)
     template = Container(
-        name=f"{recipe_config.id}-fetch-template",
+        name=f"{recipe_config.id}-fetch-template-",
         command=["sh", "-c"],
         args=[
             f"mkdir -p /output_dir/ && wget --content-disposition -P /output_dir/ {fetch_url}",
@@ -53,7 +53,7 @@ def _make_publish_template(recipe_id: str) -> Container:
     """Creates a container template that will move final output data into the
     OGDC data storage volume under a subpath named for the recipe_id."""
     template = Container(
-        name="publish-data",
+        name="publish-data-",
         command=["sh", "-c"],
         args=[
             "rsync --progress /input_dir/* /output_dir/",
@@ -99,7 +99,7 @@ def _remove_existing_published_data(*, recipe_config: RecipeConfig) -> None:
         workflows_service=ARGO_WORKFLOW_SERVICE,
     ) as w:
         overwrite_template = Container(
-            name="overwrite-already-published",
+            name="overwrite-already-published-",
             command=["sh", "-c"],
             args=[
                 f"rm -rf /mnt/{recipe_config.id}",
@@ -132,7 +132,7 @@ def _check_for_existing_published_data(*, recipe_config: RecipeConfig) -> bool:
         workflows_service=ARGO_WORKFLOW_SERVICE,
     ) as w:
         check_dir_template = Container(
-            name="check-already-published",
+            name="check-already-published-",
             command=["sh", "-c"],
             # Check for the existence of the recipe-specific subpath. If it
             # exists, writ eout a file with "yes". Otherwise write out a file
