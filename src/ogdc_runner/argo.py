@@ -283,3 +283,43 @@ def submit_workflow(workflow: Workflow, *, wait: bool = False) -> str:
         wait_for_workflow_completion(workflow_name)
 
     return workflow_name
+
+
+def update_runner_image(image: Optional[str] = None, tag: Optional[str] = None, 
+                       pull_policy: Optional[str] = None) -> None:
+    """
+    Update the OGDC runner image configuration.
+    
+    Args:
+        image: New image path (without tag)
+        tag: New image tag
+        pull_policy: New image pull policy
+    """
+    argo_manager.update_image(image, tag, pull_policy)
+
+def update_namespace(namespace: str) -> None:
+    """
+    Update the namespace for Argo workflows.
+    
+    Args:
+        namespace: New namespace for workflows
+    """
+    argo_manager.update_namespace(namespace)
+
+def update_service_account(service_account_name: str) -> None:
+    """
+    Update the service account name for Argo workflows.
+    
+    Args:
+        service_account_name: New service account name
+    """
+    argo_manager.update_service_account(service_account_name)
+
+def update_workflow_service_url(url: str) -> None:
+    """
+    Update the workflow service URL.
+    
+    Args:
+        url: New workflow service URL
+    """
+    argo_manager.update_workflow_service_url(url)
