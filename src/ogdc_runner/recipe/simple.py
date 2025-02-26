@@ -34,18 +34,42 @@ def _make_cmd_template(
 
     return template
 
-
-def _make_fetch_url_template(recipe_config: RecipeConfig) -> Container:
-    fetch_url = str(recipe_config.input.url)
+def _make_fetch_input_template(recipe_config: RecipeConfig) -> Container:
+    """Creates a container template that fetches multiple inputs from URLs or file paths.
+    
+    Supports:
+    - HTTP/HTTPS URLs
+    - File paths (including PVC paths)
+    """
+    # Create commands to fetch each input
+    fetch_commands = []
+    
+    for i, param in enumerate(recipe_config.input.params):
+        param_str = str(param)
+        # Check if the parameter is a URL
+        if param_str.startswith(('http://', 'https://')):
+            # It's a URL, use wget
+            fetch_commands.append(f"wget --content-disposition -P /output_dir/ {param_str}")
+        else:
+            # It's a file path (including PVC paths), use cp
+            # Get just the filename for the destination
+            filename = param_str.split('/')[-1]
+            fetch_commands.append(f"cp {param_str} /output_dir/{filename}")
+    
+    # Join all commands with && for sequential execution
+    combined_command = " && ".join(fetch_commands)
+    if not combined_command:
+        combined_command = "echo 'No input files to fetch'"
+    
     template = Container(
         name=f"{recipe_config.id}-fetch-template-",
         command=["sh", "-c"],
         args=[
-            f"mkdir -p /output_dir/ && wget --content-disposition -P /output_dir/ {fetch_url}",
+            f"mkdir -p /output_dir/ && {combined_command}",
         ],
         outputs=[Artifact(name="output-dir", path="/output_dir/")],
     )
-
+    
     return template
 
 
@@ -226,9 +250,11 @@ def make_and_submit_simple_workflow(
         for idx, command in enumerate(commands):
             cmd_template = _make_cmd_template(name=f"run-cmd-{idx}", command=command)
             cmd_templates.append(cmd_template)
-        fetch_template = _make_fetch_url_template(recipe_config)
+        
+        # Use the simplified multi-input fetch template
+        fetch_template = _make_fetch_input_template(recipe_config)
 
-        # create publication template
+        # Create publication template
         publish_template = _make_publish_template(recipe_config.id)
 
         with Steps(name="steps"):
@@ -238,7 +264,7 @@ def make_and_submit_simple_workflow(
                     name=f"step-{idx}",
                     arguments=step.get_artifact("output-dir").with_name("input-dir"),  # type: ignore[union-attr]
                 )
-            # publish final data
+            # Publish final data
             publish_template(
                 name="publish-data",
                 arguments=step.get_artifact("output-dir").with_name("input-dir"),  # type: ignore[union-attr]
