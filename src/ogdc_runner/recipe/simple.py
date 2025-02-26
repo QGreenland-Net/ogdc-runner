@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fsspec
+from typing import Optional
 from hera.workflows import (
     Artifact,
     Container,
@@ -11,7 +12,13 @@ from hera.workflows import (
 )
 from loguru import logger
 
-from ogdc_runner.argo import ARGO_WORKFLOW_SERVICE, OGDC_WORKFLOW_PVC, submit_workflow
+from ogdc_runner.argo import (
+    ARGO_WORKFLOW_SERVICE, 
+    OGDC_WORKFLOW_PVC, 
+    submit_workflow,
+    update_runner_image,
+    update_namespace,
+)
 from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished, OgdcWorkflowExecutionError
 from ogdc_runner.models.recipe_config import RecipeConfig
@@ -21,7 +28,10 @@ from ogdc_runner.recipe import get_recipe_config
 def _make_cmd_template(
     name: str,
     command: str,
+    custom_image: Optional[str] = None,
+    custom_tag: Optional[str] = None,
 ) -> Container:
+    """Creates a command template with an optional custom image."""
     template = Container(
         name=name,
         command=["sh", "-c"],
@@ -31,10 +41,20 @@ def _make_cmd_template(
         inputs=[Artifact(name="input-dir", path="/input_dir/")],
         outputs=[Artifact(name="output-dir", path="/output_dir/")],
     )
+    
+    # Set custom image if provided
+    if custom_image or custom_tag:
+        # This will override the global image setting just for this container
+        template.image = custom_image if custom_image else None
+        template.image_tag = custom_tag if custom_tag else None
 
     return template
 
-def _make_fetch_input_template(recipe_config: RecipeConfig) -> Container:
+def _make_fetch_input_template(
+    recipe_config: RecipeConfig,
+    custom_image: Optional[str] = None,
+    custom_tag: Optional[str] = None,
+) -> Container:
     """Creates a container template that fetches multiple inputs from URLs or file paths.
     
     Supports:
@@ -70,10 +90,20 @@ def _make_fetch_input_template(recipe_config: RecipeConfig) -> Container:
         outputs=[Artifact(name="output-dir", path="/output_dir/")],
     )
     
+    # Set custom image if provided
+    if custom_image or custom_tag:
+        # This will override the global image setting just for this container
+        template.image = custom_image if custom_image else None
+        template.image_tag = custom_tag if custom_tag else None
+    
     return template
 
 
-def _make_publish_template(recipe_id: str) -> Container:
+def _make_publish_template(
+    recipe_id: str,
+    custom_image: Optional[str] = None,
+    custom_tag: Optional[str] = None,
+) -> Container:
     """Creates a container template that will move final output data into the
     OGDC data storage volume under a subpath named for the recipe_id."""
     template = Container(
@@ -91,6 +121,12 @@ def _make_publish_template(recipe_id: str) -> Container:
             )
         ],
     )
+    
+    # Set custom image if provided
+    if custom_image or custom_tag:
+        # This will override the global image setting just for this container
+        template.image = custom_image if custom_image else None
+        template.image_tag = custom_tag if custom_tag else None
 
     return template
 
@@ -114,7 +150,12 @@ def _cmds_from_simple_recipe(recipe_dir: str) -> list[str]:
     return commands
 
 
-def _remove_existing_published_data(*, recipe_config: RecipeConfig) -> None:
+def _remove_existing_published_data(
+    *, 
+    recipe_config: RecipeConfig,
+    custom_image: Optional[str] = None,
+    custom_tag: Optional[str] = None,
+) -> None:
     """Executes an argo workflow that removes published data for a recipe if it
     exists."""
     with Workflow(
@@ -135,6 +176,13 @@ def _remove_existing_published_data(*, recipe_config: RecipeConfig) -> None:
                 ),
             ],
         )
+        
+        # Set custom image if provided
+        if custom_image or custom_tag:
+            # This will override the global image setting just for this container
+            overwrite_template.image = custom_image if custom_image else None
+            overwrite_template.image_tag = custom_tag if custom_tag else None
+            
         with Steps(name="steps"):
             overwrite_template()
 
@@ -144,7 +192,12 @@ def _remove_existing_published_data(*, recipe_config: RecipeConfig) -> None:
     ARGO_WORKFLOW_SERVICE.delete_workflow(workflow_name)
 
 
-def _check_for_existing_published_data(*, recipe_config: RecipeConfig) -> bool:
+def _check_for_existing_published_data(
+    *, 
+    recipe_config: RecipeConfig,
+    custom_image: Optional[str] = None,
+    custom_tag: Optional[str] = None,
+) -> bool:
     """Execute argo workflow that checks if the given recipe has published data.
 
     Returns `True` if data have already been published for the given recipe,
@@ -159,7 +212,7 @@ def _check_for_existing_published_data(*, recipe_config: RecipeConfig) -> bool:
             name="check-already-published-",
             command=["sh", "-c"],
             # Check for the existence of the recipe-specific subpath. If it
-            # exists, writ eout a file with "yes". Otherwise write out a file
+            # exists, write out a file with "yes". Otherwise write out a file
             # with "no". This file becomes an argo parameter that we can check
             # later.
             args=[
@@ -178,6 +231,12 @@ def _check_for_existing_published_data(*, recipe_config: RecipeConfig) -> bool:
                 ),
             ],
         )
+        
+        # Set custom image if provided
+        if custom_image or custom_tag:
+            # This will override the global image setting just for this container
+            check_dir_template.image = custom_image if custom_image else None
+            check_dir_template.image_tag = custom_tag if custom_tag else None
 
         with Steps(name="steps"):
             check_dir_template()
@@ -209,7 +268,13 @@ def _check_for_existing_published_data(*, recipe_config: RecipeConfig) -> bool:
     return result == "yes"
 
 
-def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> bool:
+def data_already_published(
+    *, 
+    recipe_config: RecipeConfig, 
+    overwrite: bool,
+    custom_image: Optional[str] = None,
+    custom_tag: Optional[str] = None,
+) -> bool:
     """Check for the existence of published data for the given
     recipe and optionally remove it.
 
@@ -223,23 +288,46 @@ def data_already_published(*, recipe_config: RecipeConfig, overwrite: bool) -> b
         # If `overwrite` is True, remove the existing data and return `False`.
         _remove_existing_published_data(
             recipe_config=recipe_config,
+            custom_image=custom_image,
+            custom_tag=custom_tag,
         )
         return False
 
     return _check_for_existing_published_data(
         recipe_config=recipe_config,
+        custom_image=custom_image,
+        custom_tag=custom_tag,
     )
 
 
 def make_and_submit_simple_workflow(
     recipe_config: RecipeConfig,
     wait: bool,
+    custom_image: Optional[str] = None,
+    custom_tag: Optional[str] = None,
+    custom_namespace: Optional[str] = None,
+    update_global: bool = False,
 ) -> str:
     """Create and submit an argo workflow based on a simple recipe.
+
+    Args:
+        recipe_config: The recipe configuration
+        wait: Whether to wait for the workflow to complete
+        custom_image: Optional custom image to use for all containers
+        custom_tag: Optional custom tag for the image
+        custom_namespace: Optional custom namespace for the workflow
+        update_global: If True, update the global image config; if False, only apply to this workflow
 
     Returns the name of the workflow as a str.
     """
     commands = _cmds_from_simple_recipe(recipe_config.recipe_directory)
+    
+    # Update global configurations if requested
+    if update_global:
+        if custom_image or custom_tag:
+            update_runner_image(image=custom_image, tag=custom_tag)
+        if custom_namespace:
+            update_namespace(namespace=custom_namespace)
 
     with Workflow(
         generate_name=f"{recipe_config.id}-",
@@ -248,14 +336,27 @@ def make_and_submit_simple_workflow(
     ) as w:
         cmd_templates = []
         for idx, command in enumerate(commands):
-            cmd_template = _make_cmd_template(name=f"run-cmd-{idx}", command=command)
+            cmd_template = _make_cmd_template(
+                name=f"run-cmd-{idx}", 
+                command=command,
+                custom_image=custom_image,
+                custom_tag=custom_tag,
+            )
             cmd_templates.append(cmd_template)
         
         # Use the simplified multi-input fetch template
-        fetch_template = _make_fetch_input_template(recipe_config)
+        fetch_template = _make_fetch_input_template(
+            recipe_config=recipe_config,
+            custom_image=custom_image,
+            custom_tag=custom_tag,
+        )
 
         # Create publication template
-        publish_template = _make_publish_template(recipe_config.id)
+        publish_template = _make_publish_template(
+            recipe_id=recipe_config.id,
+            custom_image=custom_image,
+            custom_tag=custom_tag,
+        )
 
         with Steps(name="steps"):
             step = fetch_template()
@@ -275,14 +376,38 @@ def make_and_submit_simple_workflow(
     return workflow_name
 
 
-def submit_ogdc_recipe(*, recipe_dir: str, wait: bool, overwrite: bool) -> str:
+def submit_ogdc_recipe(
+    *, 
+    recipe_dir: str, 
+    wait: bool, 
+    overwrite: bool,
+    custom_image: Optional[str] = None,
+    custom_tag: Optional[str] = None,
+    custom_namespace: Optional[str] = None,
+    update_global: bool = False,
+) -> str:
     """Submit an OGDC recipe for processing via argo workflows.
+
+    Args:
+        recipe_dir: Path to the recipe directory
+        wait: Whether to wait for the workflow to complete
+        overwrite: Whether to overwrite existing published data
+        custom_image: Optional custom image to use for all containers
+        custom_tag: Optional custom tag for the image
+        custom_namespace: Optional custom namespace for the workflow
+        update_global: If True, update the global image config; if False, only apply to this workflow
 
     Returns the name of the OGDC simple recipe submitted to Argo.
     """
     recipe_config = get_recipe_config(recipe_dir)
+    
     # Check if the user-submitted workflow has already been published
-    if data_already_published(recipe_config=recipe_config, overwrite=overwrite):
+    if data_already_published(
+        recipe_config=recipe_config, 
+        overwrite=overwrite,
+        custom_image=custom_image,
+        custom_tag=custom_tag,
+    ):
         err_msg = f"Data for recipe {recipe_config.id} have already been published."
         raise OgdcDataAlreadyPublished(err_msg)
 
@@ -290,6 +415,10 @@ def submit_ogdc_recipe(*, recipe_dir: str, wait: bool, overwrite: bool) -> str:
     simple_recipe_workflow_name = make_and_submit_simple_workflow(
         recipe_config=recipe_config,
         wait=wait,
+        custom_image=custom_image,
+        custom_tag=custom_tag,
+        custom_namespace=custom_namespace,
+        update_global=update_global,
     )
 
     return simple_recipe_workflow_name
