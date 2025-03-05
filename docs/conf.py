@@ -48,3 +48,10 @@ nitpick_ignore = [
 ]
 
 always_document_param_types = True
+
+
+templates_path = ['_templates']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+
+html_static_path = ['_static']
+
