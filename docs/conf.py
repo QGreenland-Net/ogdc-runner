@@ -1,7 +1,7 @@
+from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from __future__ import annotations
 
 import importlib.metadata
 
@@ -10,10 +10,9 @@ sys.path.insert(0, str(Path('../').resolve()))
 project = "ogdc-runner"
 copyright = "2024, NSIDC & ADC"
 author = "QGreenland-Net team"
-version = release = importlib.metadata.version("ogdc_runner")
+# version = release = importlib.metadata.version("ogdc_runner")
 
 extensions = [
-    "myst_parser",
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
