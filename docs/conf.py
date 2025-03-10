@@ -13,6 +13,7 @@ author = "QGreenland-Net team"
 # version = release = importlib.metadata.version("ogdc_runner")
 
 extensions = [
+    'myst_parser',
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
