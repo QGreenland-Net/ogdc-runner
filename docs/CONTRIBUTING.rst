@@ -13,7 +13,7 @@ First, ensure you have [ogdc-helm](https://github.com/QGreenland-Net/ogdc-helm)
 setup for development. The argo server ports are expected to be forwarded for
 access via localhost.
 
-Now you can set up a python development environment for `ogdc-runner` by
+Now you can set up a python development environment for ``ogdc-runner`` by
 running:
 
 ```bash
@@ -37,7 +37,7 @@ Workflow status: Succeeded
 
 ### Using a local docker image for workflow execution
 
-The `ogdc-runner` supports using a local `ogdc-runner` image for development
+The ``ogdc-runner`` supports using a local ``ogdc-runner`` image for development
 purposes (e.g., you want to change and test something about the image without
 needing to release it to the GHCR).
 
@@ -47,11 +47,11 @@ First, build a local image:
 docker build . -t ogdc-runner
 ```
 
-> [!NOTE] The docker image must be built in the `rancher-desktop` context so
+> [!NOTE] The docker image must be built in the ``rancher-desktop`` context so
 > that it is available to the Argo deployment on the developer's local machine.
-> Check that you have the correct context selected with `docker context ls`.
+> Check that you have the correct context selected with ``docker context ls``.
 
-Next, set the `ENVIRONMENT` envvar to `dev`. This will tell `ogdc-runner` to use
+Next, set the ``ENVIRONMENT`` envvar to ``dev``. This will tell ``ogdc-runner`` to use
 the locally built image instead of the one hosted on the GHCR:
 
 ```
@@ -61,9 +61,9 @@ export ENNVIRONMENT=dev
 ## Testing, linting, rendering docs with Nox
 
 The fastest way to start is to use Nox. If you don't have Nox, you can use
-`pipx run nox` to run it without installing, or `pipx install nox`. If you don't
-have pipx, then you can install with `pip install pipx`. If you use macOS, use
-`brew install pipx nox`. To use:
+``pipx run nox`` to run it without installing, or ``pipx install nox``. If you don't
+have pipx, then you can install with ``pip install pipx``. If you use macOS, use
+``brew install pipx nox``. To use:
 
 ```console
 nox
@@ -90,7 +90,7 @@ environment for each run.
 ### Reusing Nox virtual environments
 
 **By default, Nox deletes and recreates virtual environments for every run.**
-Because this is slow, you may want to skip that step with `-R` flag:
+Because this is slow, you may want to skip that step with ``-R`` flag:
 
 ```console
 nox -R  # MUCH faster!
@@ -101,15 +101,15 @@ Please read more in the
 
 ## Automated pre-commit checks
 
-`pre-commit` can check that code passes required checks before committing:
+``pre-commit`` can check that code passes required checks before committing:
 
 ```bash
 pip install pre-commit  # or brew install pre-commit on macOS
 pre-commit install  # install Git pre-commit hook from .pre-commit-config.yml
 ```
 
-You can also/alternatively run `pre-commit run` (will run for changed files
-only) or `pre-commit run --all-files` to check even without installing the hook.
+You can also/alternatively run ``pre-commit run`` (will run for changed files
+only) or ``pre-commit run --all-files`` to check even without installing the hook.
 
 ## Testing
 
