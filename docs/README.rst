@@ -62,14 +62,14 @@ ogdc-runner submit github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags
 
 ## Implementation notes
 
-- `ogdc-runner` could be a Python program
+- ``ogdc-runner`` could be a Python program
 - The trigger/status interface could be handled (transparently?) by a GitHub
   Actions self-hosted runner.
 
 ## Contributing
 
 See [./docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md) for information about
-developing `ogdc-runner`.
+developing ``ogdc-runner``.
 
 <!-- prettier-ignore-start -->
 [actions-badge]:            https://github.com/qgreenland-net/ogdc-runner/workflows/CI/badge.svg
