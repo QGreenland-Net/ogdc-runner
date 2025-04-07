@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import fsspec
-from typing import Optional, List, Dict, Any
 from hera.workflows import (
     Artifact,
     Container,
@@ -13,21 +12,21 @@ from hera.workflows import (
 from loguru import logger
 
 from ogdc_runner.argo import (
-    ARGO_WORKFLOW_SERVICE, 
-    OGDC_WORKFLOW_PVC, 
+    ARGO_WORKFLOW_SERVICE,
+    OGDC_WORKFLOW_PVC,
     submit_workflow,
-    update_runner_image,
     update_namespace,
+    update_runner_image,
 )
-from ogdc_runner.exceptions import OgdcDataAlreadyPublished, OgdcWorkflowExecutionError
+from ogdc_runner.exceptions import OgdcWorkflowExecutionError
 from ogdc_runner.models.recipe_config import RecipeConfig
 
 
 def make_cmd_template(
     name: str,
     command: str,
-    custom_image: Optional[str] = None,
-    custom_tag: Optional[str] = None,
+    custom_image: str | None = None,
+    custom_tag: str | None = None,
 ) -> Container:
     """Creates a command template with an optional custom image."""
     template = Container(
@@ -39,7 +38,7 @@ def make_cmd_template(
         inputs=[Artifact(name="input-dir", path="/input_dir/")],
         outputs=[Artifact(name="output-dir", path="/output_dir/")],
     )
-    
+
     # Set custom image if provided
     if custom_image or custom_tag:
         # This will override the global image setting just for this container
@@ -51,35 +50,37 @@ def make_cmd_template(
 
 def make_fetch_input_template(
     recipe_config: RecipeConfig,
-    custom_image: Optional[str] = None,
-    custom_tag: Optional[str] = None,
+    custom_image: str | None = None,
+    custom_tag: str | None = None,
 ) -> Container:
     """Creates a container template that fetches multiple inputs from URLs or file paths.
-    
+
     Supports:
     - HTTP/HTTPS URLs
     - File paths (including PVC paths)
     """
     # Create commands to fetch each input
     fetch_commands = []
-    
+
     for i, param in enumerate(recipe_config.input.params):
         param_str = str(param)
         # Check if the parameter is a URL
-        if param_str.startswith(('http://', 'https://')):
+        if param_str.startswith(("http://", "https://")):
             # It's a URL, use wget
-            fetch_commands.append(f"wget --content-disposition -P /output_dir/ {param_str}")
+            fetch_commands.append(
+                f"wget --content-disposition -P /output_dir/ {param_str}"
+            )
         else:
             # It's a file path (including PVC paths), use cp
             # Get just the filename for the destination
-            filename = param_str.split('/')[-1]
+            filename = param_str.split("/")[-1]
             fetch_commands.append(f"cp {param_str} /output_dir/{filename}")
-    
+
     # Join all commands with && for sequential execution
     combined_command = " && ".join(fetch_commands)
     if not combined_command:
         combined_command = "echo 'No input files to fetch'"
-    
+
     template = Container(
         name=f"{recipe_config.id}-fetch-template-",
         command=["sh", "-c"],
@@ -88,20 +89,20 @@ def make_fetch_input_template(
         ],
         outputs=[Artifact(name="output-dir", path="/output_dir/")],
     )
-    
+
     # Set custom image if provided
     if custom_image or custom_tag:
         # This will override the global image setting just for this container
         template.image = custom_image if custom_image else None
         template.image_tag = custom_tag if custom_tag else None
-    
+
     return template
 
 
 def make_publish_template(
     recipe_id: str,
-    custom_image: Optional[str] = None,
-    custom_tag: Optional[str] = None,
+    custom_image: str | None = None,
+    custom_tag: str | None = None,
 ) -> Container:
     """Creates a container template that will move final output data into the
     OGDC data storage volume under a subpath named for the recipe_id."""
@@ -120,7 +121,7 @@ def make_publish_template(
             )
         ],
     )
-    
+
     # Set custom image if provided
     if custom_image or custom_tag:
         # This will override the global image setting just for this container
@@ -131,10 +132,10 @@ def make_publish_template(
 
 
 def remove_existing_published_data(
-    *, 
+    *,
     recipe_config: RecipeConfig,
-    custom_image: Optional[str] = None,
-    custom_tag: Optional[str] = None,
+    custom_image: str | None = None,
+    custom_tag: str | None = None,
 ) -> None:
     """Executes an argo workflow that removes published data for a recipe if it
     exists."""
@@ -156,13 +157,13 @@ def remove_existing_published_data(
                 ),
             ],
         )
-        
+
         # Set custom image if provided
         if custom_image or custom_tag:
             # This will override the global image setting just for this container
             overwrite_template.image = custom_image if custom_image else None
             overwrite_template.image_tag = custom_tag if custom_tag else None
-            
+
         with Steps(name="steps"):
             overwrite_template()
 
@@ -173,10 +174,10 @@ def remove_existing_published_data(
 
 
 def check_for_existing_published_data(
-    *, 
+    *,
     recipe_config: RecipeConfig,
-    custom_image: Optional[str] = None,
-    custom_tag: Optional[str] = None,
+    custom_image: str | None = None,
+    custom_tag: str | None = None,
 ) -> bool:
     """Execute argo workflow that checks if the given recipe has published data.
 
@@ -211,7 +212,7 @@ def check_for_existing_published_data(
                 ),
             ],
         )
-        
+
         # Set custom image if provided
         if custom_image or custom_tag:
             # This will override the global image setting just for this container
@@ -249,11 +250,11 @@ def check_for_existing_published_data(
 
 
 def data_already_published(
-    *, 
-    recipe_config: RecipeConfig, 
+    *,
+    recipe_config: RecipeConfig,
     overwrite: bool,
-    custom_image: Optional[str] = None,
-    custom_tag: Optional[str] = None,
+    custom_image: str | None = None,
+    custom_tag: str | None = None,
 ) -> bool:
     """Check for the existence of published data for the given
     recipe and optionally remove it.
@@ -280,7 +281,7 @@ def data_already_published(
     )
 
 
-def parse_commands_from_recipe_file(recipe_dir: str, filename: str) -> List[str]:
+def parse_commands_from_recipe_file(recipe_dir: str, filename: str) -> list[str]:
     """Read commands from a recipe file.
 
     Args:
@@ -302,13 +303,13 @@ def parse_commands_from_recipe_file(recipe_dir: str, filename: str) -> List[str]
 
 def apply_custom_container_config(
     workflow: Workflow,
-    custom_image: Optional[str] = None, 
-    custom_tag: Optional[str] = None,
-    custom_namespace: Optional[str] = None,
-    update_global: bool = False
+    custom_image: str | None = None,
+    custom_tag: str | None = None,
+    custom_namespace: str | None = None,
+    update_global: bool = False,
 ) -> None:
     """Apply custom configuration to a workflow.
-    
+
     Args:
         workflow: The workflow to configure
         custom_image: Optional custom image to use

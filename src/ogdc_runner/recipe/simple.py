@@ -1,38 +1,36 @@
 from __future__ import annotations
 
-from typing import Optional
 from hera.workflows import (
     Steps,
     Workflow,
 )
-from loguru import logger
 
 from ogdc_runner.argo import (
-    ARGO_WORKFLOW_SERVICE, 
+    ARGO_WORKFLOW_SERVICE,
     submit_workflow,
+)
+
+# Import common utilities
+from ogdc_runner.common import (
+    apply_custom_container_config,
+    data_already_published,
+    make_cmd_template,
+    make_fetch_input_template,
+    make_publish_template,
+    parse_commands_from_recipe_file,
 )
 from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.recipe import get_recipe_config
 
-# Import common utilities
-from ogdc_runner.common import (
-    make_cmd_template,
-    make_fetch_input_template,
-    make_publish_template,
-    data_already_published,
-    parse_commands_from_recipe_file,
-    apply_custom_container_config,
-)
-
 
 def make_and_submit_simple_workflow(
     recipe_config: RecipeConfig,
     wait: bool,
-    custom_image: Optional[str] = None,
-    custom_tag: Optional[str] = None,
-    custom_namespace: Optional[str] = None,
+    custom_image: str | None = None,
+    custom_tag: str | None = None,
+    custom_namespace: str | None = None,
     update_global: bool = False,
 ) -> str:
     """Create and submit an argo workflow based on a simple recipe.
@@ -66,18 +64,18 @@ def make_and_submit_simple_workflow(
             custom_namespace=custom_namespace,
             update_global=update_global,
         )
-        
+
         # Create command templates
         cmd_templates = []
         for idx, command in enumerate(commands):
             cmd_template = make_cmd_template(
-                name=f"run-cmd-{idx}", 
+                name=f"run-cmd-{idx}",
                 command=command,
                 custom_image=custom_image,
                 custom_tag=custom_tag,
             )
             cmd_templates.append(cmd_template)
-        
+
         # Use the multi-input fetch template
         fetch_template = make_fetch_input_template(
             recipe_config=recipe_config,
@@ -113,13 +111,13 @@ def make_and_submit_simple_workflow(
 
 
 def submit_ogdc_recipe(
-    *, 
-    recipe_dir: str, 
-    wait: bool, 
+    *,
+    recipe_dir: str,
+    wait: bool,
     overwrite: bool,
-    custom_image: Optional[str] = None,
-    custom_tag: Optional[str] = None,
-    custom_namespace: Optional[str] = None,
+    custom_image: str | None = None,
+    custom_tag: str | None = None,
+    custom_namespace: str | None = None,
     update_global: bool = False,
 ) -> str:
     """Submit an OGDC recipe for processing via argo workflows.
@@ -137,10 +135,10 @@ def submit_ogdc_recipe(
     """
     # Get the recipe configuration
     recipe_config = get_recipe_config(recipe_dir)
-    
+
     # Check if the user-submitted workflow has already been published
     if data_already_published(
-        recipe_config=recipe_config, 
+        recipe_config=recipe_config,
         overwrite=overwrite,
         custom_image=custom_image,
         custom_tag=custom_tag,
