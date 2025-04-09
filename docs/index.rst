@@ -8,8 +8,7 @@ ogdc-runner documentation
 =========================
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents
+   :maxdepth: 1
    :hidden:
-   ../README.md
+
    CONTRIBUTING.md

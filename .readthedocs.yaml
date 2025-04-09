@@ -7,6 +7,10 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.11"
+    nodejs: "16"
+  jobs:
+    post_install:
+      - npm install -g @mermaid-js/mermaid-cli
 sphinx:
   configuration: docs/conf.py
 
