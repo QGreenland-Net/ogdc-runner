@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import importlib.metadata
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path("../").resolve()))
 
 project = "ogdc-runner"
 copyright = "2024, NSIDC & ADC"
 author = "QGreenland-Net team"
-version = release = importlib.metadata.version("ogdc_runner")
 
 extensions = [
     "myst_parser",
@@ -43,3 +45,9 @@ nitpick_ignore = [
 ]
 
 always_document_param_types = True
+
+
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+
+html_static_path = ["_static"]
