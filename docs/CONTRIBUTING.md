@@ -19,7 +19,7 @@ running:
 ```bash
 python -m venv .venv
 source ./.venv/bin/activate
-pip install -v --editable .[dev]
+pip install -v --editable ".[dev]"
 ```
 
 ## Running the CLI in dev
