@@ -3,7 +3,7 @@ from __future__ import annotations
 from hera.workflows import (
     DAG,
     Artifact,
-    Container,
+    HTTPArtifact,
     Parameter,
     Script,
     Workflow,
@@ -26,8 +26,55 @@ from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.recipe import get_recipe_config
 
 
+def make_download_viz_config_template(
+    config_url: str = "https://gist.githubusercontent.com/rushirajnenuji/1b41924b8cb81ae8a9795823b9a89ea2/raw/3f0f78840dd345a69e1a863b972eedec6c74c2a6/viz-config.json",
+    custom_image: str | None = None,
+    custom_tag: str | None = None,
+) -> Script:
+    """Creates a template that downloads visualization configuration from a URL.
+
+    Args:
+        config_url: URL to the visualization configuration file
+        custom_image: Optional custom container image
+        custom_tag: Optional custom container image tag
+
+    Returns:
+        A Script template for downloading viz config
+    """
+    template = Script(
+        name="download-viz-config",
+        outputs=[
+            Artifact(
+                name="viz-config-json", path="/mnt/workflow/config/viz-config.json"
+            ),
+        ],
+        image="ghcr.io/rushirajnenuji/vizstaging" if not custom_image else custom_image,
+        image_tag=custom_tag if custom_tag else None,
+        command=["python"],
+        source=f"""
+import requests
+from pathlib import Path
+
+url = "{config_url}"
+output_path = Path("{{{{outputs.artifacts.viz-config-json.path}}}}")
+output_path.parent.mkdir(parents=True, exist_ok=True)
+
+response = requests.get(url)
+response.raise_for_status()
+
+with open(output_path, "w") as f:
+    f.write(response.text)
+""",
+        volume_mounts=[
+            models.VolumeMount(
+                name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow"
+            )
+        ],
+    )
+    return template
+
+
 def make_batch_template(
-    input_url: str,
     num_features: int = 200,
     custom_image: str | None = None,
     custom_tag: str | None = None,
@@ -35,7 +82,6 @@ def make_batch_template(
     """Creates a template that batches input data into chunks.
 
     Args:
-        input_url: URL to the input data file
         num_features: Number of features to include in each batch
         custom_image: Optional custom container image
         custom_tag: Optional custom container image tag
@@ -44,31 +90,37 @@ def make_batch_template(
         A Script template for batching
     """
     template = Script(
-        name="batch-template",
+        name="batching",
         inputs=[
             Parameter(name="num_features", value=str(num_features)),
-            Artifact(
+            HTTPArtifact(
                 name="batch-input",
-                http=models.HTTPArtifact(url=input_url),
-                path="/tmp/pdg_processing/input/ice_basins.gpkg",
+                path="/mnt/workflow/input/ice_basins.gpkg",
+                url="https://demo.arcticdata.io/tiles/3dtt/Ice_Basins_1000.gpkg",
             ),
         ],
         outputs=[
-            Artifact(name="batch-output", path="/tmp/pdg_processing/output/batch"),
+            Artifact(name="batch-output", path="/mnt/workflow/output/batch"),
         ],
-        image="ghcr.io/mfisher87/pdgstaging" if not custom_image else custom_image,
+        image="ghcr.io/rushirajnenuji/vizstaging" if not custom_image else custom_image,
         image_tag=custom_tag if custom_tag else None,
+        command=["python"],
         source="""
 import json
 import sys
 from pathlib import Path
-
 import geopandas as gpd
+
+# Redirect print statements to stderr instead of stdout
+# This way they won't interfere with the JSON output
+def print_log(message):
+    print(message, file=sys.stderr)
 
 gdf = gpd.read_file("{{inputs.artifacts.batch-input.path}}")
 results = []
 for idx, start in enumerate(range(0, len(gdf), {{inputs.parameters.num_features}})):
     output_fp = Path("{{outputs.artifacts.batch-output.path}}/" + f"chunk-{idx}.gpkg")
+    print_log(f"Writing chunk {idx} to {output_fp}")
     output_fp.parent.mkdir(parents=True, exist_ok=True)
     gdf[start:start+{{inputs.parameters.num_features}}].to_file(
         filename=output_fp,
@@ -76,98 +128,63 @@ for idx, start in enumerate(range(0, len(gdf), {{inputs.parameters.num_features}
     )
     results.append(str(output_fp))
 
-json.dump(results, sys.stdout)
-        """,
-        command=["python"],
+# Output only the JSON to stdout
+print(json.dumps(results))
+""",
+        volume_mounts=[
+            models.VolumeMount(
+                name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow"
+            )
+        ],
     )
-
     return template
 
 
-def make_stage_template(
-    config_url: str,
+def make_tiling_template(
     custom_image: str | None = None,
     custom_tag: str | None = None,
 ) -> Script:
-    """Creates a template that stages data for visualization.
+    """Creates a template for tiling geospatial data.
 
     Args:
-        config_url: URL to the visualization configuration file
         custom_image: Optional custom container image
         custom_tag: Optional custom container image tag
 
     Returns:
-        A Script template for staging
+        A Script template for tiling
     """
     template = Script(
-        name="stage-template",
+        name="tiling",
         inputs=[
             Parameter(name="chunk-filepath"),
-            Artifact(
-                name="viz-config-json",
-                http=models.HTTPArtifact(url=config_url),
-                path="/tmp/config.json",
-            ),
-            Artifact(name="batch-output", path="/tmp/pdg_processing/output/batch"),
         ],
-        outputs=[
-            Artifact(name="staging-output", path="/tmp/pdg_processing/output/staged"),
-        ],
-        image="ghcr.io/mfisher87/pdgstaging" if not custom_image else custom_image,
+        image="ghcr.io/rushirajnenuji/vizstaging" if not custom_image else custom_image,
         image_tag=custom_tag if custom_tag else None,
+        command=["python"],
         source="""
 import json
 from pathlib import Path
-
 from pdgstaging import TileStager
+import sys
 
-workflow_config = json.loads(Path("{{inputs.artifacts.viz-config-json.path}}").read_text())
+# Log to stderr
+def print_log(message):
+    print(message, file=sys.stderr)
+
+# Read the viz-config.json from the PVC
+workflow_config = json.loads(Path("/mnt/workflow/config/viz-config.json").read_text())
 stager = TileStager(workflow_config, check_footprints=False)
+print_log('Staging chunk file')
+print_log('{{inputs.parameters.chunk-filepath}}')
 stager.stage("{{inputs.parameters.chunk-filepath}}")
-print("Staging done")
-        """,
-        command=["python"],
-    )
-
-    return template
-
-
-def make_rasterize_template(
-    config_url: str,
-    custom_image: str | None = None,
-    custom_tag: str | None = None,
-) -> Container:
-    """Creates a template that rasterizes staged data.
-
-    Args:
-        config_url: URL to the visualization configuration file
-        custom_image: Optional custom container image
-        custom_tag: Optional custom container image tag
-
-    Returns:
-        A Container template for rasterization
-    """
-    template = Container(
-        name="rasterize-template",
-        inputs=[
-            Artifact(
-                name="viz-config-json",
-                http=models.HTTPArtifact(url=config_url),
-                path="/tmp/config.json",
-            ),
-            Artifact(name="staging-output", path="/tmp/pdg_processing/output/staged"),
+print_log("Staging done")
+""",
+        volume_mounts=[
+            models.VolumeMount(
+                name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow"
+            )
         ],
-        outputs=[
-            Artifact(name="raster-output", path="/tmp/pdg_processing/output/raster"),
-        ],
-        image="ghcr.io/permafrostdiscoverygateway/viz-workflow:0.2.3"
-        if not custom_image
-        else custom_image,
-        image_tag=custom_tag if custom_tag else None,
-        command=["python"],
-        args=["-m", "pdgraster", "-c", "{{inputs.artifacts.viz-config-json.path}}"],
     )
-
     return template
 
 
@@ -181,7 +198,7 @@ def make_and_submit_parallel_workflow(
     enable_rasterize: bool = False,
     num_features: int = 200,
     input_url: str = "https://demo.arcticdata.io/tiles/3dtt/Ice_Basins_1000.gpkg",
-    config_url: str = "https://gist.githubusercontent.com/mfisher87/f13f87949809a4eef0485f3eb05b9534/raw/47cbf12b30b40d0a51da51dd729985ff5a8459e8/qgnet_config.json",
+    config_url: str = "https://gist.githubusercontent.com/rushirajnenuji/1b41924b8cb81ae8a9795823b9a89ea2/raw/3f0f78840dd345a69e1a863b972eedec6c74c2a6/viz-config.json",
 ) -> str:
     """Create and submit an Argo workflow for parallel processing of geospatial data.
 
@@ -206,7 +223,15 @@ def make_and_submit_parallel_workflow(
     with Workflow(
         generate_name=f"{recipe_config.id}-pdg-",
         entrypoint="main",
+        namespace="qgnet",
+        service_account_name="argo-workflow",
         workflows_service=ARGO_WORKFLOW_SERVICE,
+        volumes=[
+            {
+                "name": "qgnet-ogdc-workflow-pvc",
+                "persistentVolumeClaim": {"claimName": "qgnet-ogdc-workflow-pvc"},
+            }
+        ],
         annotations={
             "workflows.argoproj.io/description": "Parallel workflow for PDG visualization tiles"
         },
@@ -221,60 +246,46 @@ def make_and_submit_parallel_workflow(
             update_global=update_global,
         )
 
-        # Create the batch template
-        batch_template = make_batch_template(
-            input_url=input_url,
-            num_features=num_features,
-            custom_image=custom_image,
-            custom_tag=custom_tag,
-        )
-
-        # Create the stage template
-        stage_template = make_stage_template(
+        # Create the templates
+        download_viz_config_template = make_download_viz_config_template(
             config_url=config_url,
             custom_image=custom_image,
             custom_tag=custom_tag,
         )
 
-        # Create the rasterize template if enabled
-        if enable_rasterize:
-            rasterize_template = make_rasterize_template(
-                config_url=config_url,
-                custom_image=custom_image,
-                custom_tag=custom_tag,
-            )
+        batch_template = make_batch_template(
+            num_features=num_features,
+            custom_image=custom_image,
+            custom_tag=custom_tag,
+        )
+
+        tiling_template = make_tiling_template(
+            custom_image=custom_image,
+            custom_tag=custom_tag,
+        )
 
         # Set up the DAG
-        with DAG(name="main"):
-            # Batch task
-            batch_task = batch_template(name="batch")
+        with DAG(name="main") as dag:
+            # Step 1: Download viz-config.json
+            download_task = download_viz_config_template()
 
-            # Stage task with parameter from batch
-            stage_task = stage_template(
-                name="stage",
+            # Step 2: Batching step
+            batch_task = batch_template()
+
+            # Step 3: Tiling step, depends on both the download and batch tasks
+            stage_task = tiling_template(
                 arguments={
-                    "parameters": {"chunk-filepath": "{{item}}"},
-                    "artifacts": {
-                        "batch-output": batch_task.get_artifact("batch-output")
-                    },
+                    "chunk-filepath": "{{item}}",
                 },
-                with_param="{{tasks.batch.outputs.result}}",
-            ).after(batch_task)
+                with_param=batch_task.get_result_as("result"),
+            )
 
-            # Rasterize task if enabled
-            if enable_rasterize:
-                rasterize_template(
-                    name="rasterize",
-                    arguments={
-                        "artifacts": {
-                            "staging-output": stage_task.get_artifact("staging-output")
-                        }
-                    },
-                ).after(stage_task)
+            # Define task dependencies
+            download_task >> batch_task  # Download config before batching
+            batch_task >> stage_task  # Batch before tiling
 
     # Submit the workflow
     workflow_name = submit_workflow(w, wait=wait)
-
     return workflow_name
 
 
@@ -328,7 +339,7 @@ def submit_parallel_ogdc_recipe(
         input_url = "https://demo.arcticdata.io/tiles/3dtt/Ice_Basins_1000.gpkg"
 
     if config_url is None:
-        config_url = "https://gist.githubusercontent.com/mfisher87/f13f87949809a4eef0485f3eb05b9534/raw/47cbf12b30b40d0a51da51dd729985ff5a8459e8/qgnet_config.json"
+        config_url = "https://gist.githubusercontent.com/rushirajnenuji/1b41924b8cb81ae8a9795823b9a89ea2/raw/3f0f78840dd345a69e1a863b972eedec6c74c2a6/viz-config.json"
 
     # Submit the workflow
     workflow_name = make_and_submit_parallel_workflow(
