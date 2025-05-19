@@ -140,7 +140,7 @@ def tiling_process():
     print_log("Staging done")
 
 
-def make_and_submit_parallel_workflow(
+def make_and_submit_viz_workflow(
     recipe_config: RecipeConfig,
     wait: bool,
     custom_image: str | None = None,
@@ -223,7 +223,7 @@ def make_and_submit_parallel_workflow(
     return workflow_name
 
 
-def submit_parallel_ogdc_recipe(
+def submit_viz_workflow_recipe(
     *,
     recipe_dir: str,
     wait: bool,
@@ -258,16 +258,6 @@ def submit_parallel_ogdc_recipe(
     # Get the recipe configuration
     recipe_config = get_recipe_config(recipe_dir)
 
-    # Check if the user-submitted workflow has already been published
-    if data_already_published(
-        recipe_config=recipe_config,
-        overwrite=overwrite,
-        custom_image=custom_image,
-        custom_tag=custom_tag,
-    ):
-        err_msg = f"Data for recipe {recipe_config.id} have already been published."
-        raise OgdcDataAlreadyPublished(err_msg)
-
     # Set default URLs if not provided
     if input_url is None:
         input_url = "https://demo.arcticdata.io/tiles/3dtt/Ice_Basins_1000.gpkg"
@@ -276,7 +266,7 @@ def submit_parallel_ogdc_recipe(
         config_url = "https://gist.githubusercontent.com/rushirajnenuji/1b41924b8cb81ae8a9795823b9a89ea2/raw/3f0f78840dd345a69e1a863b972eedec6c74c2a6/viz-config.json"
 
     # Submit the workflow
-    workflow_name = make_and_submit_parallel_workflow(
+    workflow_name = make_and_submit_viz_workflow(
         recipe_config=recipe_config,
         wait=wait,
         custom_image=custom_image,
@@ -289,5 +279,5 @@ def submit_parallel_ogdc_recipe(
         config_url=config_url,
     )
 
-    logger.info(f"Submitted parallel workflow {workflow_name}")
+    logger.info(f"Completed workflow: {workflow_name}")
     return workflow_name

@@ -23,6 +23,7 @@ from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.recipe.viz_workflow import submit_viz_workflow_recipe
 
 
 def make_and_submit_simple_workflow(
@@ -145,6 +146,18 @@ def submit_ogdc_recipe(
     ):
         err_msg = f"Data for recipe {recipe_config.id} have already been published."
         raise OgdcDataAlreadyPublished(err_msg)
+
+    # Check if the recipe is a visualization workflow
+    if recipe_config.id == "viz-workflow":
+        return submit_viz_workflow_recipe(
+            recipe_dir=recipe_dir,
+            wait=wait,
+            overwrite=overwrite,
+            custom_image=custom_image,
+            custom_tag=custom_tag,
+            custom_namespace=custom_namespace,
+            update_global=update_global,
+        )
 
     # We currently expect all recipes to be "simple"
     simple_recipe_workflow_name = make_and_submit_simple_workflow(
