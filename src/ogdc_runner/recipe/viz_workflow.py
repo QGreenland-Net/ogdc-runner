@@ -34,7 +34,7 @@ from ogdc_runner.recipe import get_recipe_config
     command=["python"],
     volume_mounts=[{"name": "qgnet-ogdc-workflow-pvc", "mountPath": "/mnt/workflow"}],
 )
-def download_viz_config():
+def download_viz_config(config_url):
     """Downloads visualization configuration from a URL."""
     import subprocess
     import sys
@@ -46,11 +46,10 @@ def download_viz_config():
 
     import requests
 
-    url = "https://gist.githubusercontent.com/rushirajnenuji/1b41924b8cb81ae8a9795823b9a89ea2/raw/3f0f78840dd345a69e1a863b972eedec6c74c2a6/viz-config.json"
     output_path = Path("{{outputs.artifacts.viz-config-json.path}}")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    response = requests.get(url)
+    response = requests.get(config_url)
     response.raise_for_status()
 
     with Path.open(output_path, "w") as f:
@@ -60,11 +59,11 @@ def download_viz_config():
 @script(
     name="batching",
     inputs=[
-        Parameter(name="num_features", value=250),
+        Parameter(name="input_url"),
         HTTPArtifact(
             name="batch-input",
             path="/mnt/workflow/input/ice_basins.gpkg",
-            url="https://demo.arcticdata.io/tiles/3dtt/Ice_Basins_1000.gpkg",
+            url="{{inputs.parameters.input_url}}",
         ),
     ],
     outputs=[
@@ -77,7 +76,7 @@ def download_viz_config():
     command=["python"],
     volume_mounts=[{"name": "qgnet-ogdc-workflow-pvc", "mountPath": "/mnt/workflow"}],
 )
-def batch_process():
+def batch_process(input_url, num_features):  # noqa: ARG001
     """Processes data in batches."""
     import json
     import sys
@@ -92,13 +91,13 @@ def batch_process():
 
     gdf = gpd.read_file("{{inputs.artifacts.batch-input.path}}")
     results = []
-    for idx, start in enumerate(range(0, len(gdf), {{inputs.parameters.num_features}})):  # noqa: F821
+    for idx, start in enumerate(range(0, len(gdf), num_features)):
         output_fp = Path(
             "{{outputs.artifacts.batch-output.path}}/" + f"chunk-{idx}.gpkg"
         )
         print_log(f"Writing chunk {idx} to {output_fp}")
         output_fp.parent.mkdir(parents=True, exist_ok=True)
-        gdf[start : start + {{inputs.parameters.num_features}}].to_file(  # noqa: F821
+        gdf[start : start + num_features].to_file(
             filename=output_fp,
             driver="GPKG",
         )
@@ -150,7 +149,7 @@ def make_and_submit_viz_workflow(
     enable_tiling: bool = False,
     enable_rasterize: bool = False,
     enable_3dtiles: bool = False,
-    num_features: int = 200,
+    num_features: int = 250,
     input_url: str | None = None,
     config_url: str | None = None,
 ) -> str:
@@ -175,7 +174,7 @@ def make_and_submit_viz_workflow(
         The name of the submitted workflow
     """
     with Workflow(
-        generate_name=f"{recipe_config.id}-pdg-",
+        generate_name=f"{recipe_config.id}-",
         entrypoint="main",
         namespace="qgnet",
         service_account_name="argo-workflow",
@@ -187,7 +186,7 @@ def make_and_submit_viz_workflow(
             }
         ],
         annotations={
-            "workflows.argoproj.io/description": "Parallel workflow for PDG visualization tiles"
+            "workflows.argoproj.io/description": "Visualization workflow for OGDC",
         },
         labels={"workflows.argoproj.io/archive-strategy": "false"},
         pod_gc_strategy="OnWorkflowCompletion",
@@ -203,10 +202,12 @@ def make_and_submit_viz_workflow(
         # Set up the DAG
         with DAG(name="main"):
             # Step 1: Download viz-config.json
-            download_task = download_viz_config()
+            download_task = download_viz_config(arguments={"config_url": config_url})
 
             # Step 2: Batching step
-            batch_task = batch_process()
+            batch_task = batch_process(
+                arguments={"input_url": input_url, "num_features": num_features}
+            )
 
             # Step 3: Tiling step, depends on batch task results
             if enable_tiling:
@@ -226,7 +227,10 @@ def make_and_submit_viz_workflow(
                 pass  # Placeholder for 3D Tiles logic
 
             if enable_tiling:
-                batch_task >> stage_task  # Batch before tiling
+                [
+                    download_task,
+                    batch_task,
+                ] >> stage_task  # tiling depends on both download and batch tasks
 
     # Submit the workflow
     workflow_name = submit_workflow(w, wait=wait)
