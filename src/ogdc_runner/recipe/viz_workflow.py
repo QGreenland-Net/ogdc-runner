@@ -18,9 +18,9 @@ from ogdc_runner.argo import (
 # Import common utilities
 from ogdc_runner.common import (
     apply_custom_container_config,
-    data_already_published,
+    parse_commands_from_recipe_file,
 )
-from ogdc_runner.exceptions import OgdcDataAlreadyPublished
+from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.recipe import get_recipe_config
 
@@ -147,10 +147,12 @@ def make_and_submit_viz_workflow(
     custom_tag: str | None = None,
     custom_namespace: str | None = None,
     update_global: bool = False,
+    enable_tiling: bool = False,
     enable_rasterize: bool = False,
+    enable_3dtiles: bool = False,
     num_features: int = 200,
-    input_url: str = "https://demo.arcticdata.io/tiles/3dtt/Ice_Basins_1000.gpkg",
-    config_url: str = "https://gist.githubusercontent.com/rushirajnenuji/1b41924b8cb81ae8a9795823b9a89ea2/raw/3f0f78840dd345a69e1a863b972eedec6c74c2a6/viz-config.json",
+    input_url: str | None = None,
+    config_url: str | None = None,
 ) -> str:
     """Create and submit an Argo workflow for parallel processing of geospatial data.
 
@@ -188,10 +190,10 @@ def make_and_submit_viz_workflow(
             "workflows.argoproj.io/description": "Parallel workflow for PDG visualization tiles"
         },
         labels={"workflows.argoproj.io/archive-strategy": "false"},
+        pod_gc_strategy="OnWorkflowCompletion",
     ) as w:
         # Apply custom configuration if provided
         apply_custom_container_config(
-            workflow=w,
             custom_image=custom_image,
             custom_tag=custom_tag,
             custom_namespace=custom_namespace,
@@ -207,16 +209,24 @@ def make_and_submit_viz_workflow(
             batch_task = batch_process()
 
             # Step 3: Tiling step, depends on batch task results
-            stage_task = tiling_process(
-                arguments={
-                    "chunk-filepath": "{{item}}",
-                },
-                with_param=batch_task.get_result_as("result"),
-            )
+            if enable_tiling:
+                stage_task = tiling_process(
+                    arguments={
+                        "chunk-filepath": "{{item}}",
+                    },
+                    with_param=batch_task.get_result_as("result"),
+                )
 
-            # Define task dependencies
-            download_task >> batch_task  # Download config before batching
-            batch_task >> stage_task  # Batch before tiling
+            # Step 4: Rasterization step (if needed)
+            if enable_rasterize:
+                pass  # Placeholder for rasterization logic
+
+            # Step 5: 3D Tiles step (if needed)
+            if enable_3dtiles:
+                pass  # Placeholder for 3D Tiles logic
+
+            if enable_tiling:
+                batch_task >> stage_task  # Batch before tiling
 
     # Submit the workflow
     workflow_name = submit_workflow(w, wait=wait)
@@ -227,15 +237,11 @@ def submit_viz_workflow_recipe(
     *,
     recipe_dir: str,
     wait: bool,
-    overwrite: bool,
     custom_image: str | None = None,
     custom_tag: str | None = None,
     custom_namespace: str | None = None,
     update_global: bool = False,
-    enable_rasterize: bool = False,
     num_features: int = 50,
-    input_url: str | None = None,
-    config_url: str | None = None,
 ) -> str:
     """Submit an OGDC recipe for parallel processing via Argo workflows.
 
@@ -258,7 +264,24 @@ def submit_viz_workflow_recipe(
     # Get the recipe configuration
     recipe_config = get_recipe_config(recipe_dir)
 
-    # Set default URLs if not provided
+    # Parse commands from the simple recipe file
+    commands = parse_commands_from_recipe_file(
+        recipe_config.recipe_directory,
+        SIMPLE_RECIPE_FILENAME,
+    )
+
+    # Set flags based on commands
+    enable_tiling = any(cmd.lower() == "tile=true" for cmd in commands)
+    enable_rasterize = any(cmd.lower() == "rasterize=true" for cmd in commands)
+    enable_3dtiles = any(cmd.lower() == "3dtile=true" for cmd in commands)
+
+    # Set input_url and config_url from params array if available
+    params = recipe_config.input.params
+    if params and len(params) >= 2:
+        input_url = params[0]
+        config_url = params[1]
+
+    # # Set default URLs if not provided
     if input_url is None:
         input_url = "https://demo.arcticdata.io/tiles/3dtt/Ice_Basins_1000.gpkg"
 
@@ -273,7 +296,9 @@ def submit_viz_workflow_recipe(
         custom_tag=custom_tag,
         custom_namespace=custom_namespace,
         update_global=update_global,
+        enable_tiling=enable_tiling,
         enable_rasterize=enable_rasterize,
+        enable_3dtiles=enable_3dtiles,
         num_features=num_features,
         input_url=input_url,
         config_url=config_url,

@@ -152,7 +152,6 @@ def submit_ogdc_recipe(
         return submit_viz_workflow_recipe(
             recipe_dir=recipe_dir,
             wait=wait,
-            overwrite=overwrite,
             custom_image=custom_image,
             custom_tag=custom_tag,
             custom_namespace=custom_namespace,

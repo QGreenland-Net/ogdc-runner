@@ -302,7 +302,6 @@ def parse_commands_from_recipe_file(recipe_dir: str, filename: str) -> list[str]
 
 
 def apply_custom_container_config(
-    workflow: Workflow,
     custom_image: str | None = None,
     custom_tag: str | None = None,
     custom_namespace: str | None = None,
@@ -311,7 +310,6 @@ def apply_custom_container_config(
     """Apply custom configuration to a workflow.
 
     Args:
-        workflow: The workflow to configure
         custom_image: Optional custom image to use
         custom_tag: Optional custom tag for the image
         custom_namespace: Optional custom namespace
