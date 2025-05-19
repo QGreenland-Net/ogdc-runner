@@ -62,7 +62,7 @@ def make_fetch_input_template(
     # Create commands to fetch each input
     fetch_commands = []
 
-    for i, param in enumerate(recipe_config.input.params):
+    for _i, param in enumerate(recipe_config.input.params):
         param_str = str(param)
         # Check if the parameter is a URL
         if param_str.startswith(("http://", "https://")):

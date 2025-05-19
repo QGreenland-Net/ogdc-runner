@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import Union
-
 from pydantic import AnyUrl, BaseModel, Field, validator
 
 # Input parameter can be either a URL or a file path (as string)
-InputParam = Union[AnyUrl, str]
+InputParam = AnyUrl | str
 
 
 # Create a model for the recipe input
@@ -16,7 +14,8 @@ class RecipeInput(BaseModel):
     def validate_params(cls, params):
         """Ensure there's at least one input parameter."""
         if not params:
-            raise ValueError("At least one input parameter is required")
+            error_msg = "At least one input parameter is required"
+            raise ValueError(error_msg)
         return params
 
 

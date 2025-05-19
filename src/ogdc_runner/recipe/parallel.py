@@ -53,7 +53,7 @@ def download_viz_config():
     response = requests.get(url)
     response.raise_for_status()
 
-    with open(output_path, "w") as f:
+    with Path.open(output_path, "w") as f:
         f.write(response.text)
 
 
@@ -92,13 +92,13 @@ def batch_process():
 
     gdf = gpd.read_file("{{inputs.artifacts.batch-input.path}}")
     results = []
-    for idx, start in enumerate(range(0, len(gdf), {{inputs.parameters.num_features}})):
+    for idx, start in enumerate(range(0, len(gdf), {{inputs.parameters.num_features}})):  # noqa: F821
         output_fp = Path(
             "{{outputs.artifacts.batch-output.path}}/" + f"chunk-{idx}.gpkg"
         )
         print_log(f"Writing chunk {idx} to {output_fp}")
         output_fp.parent.mkdir(parents=True, exist_ok=True)
-        gdf[start : start + {{inputs.parameters.num_features}}].to_file(
+        gdf[start : start + {{inputs.parameters.num_features}}].to_file(  # noqa: F821
             filename=output_fp,
             driver="GPKG",
         )
@@ -199,7 +199,7 @@ def make_and_submit_parallel_workflow(
         )
 
         # Set up the DAG
-        with DAG(name="main") as dag:
+        with DAG(name="main"):
             # Step 1: Download viz-config.json
             download_task = download_viz_config()
 
