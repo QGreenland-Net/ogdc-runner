@@ -7,7 +7,7 @@ from ogdc_runner.models.recipe_config import RecipeConfig, RecipeInput, RecipeOu
 
 
 def test_recipe_meta():
-    recipe_input = RecipeInput(url=AnyUrl("http://www.example.com"))
+    recipe_input = RecipeInput(params=[AnyUrl("http://www.example.com")])
     recipe_output = RecipeOutput(dataone_id="12345")
     name = "Test Recipe"
     recipe_id = "test-recipe"
@@ -27,7 +27,7 @@ def test_recipe_meta():
 
 
 def test_recipe_meta_failure_bad_id():
-    recipe_input = RecipeInput(url=AnyUrl("http://www.example.com"))
+    recipe_input = RecipeInput(params=[AnyUrl("http://www.example.com")])
     recipe_output = RecipeOutput(dataone_id="12345")
     name = "Test Recipe"
 

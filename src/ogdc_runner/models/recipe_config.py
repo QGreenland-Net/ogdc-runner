@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import AnyUrl, BaseModel, Field, validator
+from pydantic import AnyUrl, BaseModel, Field, field_validator
 
 # Input parameter can be either a URL or a file path (as string)
 InputParam = AnyUrl | str
@@ -10,7 +10,7 @@ InputParam = AnyUrl | str
 class RecipeInput(BaseModel):
     params: list[InputParam]
 
-    @validator("params")
+    @field_validator("params")
     def validate_params(cls, params):
         """Ensure there's at least one input parameter."""
         if not params:

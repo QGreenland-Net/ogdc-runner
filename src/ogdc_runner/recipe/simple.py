@@ -59,7 +59,6 @@ def make_and_submit_simple_workflow(
     ) as w:
         # Apply custom configuration if provided
         apply_custom_container_config(
-            workflow=w,
             custom_image=custom_image,
             custom_tag=custom_tag,
             custom_namespace=custom_namespace,

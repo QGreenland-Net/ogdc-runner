@@ -17,3 +17,9 @@ class OgdcWorkflowExecutionError(OgdcRunnerException):
     """Exception for unexpected failures resulting from argo workflow executions."""
 
     pass
+
+
+class OgdcInvalidRecipeDir(OgdcRunnerException):
+    """Exception that is raised when data for a recipe have already been published."""
+
+    pass

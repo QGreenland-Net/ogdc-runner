@@ -190,7 +190,7 @@ def check_for_existing_published_data(
         workflows_service=ARGO_WORKFLOW_SERVICE,
     ) as w:
         check_dir_template = Container(
-            name="check-already-published-",
+            name="check-already-published",
             command=["sh", "-c"],
             # Check for the existence of the recipe-specific subpath. If it
             # exists, write out a file with "yes". Otherwise write out a file
