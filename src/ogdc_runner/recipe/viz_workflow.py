@@ -8,7 +8,11 @@ from hera.workflows import (
     Workflow,
     script,
 )
-from hera.workflows.models import VolumeMount
+from hera.workflows.models import (
+    PersistentVolumeClaimVolumeSource,
+    Volume,
+    VolumeMount,
+)
 from loguru import logger
 from pydantic import AnyUrl
 
@@ -38,7 +42,7 @@ from ogdc_runner.recipe import get_recipe_config
         VolumeMount(name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow")
     ],
 )
-def download_viz_config(config_url) -> None:
+def download_viz_config(config_url) -> None:  # type: ignore[no-untyped-def]
     """Downloads visualization configuration from a URL."""
     import subprocess
     import sys
@@ -76,13 +80,13 @@ def download_viz_config(config_url) -> None:
             path="/mnt/workflow/output/batch",
         ),
     ],
-    image="ghcr.io/mfisher87/pdgstaging",
+    image="ghcr.io/rushirajnenuji/viz-staging:latest",
     command=["python"],
     volume_mounts=[
         VolumeMount(name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow")
     ],
 )
-def batch_process(input_url, num_features) -> None:  # noqa: ARG001
+def batch_process(input_url, num_features) -> None:  # type: ignore[no-untyped-def] # noqa: ARG001
     """Processes data in batches."""
     import json
     import sys
@@ -118,7 +122,7 @@ def batch_process(input_url, num_features) -> None:  # noqa: ARG001
     inputs=[
         Parameter(name="chunk-filepath"),
     ],
-    image="ghcr.io/mfisher87/pdgstaging",
+    image="ghcr.io/rushirajnenuji/viz-staging:latest",
     command=["python"],
     volume_mounts=[
         VolumeMount(name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow")
@@ -187,8 +191,13 @@ def make_and_submit_viz_workflow(
         namespace="qgnet",
         service_account_name="argo-workflow",
         workflows_service=ARGO_WORKFLOW_SERVICE,
-        volume_mounts=[
-            VolumeMount(name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow")
+        volumes=[
+            Volume(
+                name="qgnet-ogdc-workflow-pvc",
+                persistent_volume_claim=PersistentVolumeClaimVolumeSource(
+                    claim_name="qgnet-ogdc-workflow-pvc"
+                ),
+            )
         ],
         annotations={
             "workflows.argoproj.io/description": "Visualization workflow for OGDC",
