@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import importlib
 import sys
+from typing import Any
 
 import pytest
 from hera.workflows import Container
 
 
 # Patch sys.modules to allow re-importing the argo module after env changes
-def reload_argo_module(_: object) -> object:
+def reload_argo_module(_: object) -> Any:
     # Remove ogdc_runner.argo from sys.modules so it reloads with new env vars
     sys.modules.pop("ogdc_runner.argo", None)
     sys.modules.pop("src.ogdc_runner.argo", None)

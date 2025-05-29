@@ -48,7 +48,7 @@ def download_viz_config(config_url) -> None:
 
     from pathlib import Path
 
-    import requests
+    import requests  # type: ignore[import-untyped]
 
     output_path = Path("{{outputs.artifacts.viz-config-json.path}}")
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -88,7 +88,7 @@ def batch_process(input_url, num_features) -> None:  # noqa: ARG001
     import sys
     from pathlib import Path
 
-    import geopandas as gpd
+    import geopandas as gpd  # type: ignore[import-not-found]
 
     # Redirect print statements to stderr instead of stdout
     # This way they won't interfere with the JSON output
@@ -130,7 +130,7 @@ def tiling_process() -> None:
     import sys
     from pathlib import Path
 
-    from pdgstaging import TileStager
+    from pdgstaging import TileStager  # type: ignore[import-not-found]
 
     # Log to stderr
     def print_log(message: str) -> None:
@@ -231,10 +231,11 @@ def make_and_submit_viz_workflow(
                 pass  # Placeholder for 3D Tiles logic
 
             if enable_tiling:
-                [
+                [  # type: ignore[operator]
                     download_task,
                     batch_task,
-                ] >> stage_task  # tiling depends on both download and batch tasks
+                ] >> stage_task
+                # tiling depends on both download and batch tasks
 
     # Submit the workflow
     workflow_name = submit_workflow(w, wait=wait)
