@@ -8,7 +8,9 @@ from hera.workflows import (
     Workflow,
     script,
 )
+from hera.workflows.models import VolumeMount
 from loguru import logger
+from pydantic import AnyUrl
 
 from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
@@ -32,9 +34,11 @@ from ogdc_runner.recipe import get_recipe_config
     ],
     image="python:3.10-slim",
     command=["python"],
-    volume_mounts=[{"name": "qgnet-ogdc-workflow-pvc", "mountPath": "/mnt/workflow"}],
+    volume_mounts=[
+        VolumeMount(name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow")
+    ],
 )
-def download_viz_config(config_url):
+def download_viz_config(config_url) -> None:
     """Downloads visualization configuration from a URL."""
     import subprocess
     import sys
@@ -74,9 +78,11 @@ def download_viz_config(config_url):
     ],
     image="ghcr.io/mfisher87/pdgstaging",
     command=["python"],
-    volume_mounts=[{"name": "qgnet-ogdc-workflow-pvc", "mountPath": "/mnt/workflow"}],
+    volume_mounts=[
+        VolumeMount(name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow")
+    ],
 )
-def batch_process(input_url, num_features):  # noqa: ARG001
+def batch_process(input_url, num_features) -> None:  # noqa: ARG001
     """Processes data in batches."""
     import json
     import sys
@@ -86,7 +92,7 @@ def batch_process(input_url, num_features):  # noqa: ARG001
 
     # Redirect print statements to stderr instead of stdout
     # This way they won't interfere with the JSON output
-    def print_log(message):
+    def print_log(message: str) -> None:
         print(message, file=sys.stderr)
 
     gdf = gpd.read_file("{{inputs.artifacts.batch-input.path}}")
@@ -114,9 +120,11 @@ def batch_process(input_url, num_features):  # noqa: ARG001
     ],
     image="ghcr.io/mfisher87/pdgstaging",
     command=["python"],
-    volume_mounts=[{"name": "qgnet-ogdc-workflow-pvc", "mountPath": "/mnt/workflow"}],
+    volume_mounts=[
+        VolumeMount(name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow")
+    ],
 )
-def tiling_process():
+def tiling_process() -> None:
     """Creates tiles from a geospatial data chunk."""
     import json
     import sys
@@ -125,7 +133,7 @@ def tiling_process():
     from pdgstaging import TileStager
 
     # Log to stderr
-    def print_log(message):
+    def print_log(message: str) -> None:
         print(message, file=sys.stderr)
 
     # Read the viz-config.json from the PVC
@@ -150,8 +158,8 @@ def make_and_submit_viz_workflow(
     enable_rasterize: bool = False,
     enable_3dtiles: bool = False,
     num_features: int = 250,
-    input_url: str | None = None,
-    config_url: str | None = None,
+    input_url: AnyUrl | str | None = None,
+    config_url: AnyUrl | str | None = None,
 ) -> str:
     """Create and submit an Argo workflow for parallel processing of geospatial data.
 
@@ -179,17 +187,13 @@ def make_and_submit_viz_workflow(
         namespace="qgnet",
         service_account_name="argo-workflow",
         workflows_service=ARGO_WORKFLOW_SERVICE,
-        volumes=[
-            {
-                "name": "qgnet-ogdc-workflow-pvc",
-                "persistentVolumeClaim": {"claimName": "qgnet-ogdc-workflow-pvc"},
-            }
+        volume_mounts=[
+            VolumeMount(name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow")
         ],
         annotations={
             "workflows.argoproj.io/description": "Visualization workflow for OGDC",
         },
         labels={"workflows.argoproj.io/archive-strategy": "false"},
-        pod_gc_strategy="OnWorkflowCompletion",
     ) as w:
         # Apply custom configuration if provided
         apply_custom_container_config(
@@ -284,13 +288,6 @@ def submit_viz_workflow_recipe(
     if params and len(params) >= 2:
         input_url = params[0]
         config_url = params[1]
-
-    # # Set default URLs if not provided
-    if input_url is None:
-        input_url = "https://demo.arcticdata.io/tiles/3dtt/Ice_Basins_1000.gpkg"
-
-    if config_url is None:
-        config_url = "https://gist.githubusercontent.com/rushirajnenuji/1b41924b8cb81ae8a9795823b9a89ea2/raw/3f0f78840dd345a69e1a863b972eedec6c74c2a6/viz-config.json"
 
     # Submit the workflow
     workflow_name = make_and_submit_viz_workflow(

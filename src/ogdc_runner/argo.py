@@ -110,7 +110,7 @@ class ArgoConfig:
 class ArgoManager:
     """Manager for Argo workflow configurations and services."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._config = self._initialize_config()
         self._workflow_service = self._setup_workflow_service()
         self._apply_global_config()
@@ -248,8 +248,8 @@ class ArgoManager:
 
 
 # Initialize the ArgoManager as a singleton
-argo_manager = ArgoManager()
-ARGO_WORKFLOW_SERVICE = argo_manager.workflow_service
+argo_manager: ArgoManager = ArgoManager()
+ARGO_WORKFLOW_SERVICE: WorkflowsService = argo_manager.workflow_service
 
 
 def get_workflow_status(workflow_name: str) -> str | None:

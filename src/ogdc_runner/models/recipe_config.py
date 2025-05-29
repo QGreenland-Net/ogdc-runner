@@ -11,7 +11,7 @@ class RecipeInput(BaseModel):
     params: list[InputParam]
 
     @field_validator("params")
-    def validate_params(cls, params):
+    def validate_params(cls, params: list[InputParam]) -> list[InputParam]:
         """Ensure there's at least one input parameter."""
         if not params:
             error_msg = "At least one input parameter is required"

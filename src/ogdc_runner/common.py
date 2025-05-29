@@ -43,7 +43,7 @@ def make_cmd_template(
     if custom_image or custom_tag:
         # This will override the global image setting just for this container
         template.image = custom_image if custom_image else None
-        template.image_tag = custom_tag if custom_tag else None
+        template.image_tag = custom_tag if custom_tag else None  # type: ignore[attr-defined]
 
     return template
 
@@ -94,7 +94,7 @@ def make_fetch_input_template(
     if custom_image or custom_tag:
         # This will override the global image setting just for this container
         template.image = custom_image if custom_image else None
-        template.image_tag = custom_tag if custom_tag else None
+        template.image_tag = custom_tag if custom_tag else None  # type: ignore[attr-defined]
 
     return template
 
@@ -126,7 +126,7 @@ def make_publish_template(
     if custom_image or custom_tag:
         # This will override the global image setting just for this container
         template.image = custom_image if custom_image else None
-        template.image_tag = custom_tag if custom_tag else None
+        template.image_tag = custom_tag if custom_tag else None  # type: ignore[attr-defined]
 
     return template
 
@@ -162,7 +162,7 @@ def remove_existing_published_data(
         if custom_image or custom_tag:
             # This will override the global image setting just for this container
             overwrite_template.image = custom_image if custom_image else None
-            overwrite_template.image_tag = custom_tag if custom_tag else None
+            overwrite_template.image_tag = custom_tag if custom_tag else None  # type: ignore[attr-defined]
 
         with Steps(name="steps"):
             overwrite_template()
@@ -217,7 +217,7 @@ def check_for_existing_published_data(
         if custom_image or custom_tag:
             # This will override the global image setting just for this container
             check_dir_template.image = custom_image if custom_image else None
-            check_dir_template.image_tag = custom_tag if custom_tag else None
+            check_dir_template.image_tag = custom_tag if custom_tag else None  # type: ignore[attr-defined]
 
         with Steps(name="steps"):
             check_dir_template()
