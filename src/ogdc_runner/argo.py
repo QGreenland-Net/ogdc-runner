@@ -34,77 +34,17 @@ class ArgoConfig:
         runner_image_tag: str,
         image_pull_policy: str,
     ):
-        self._namespace = namespace
-        self._service_account_name = service_account_name
-        self._workflows_service_url = workflows_service_url
-        self._runner_image = runner_image
-        self._runner_image_tag = runner_image_tag
-        self._image_pull_policy = image_pull_policy
-
-    @property
-    def namespace(self) -> str:
-        """Get the namespace."""
-        return self._namespace
-
-    @namespace.setter
-    def namespace(self, value: str) -> None:
-        """Set the namespace."""
-        self._namespace = value
-
-    @property
-    def service_account_name(self) -> str:
-        """Get the service account name."""
-        return self._service_account_name
-
-    @service_account_name.setter
-    def service_account_name(self, value: str) -> None:
-        """Set the service account name."""
-        self._service_account_name = value
-
-    @property
-    def workflows_service_url(self) -> str:
-        """Get the workflows service URL."""
-        return self._workflows_service_url
-
-    @workflows_service_url.setter
-    def workflows_service_url(self, value: str) -> None:
-        """Set the workflows service URL."""
-        self._workflows_service_url = value
-
-    @property
-    def runner_image(self) -> str:
-        """Get the runner image."""
-        return self._runner_image
-
-    @runner_image.setter
-    def runner_image(self, value: str) -> None:
-        """Set the runner image."""
-        self._runner_image = value
-
-    @property
-    def runner_image_tag(self) -> str:
-        """Get the runner image tag."""
-        return self._runner_image_tag
-
-    @runner_image_tag.setter
-    def runner_image_tag(self, value: str) -> None:
-        """Set the runner image tag."""
-        self._runner_image_tag = value
-
-    @property
-    def image_pull_policy(self) -> str:
-        """Get the image pull policy."""
-        return self._image_pull_policy
-
-    @image_pull_policy.setter
-    def image_pull_policy(self, value: str) -> None:
-        """Set the image pull policy."""
-        self._image_pull_policy = value
+        self.namespace = namespace
+        self.service_account_name = service_account_name
+        self.workflows_service_url = workflows_service_url
+        self.runner_image = runner_image
+        self.runner_image_tag = runner_image_tag
+        self.image_pull_policy = image_pull_policy
 
     @property
     def full_image_path(self) -> str:
         """Return the full image path with tag."""
-        return f"{self._runner_image}:{self._runner_image_tag}"
+        return f"{self.runner_image}:{self.runner_image_tag}"
 
 
 class ArgoManager:
@@ -208,44 +148,6 @@ class ArgoManager:
             f"Updated runner image to {self._config.full_image_path} with pull policy {self._config.image_pull_policy}"
         )
 
-    def update_namespace(self, namespace: str) -> None:
-        """
-        Update the namespace for Argo workflows and recreate the workflow service.
-
-        Args:
-            namespace: New namespace for workflows
-        """
-        self._config.namespace = namespace
-        # Recreate the workflow service with the new namespace
-        self._workflow_service = self._setup_workflow_service()
-        # Re-apply global config with updated values
-        self._apply_global_config()
-        logger.info(f"Updated namespace to {namespace}")
-
-    def update_service_account(self, service_account_name: str) -> None:
-        """
-        Update the service account name for Argo workflows.
-
-        Args:
-            service_account_name: New service account name
-        """
-        self._config.service_account_name = service_account_name
-        # Re-apply global config with updated values
-        self._apply_global_config()
-        logger.info(f"Updated service account to {service_account_name}")
-
-    def update_workflow_service_url(self, url: str) -> None:
-        """
-        Update the workflow service URL and recreate the workflow service.
-
-        Args:
-            url: New workflow service URL
-        """
-        self._config.workflows_service_url = url
-        # Recreate the workflow service with the new URL
-        self._workflow_service = self._setup_workflow_service()
-        logger.info(f"Updated workflow service URL to {url}")
-
 
 # Initialize the ArgoManager as a singleton
 argo_manager: ArgoManager = ArgoManager()
@@ -311,40 +213,9 @@ def update_runner_image(
     argo_manager.update_image(image, tag, pull_policy)
 
 
-def update_namespace(namespace: str) -> None:
-    """
-    Update the namespace for Argo workflows.
-
-    Args:
-        namespace: New namespace for workflows
-    """
-    argo_manager.update_namespace(namespace)
-
-
-def update_service_account(service_account_name: str) -> None:
-    """
-    Update the service account name for Argo workflows.
-
-    Args:
-        service_account_name: New service account name
-    """
-    argo_manager.update_service_account(service_account_name)
-
-
-def update_workflow_service_url(url: str) -> None:
-    """
-    Update the workflow service URL.
-
-    Args:
-        url: New workflow service URL
-    """
-    argo_manager.update_workflow_service_url(url)
-
-
 def apply_custom_container_config(
     custom_image: str | None = None,
     custom_tag: str | None = None,
-    custom_namespace: str | None = None,
     update_global: bool = False,
 ) -> None:
     """Apply custom configuration to a workflow.
@@ -355,8 +226,5 @@ def apply_custom_container_config(
         custom_namespace: Optional custom namespace
         update_global: If True, update the global config
     """
-    if update_global:
-        if custom_image or custom_tag:
-            update_runner_image(image=custom_image, tag=custom_tag)
-        if custom_namespace:
-            update_namespace(namespace=custom_namespace)
+    if update_global and (custom_image or custom_tag):
+        update_runner_image(image=custom_image, tag=custom_tag)

@@ -145,7 +145,6 @@ def make_and_submit_viz_workflow(
     wait: bool,
     custom_image: str | None = None,
     custom_tag: str | None = None,
-    custom_namespace: str | None = None,
     update_global: bool = False,
     enable_tiling: bool = False,
     enable_rasterize: bool = False,
@@ -197,7 +196,6 @@ def make_and_submit_viz_workflow(
         apply_custom_container_config(
             custom_image=custom_image,
             custom_tag=custom_tag,
-            custom_namespace=custom_namespace,
             update_global=update_global,
         )
 
