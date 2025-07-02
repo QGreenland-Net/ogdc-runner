@@ -20,6 +20,6 @@ class OgdcWorkflowExecutionError(OgdcRunnerException):
 
 
 class OgdcInvalidRecipeDir(OgdcRunnerException):
-    """Exception that is raised when data for a recipe have already been published."""
+    """Exception that is raised when recipe directory is not available/valid."""
 
     pass
