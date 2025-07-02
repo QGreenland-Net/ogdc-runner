@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import AnyUrl, BaseModel, Field, field_validator
 
-# Input parameter can be either a URL or a file path (as string)
-InputParam = AnyUrl | str
+
+# Input parameter with type and value
+class InputParam(BaseModel):
+    type: Literal["url", "pvc_mount", "file_system"]
+    value: AnyUrl | str
 
 
 # Create a model for the recipe input
@@ -30,6 +35,9 @@ class RecipeConfig(BaseModel):
     # Allow lower-case alphanumeric characters, `.`, and `,`. These are the only
     # allowable characters in k8s object names. `id` to construct such names.
     id: str = Field(..., pattern=r"^[a-z0-9.-]+$")
+
+    # Type of recipe, e.g., "simple", "visualization", etc.
+    type: Literal["simple", "visualization"] = Field(default="simple")
 
     input: RecipeInput
     output: RecipeOutput
