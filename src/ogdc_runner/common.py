@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import fsspec
 from hera.workflows import (
     Artifact,
     Container,
@@ -9,15 +8,8 @@ from hera.workflows import (
     Workflow,
     models,
 )
-from loguru import logger
 
-from ogdc_runner.argo import (
-    ARGO_WORKFLOW_SERVICE,
-    OGDC_WORKFLOW_PVC,
-    submit_workflow,
-    update_namespace,
-    update_runner_image,
-)
+from ogdc_runner.argo import ARGO_WORKFLOW_SERVICE, OGDC_WORKFLOW_PVC, submit_workflow
 from ogdc_runner.exceptions import OgdcWorkflowExecutionError
 from ogdc_runner.models.recipe_config import RecipeConfig
 
@@ -279,44 +271,3 @@ def data_already_published(
         custom_image=custom_image,
         custom_tag=custom_tag,
     )
-
-
-def parse_commands_from_recipe_file(recipe_dir: str, filename: str) -> list[str]:
-    """Read commands from a recipe file.
-
-    Args:
-        recipe_dir: The directory containing the recipe file
-        filename: The name of the recipe file to parse
-
-    Returns:
-        A list of commands from the recipe file, with comments removed
-    """
-    recipe_path = f"{recipe_dir}/{filename}"
-    logger.info(f"Reading recipe from {recipe_path}")
-
-    with fsspec.open(recipe_path, "rt") as f:
-        lines = f.read().split("\n")
-    commands = [line for line in lines if line and not line.startswith("#")]
-
-    return commands
-
-
-def apply_custom_container_config(
-    custom_image: str | None = None,
-    custom_tag: str | None = None,
-    custom_namespace: str | None = None,
-    update_global: bool = False,
-) -> None:
-    """Apply custom configuration to a workflow.
-
-    Args:
-        custom_image: Optional custom image to use
-        custom_tag: Optional custom tag for the image
-        custom_namespace: Optional custom namespace
-        update_global: If True, update the global config
-    """
-    if update_global:
-        if custom_image or custom_tag:
-            update_runner_image(image=custom_image, tag=custom_tag)
-        if custom_namespace:
-            update_namespace(namespace=custom_namespace)

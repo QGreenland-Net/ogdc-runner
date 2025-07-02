@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import fsspec
 from hera.workflows import (
     Steps,
     Workflow,
 )
+from loguru import logger
 
 from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
@@ -12,12 +14,10 @@ from ogdc_runner.argo import (
 
 # Import common utilities
 from ogdc_runner.common import (
-    apply_custom_container_config,
     data_already_published,
     make_cmd_template,
     make_fetch_input_template,
     make_publish_template,
-    parse_commands_from_recipe_file,
 )
 from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished
@@ -31,8 +31,6 @@ def make_and_submit_simple_workflow(
     wait: bool,
     custom_image: str | None = None,
     custom_tag: str | None = None,
-    custom_namespace: str | None = None,
-    update_global: bool = False,
 ) -> str:
     """Create and submit an argo workflow based on a simple recipe.
 
@@ -57,14 +55,6 @@ def make_and_submit_simple_workflow(
         entrypoint="steps",
         workflows_service=ARGO_WORKFLOW_SERVICE,
     ) as w:
-        # Apply custom configuration if provided
-        apply_custom_container_config(
-            custom_image=custom_image,
-            custom_tag=custom_tag,
-            custom_namespace=custom_namespace,
-            update_global=update_global,
-        )
-
         # Create command templates
         cmd_templates = []
         for idx, command in enumerate(commands):
@@ -168,3 +158,23 @@ def submit_ogdc_recipe(
     )
 
     return simple_recipe_workflow_name
+
+
+def parse_commands_from_recipe_file(recipe_dir: str, filename: str) -> list[str]:
+    """Read commands from a recipe file.
+
+    Args:
+        recipe_dir: The directory containing the recipe file
+        filename: The name of the recipe file to parse
+
+    Returns:
+        A list of commands from the recipe file, with comments removed
+    """
+    recipe_path = f"{recipe_dir}/{filename}"
+    logger.info(f"Reading recipe from {recipe_path}")
+
+    with fsspec.open(recipe_path, "rt") as f:
+        lines = f.read().split("\n")
+    commands = [line for line in lines if line and not line.startswith("#")]
+
+    return commands

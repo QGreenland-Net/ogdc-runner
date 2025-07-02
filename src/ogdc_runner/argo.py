@@ -339,3 +339,24 @@ def update_workflow_service_url(url: str) -> None:
         url: New workflow service URL
     """
     argo_manager.update_workflow_service_url(url)
+
+
+def apply_custom_container_config(
+    custom_image: str | None = None,
+    custom_tag: str | None = None,
+    custom_namespace: str | None = None,
+    update_global: bool = False,
+) -> None:
+    """Apply custom configuration to a workflow.
+
+    Args:
+        custom_image: Optional custom image to use
+        custom_tag: Optional custom tag for the image
+        custom_namespace: Optional custom namespace
+        update_global: If True, update the global config
+    """
+    if update_global:
+        if custom_image or custom_tag:
+            update_runner_image(image=custom_image, tag=custom_tag)
+        if custom_namespace:
+            update_namespace(namespace=custom_namespace)

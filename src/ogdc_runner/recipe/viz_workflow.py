@@ -18,15 +18,9 @@ from pydantic import AnyUrl
 
 from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
+    apply_custom_container_config,
     submit_workflow,
 )
-
-# Import common utilities
-from ogdc_runner.common import (
-    apply_custom_container_config,
-    parse_commands_from_recipe_file,
-)
-from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.recipe import get_recipe_config
 
@@ -44,11 +38,6 @@ from ogdc_runner.recipe import get_recipe_config
 )
 def download_viz_config(config_url) -> None:  # type: ignore[no-untyped-def]
     """Downloads visualization configuration from a URL."""
-    import subprocess
-    import sys
-
-    # Install requests
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
 
     from pathlib import Path
 
@@ -282,18 +271,6 @@ def submit_viz_workflow_recipe(
     # Get the recipe configuration
     recipe_config = get_recipe_config(recipe_dir)
 
-    # Parse commands from the simple recipe file
-    commands = parse_commands_from_recipe_file(
-        recipe_config.recipe_directory,
-        SIMPLE_RECIPE_FILENAME,
-    )
-
-    # Set flags based on commands
-    enable_tiling = any(cmd.lower() == "tile=true" for cmd in commands)
-    enable_rasterize = any(cmd.lower() == "rasterize=true" for cmd in commands)
-    enable_3dtiles = any(cmd.lower() == "3dtile=true" for cmd in commands)
-
-    # Set input_url and config_url from params array if available
     params = recipe_config.input.params
     if params and len(params) >= 2:
         input_url = params[0]
@@ -307,9 +284,6 @@ def submit_viz_workflow_recipe(
         custom_tag=custom_tag,
         custom_namespace=custom_namespace,
         update_global=update_global,
-        enable_tiling=enable_tiling,
-        enable_rasterize=enable_rasterize,
-        enable_3dtiles=enable_3dtiles,
         num_features=num_features,
         input_url=input_url,
         config_url=config_url,
