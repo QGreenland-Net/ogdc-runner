@@ -25,6 +25,7 @@ from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
     submit_workflow,
 )
+from ogdc_runner.constants import VIZ_RECIPE_BATCH_SIZE
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.recipe import get_recipe_config
 
@@ -33,16 +34,17 @@ from ogdc_runner.recipe import get_recipe_config
     name="batching",
     inputs=[
         Parameter(name="input_url"),
+        Parameter(name="recipe_id"),
         HTTPArtifact(
             name="batch-input",
-            path="/mnt/workflow/input/ice_basins.gpkg",
+            path="/mnt/workflow/{{inputs.parameters.recipe_id}}/input/ice_basins.gpkg",
             url="{{inputs.parameters.input_url}}",
         ),
     ],
     outputs=[
         Artifact(
             name="batch-output",
-            path="/mnt/workflow/output/batch",
+            path="/mnt/workflow/{{inputs.parameters.recipe_id}}/batch",
         ),
     ],
     image="ghcr.io/rushirajnenuji/viz-staging:latest",
@@ -51,7 +53,7 @@ from ogdc_runner.recipe import get_recipe_config
         VolumeMount(name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow")
     ],
 )
-def batch_process(input_url, num_features) -> None:  # type: ignore[no-untyped-def] # noqa: ARG001
+def batch_process(num_features) -> None:  # type: ignore[no-untyped-def]
     """Processes data in batches."""
     import sys
     from pathlib import Path
@@ -85,6 +87,7 @@ def batch_process(input_url, num_features) -> None:  # type: ignore[no-untyped-d
     name="tiling",
     inputs=[
         Parameter(name="chunk-filepath"),
+        Parameter(name="recipe_id"),
     ],
     image="ghcr.io/rushirajnenuji/viz-staging:latest",
     command=["python"],
@@ -94,22 +97,25 @@ def batch_process(input_url, num_features) -> None:  # type: ignore[no-untyped-d
 )
 def tiling_process() -> None:
     """Creates tiles from a geospatial data chunk."""
+    import json
     import sys
     from pathlib import Path
 
-    from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
+    from pdgstaging import TileStager  # type: ignore[import-not-found]
 
     # Log to stderr
     def print_log(message: str) -> None:
         print(message, file=sys.stderr)
 
     # Read the viz-config.json from the PVC
-    workflow_config = json.loads(Path("/mnt/workflow/config.json").read_text())
+    workflow_config = json.loads(
+        Path("/mnt/workflow/{inputs.parameters.recipe_id}/config.json").read_text()
+    )
 
-    vw_manager = WorkflowManager(workflow_config, check_footprints=False)
+    tiler = TileStager(workflow_config, check_footprints=False)
     print_log("Staging chunk file")
     print_log("{{inputs.parameters.chunk-filepath}}")
-    vw_manager.stage("{{inputs.parameters.chunk-filepath}}")
+    tiler.stage("{{inputs.parameters.chunk-filepath}}")
     print_log("Staging done")
 
 
@@ -132,8 +138,7 @@ def read_config_file_content(recipe_config: RecipeConfig) -> str:
 def make_and_submit_viz_workflow(
     recipe_config: RecipeConfig,
     wait: bool,
-    overwrite: bool,  # noqa: ARG001
-    input_url: AnyUrl | str | None = None,  # noqa: ARG001
+    input_url: AnyUrl | str | None = None,
 ) -> str:
     """Create and submit an Argo workflow for parallel processing of geospatial data.
 
@@ -143,7 +148,6 @@ def make_and_submit_viz_workflow(
     Args:
         recipe_config: The recipe configuration
         wait: Whether to wait for the workflow to complete
-        overwrite: Whether to overwrite existing published data
         input_url: URL to the input data file
 
     Returns:
@@ -177,7 +181,10 @@ def make_and_submit_viz_workflow(
             image="alpine:latest",
             command=["sh", "-c"],
             args=[
-                f"""mkdir -p /mnt/workflow/{recipe_config.id}/input /mnt/workflow/{recipe_config.id}/staged /mnt/workflow/{recipe_config.id}/geotiff /mnt/workflow/{recipe_config.id}/3dtiles && \
+                f"""mkdir -p /mnt/workflow/{recipe_config.id}/input && \\
+mkdir -p /mnt/workflow/{recipe_config.id}/staged && \\
+mkdir -p /mnt/workflow/{recipe_config.id}/geotiff && \\
+mkdir -p /mnt/workflow/{recipe_config.id}/3dtiles && \\
 cat > /mnt/workflow/{recipe_config.id}/config.json << 'EOF'
 {config_content}
 EOF"""
@@ -192,31 +199,33 @@ EOF"""
             # Step 1: Download viz-config.json
             # download_task = download_viz_config(arguments={"config_url": config_url})
 
-            stage_config_task = Task(  # noqa: F841
+            stage_config_task = Task(
                 name="stage-viz-config",
                 template=stage_config_file_template,
             )
 
-            # # Step 2: Batching step
-            # batch_task = batch_process(
-            #     arguments={
-            #         "input_url": input_url,
-            #         "num_features": VIZ_RECIPE_BATCH_SIZE,
-            #     },
-            # )
+            # Step 2: Batching step
+            batch_task = batch_process(
+                arguments={
+                    "input_url": input_url,
+                    "recipe_id": recipe_config.id,
+                    "num_features": VIZ_RECIPE_BATCH_SIZE,
+                },
+            )
 
-            # stage_task = tiling_process(
-            #     arguments={
-            #         "chunk-filepath": "{{item}}",
-            #     },
-            #     with_param=batch_task.get_result_as("result"),
-            # )
+            stage_task = tiling_process(
+                arguments={
+                    "chunk-filepath": "{{item}}",
+                    "recipe_id": recipe_config.id,
+                },
+                with_param=batch_task.get_result_as("result"),
+            )
 
-            # [  # type: ignore[operator]
-            #     download_task,
-            #     batch_task,
-            # ] >> stage_task
-            #     # tiling depends on both download and batch tasks
+            [  # type: ignore[operator]
+                stage_config_task,
+                batch_task,
+            ] >> stage_task
+            # tiling depends on both download and batch tasks
 
     # Submit the workflow
     workflow_name = submit_workflow(w, wait=wait)
@@ -227,16 +236,12 @@ def submit_viz_workflow_recipe(
     *,
     recipe_dir: str,
     wait: bool,
-    overwrite: bool,
 ) -> str:
     """Submit an OGDC recipe for parallel processing via Argo workflows.
 
     Args:
         recipe_dir: Path to the recipe directory
         wait: Whether to wait for the workflow to complete
-        overwrite: Whether to overwrite existing published data
-        input_url: Optional URL to the input data file (defaults to Ice_Basins_1000.gpkg)
-        config_url: Optional URL to the visualization configuration file
 
     Returns:
         The name of the submitted workflow
@@ -248,11 +253,15 @@ def submit_viz_workflow_recipe(
         # Update Argo custom image
         pass
 
+    input_param = recipe_config.input.params[0]
+    if input_param.type == "url":  # type: ignore[union-attr]
+        input_url = input_param.value
+
     # Submit the workflow
     workflow_name = make_and_submit_viz_workflow(
         recipe_config=recipe_config,
         wait=wait,
-        overwrite=overwrite,
+        input_url=input_url,
     )
 
     logger.info(f"Completed workflow: {workflow_name}")
