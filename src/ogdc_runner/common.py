@@ -45,18 +45,22 @@ def make_fetch_input_template(
     fetch_commands = []
 
     for _i, param in enumerate(recipe_config.input.params):
-        param_str = str(param)
         # Check if the parameter is a URL
-        if param_str.startswith(("http://", "https://")):
+        if param.type == "url":
             # It's a URL, use wget
             fetch_commands.append(
-                f"wget --content-disposition -P /output_dir/ {param_str}"
+                f"wget --content-disposition -P /output_dir/ {param.value}"
             )
+        elif param.type == "file_system":
+            filename = param.value.split("/")[-1]
+            fetch_commands.append(f"cp {param.value} /output_dir/{filename}")
+        elif param.type == "pvc":
+            # It's a PVC path, no need to move
+            pass
         else:
-            # It's a file path (including PVC paths), use cp
-            # Get just the filename for the destination
-            filename = param_str.split("/")[-1]
-            fetch_commands.append(f"cp {param_str} /output_dir/{filename}")
+            raise OgdcWorkflowExecutionError(
+                f"Unsupported input type: {param.type} for parameter {param.name}"
+            )
 
     # Join all commands with && for sequential execution
     combined_command = " && ".join(fetch_commands)
