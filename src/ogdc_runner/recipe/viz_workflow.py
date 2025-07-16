@@ -14,8 +14,6 @@ from hera.workflows import (
     script,
 )
 from hera.workflows.models import (
-    PersistentVolumeClaimVolumeSource,
-    Volume,
     VolumeMount,
 )
 from loguru import logger
@@ -23,6 +21,7 @@ from pydantic import AnyUrl
 
 from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
+    OGDC_WORKFLOW_PVC,
     submit_workflow,
 )
 from ogdc_runner.constants import VIZ_RECIPE_BATCH_SIZE
@@ -50,7 +49,7 @@ from ogdc_runner.recipe import get_recipe_config
     image="ghcr.io/rushirajnenuji/viz-staging:latest",
     command=["python"],
     volume_mounts=[
-        VolumeMount(name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow")
+        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
     ],
 )
 def batch_process(num_features) -> None:  # type: ignore[no-untyped-def]
@@ -92,7 +91,7 @@ def batch_process(num_features) -> None:  # type: ignore[no-untyped-def]
     image="ghcr.io/rushirajnenuji/viz-staging:latest",
     command=["python"],
     volume_mounts=[
-        VolumeMount(name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow")
+        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
     ],
 )
 def tiling_process() -> None:
@@ -109,7 +108,7 @@ def tiling_process() -> None:
 
     # Read the viz-config.json from the PVC
     workflow_config = json.loads(
-        Path("/mnt/workflow/{inputs.parameters.recipe_id}/config.json").read_text()
+        Path("/mnt/workflow/{{inputs.parameters.recipe_id}}/config.json").read_text()
     )
 
     tiler = TileStager(workflow_config, check_footprints=False)
@@ -159,14 +158,7 @@ def make_and_submit_viz_workflow(
         namespace="qgnet",
         service_account_name="argo-workflow",
         workflows_service=ARGO_WORKFLOW_SERVICE,
-        volumes=[
-            Volume(
-                name="qgnet-ogdc-workflow-pvc",
-                persistent_volume_claim=PersistentVolumeClaimVolumeSource(
-                    claim_name="qgnet-ogdc-workflow-pvc"
-                ),
-            )
-        ],
+        volumes=[OGDC_WORKFLOW_PVC],
         annotations={
             "workflows.argoproj.io/description": "Visualization workflow for OGDC",
         },
@@ -182,15 +174,19 @@ def make_and_submit_viz_workflow(
             command=["sh", "-c"],
             args=[
                 f"""mkdir -p /mnt/workflow/{recipe_config.id}/input && \\
-mkdir -p /mnt/workflow/{recipe_config.id}/staged && \\
-mkdir -p /mnt/workflow/{recipe_config.id}/geotiff && \\
-mkdir -p /mnt/workflow/{recipe_config.id}/3dtiles && \\
+mkdir -p /mnt/workflow/{recipe_config.id}/batch && \\
+mkdir -p /mnt/workflow/{recipe_config.id}/output/staged && \\
+mkdir -p /mnt/workflow/{recipe_config.id}/output/geotiff && \\
+mkdir -p /mnt/workflow/{recipe_config.id}/output/3dtiles && \\
 cat > /mnt/workflow/{recipe_config.id}/config.json << 'EOF'
 {config_content}
 EOF"""
             ],
             volume_mounts=[
-                VolumeMount(name="qgnet-ogdc-workflow-pvc", mount_path="/mnt/workflow")
+                VolumeMount(
+                    name=OGDC_WORKFLOW_PVC.name,
+                    mount_path="/mnt/workflow/",
+                )
             ],
         )
 
