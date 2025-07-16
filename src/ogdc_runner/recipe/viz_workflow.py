@@ -250,7 +250,7 @@ def submit_viz_workflow_recipe(
         pass
 
     input_param = recipe_config.input.params[0]
-    if input_param.type == "url":  # type: ignore[union-attr]
+    if input_param.type == "url":
         input_url = input_param.value
 
     # Submit the workflow

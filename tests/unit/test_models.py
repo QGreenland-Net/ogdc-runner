@@ -3,12 +3,17 @@ from __future__ import annotations
 import pytest
 from pydantic import AnyUrl, ValidationError
 
-from ogdc_runner.models.recipe_config import RecipeConfig, RecipeInput, RecipeOutput
+from ogdc_runner.models.recipe_config import (
+    InputParam,
+    RecipeConfig,
+    RecipeInput,
+    RecipeOutput,
+)
 
 
 def test_recipe_meta():
     recipe_input = RecipeInput(
-        params=[{"value": AnyUrl("http://www.example.com"), "type": "url"}]
+        params=[InputParam(value=AnyUrl("http://www.example.com"), type="url")]
     )
     recipe_output = RecipeOutput(dataone_id="12345")
     name = "Test Recipe"
@@ -30,7 +35,7 @@ def test_recipe_meta():
 
 def test_recipe_meta_failure_bad_id():
     recipe_input = RecipeInput(
-        params=[{"value": AnyUrl("http://www.example.com"), "type": "url"}]
+        params=[InputParam(value=AnyUrl("http://www.example.com"), type="url")]
     )
     recipe_output = RecipeOutput(dataone_id="12345")
     name = "Test Recipe"

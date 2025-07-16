@@ -52,14 +52,14 @@ def make_fetch_input_template(
                 f"wget --content-disposition -P /output_dir/ {param.value}"
             )
         elif param.type == "file_system":
-            filename = param.value.split("/")[-1]
+            filename = str(param.value).split("/")[-1]
             fetch_commands.append(f"cp {param.value} /output_dir/{filename}")
-        elif param.type == "pvc":
+        elif param.type == "pvc_mount":
             # It's a PVC path, no need to move
             pass
         else:
             raise OgdcWorkflowExecutionError(
-                f"Unsupported input type: {param.type} for parameter {param.name}"
+                f"Unsupported input type: {param.type} for parameter {param.value}"
             )
 
     # Join all commands with && for sequential execution
