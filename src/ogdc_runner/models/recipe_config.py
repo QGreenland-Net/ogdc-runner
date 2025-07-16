@@ -7,8 +7,8 @@ from pydantic import AnyUrl, BaseModel, Field, field_validator
 
 # Input parameter with type and value
 class InputParam(BaseModel):
-    type: Literal["url", "pvc_mount", "file_system"]
     value: AnyUrl | str
+    type: Literal["url", "pvc_mount", "file_system"]
 
 
 # Create a model for the recipe input

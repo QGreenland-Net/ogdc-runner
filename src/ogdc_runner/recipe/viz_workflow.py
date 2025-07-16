@@ -163,7 +163,6 @@ def make_and_submit_viz_workflow(
         wait: Whether to wait for the workflow to complete
         custom_image: Optional custom image to use for all containers
         custom_tag: Optional custom tag for the image
-        custom_namespace: Optional custom namespace for the workflow
         update_global: If True, update the global image config; if False, only apply to this workflow
         enable_rasterize: Whether to enable the rasterize step
         num_features: Number of features to process in each batch
@@ -244,7 +243,6 @@ def submit_viz_workflow_recipe(
     wait: bool,
     custom_image: str | None = None,
     custom_tag: str | None = None,
-    custom_namespace: str | None = None,
     update_global: bool = False,
     num_features: int = 50,
 ) -> str:
@@ -256,7 +254,6 @@ def submit_viz_workflow_recipe(
         overwrite: Whether to overwrite existing published data
         custom_image: Optional custom image to use for all containers
         custom_tag: Optional custom tag for the image
-        custom_namespace: Optional custom namespace for the workflow
         update_global: If True, update the global image config; if False, only apply to this workflow
         enable_rasterize: Whether to enable the rasterize step
         num_features: Number of features to process in each batch
@@ -280,7 +277,6 @@ def submit_viz_workflow_recipe(
         wait=wait,
         custom_image=custom_image,
         custom_tag=custom_tag,
-        custom_namespace=custom_namespace,
         update_global=update_global,
         num_features=num_features,
         input_url=input_url,

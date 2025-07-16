@@ -17,8 +17,6 @@ from ogdc_runner.models.recipe_config import RecipeConfig
 def make_cmd_template(
     name: str,
     command: str,
-    custom_image: str | None = None,
-    custom_tag: str | None = None,
 ) -> Container:
     """Creates a command template with an optional custom image."""
     template = Container(
@@ -31,19 +29,11 @@ def make_cmd_template(
         outputs=[Artifact(name="output-dir", path="/output_dir/")],
     )
 
-    # Set custom image if provided
-    if custom_image or custom_tag:
-        # This will override the global image setting just for this container
-        template.image = custom_image if custom_image else None
-        template.image_tag = custom_tag if custom_tag else None  # type: ignore[attr-defined]
-
     return template
 
 
 def make_fetch_input_template(
     recipe_config: RecipeConfig,
-    custom_image: str | None = None,
-    custom_tag: str | None = None,
 ) -> Container:
     """Creates a container template that fetches multiple inputs from URLs or file paths.
 
@@ -82,19 +72,11 @@ def make_fetch_input_template(
         outputs=[Artifact(name="output-dir", path="/output_dir/")],
     )
 
-    # Set custom image if provided
-    if custom_image or custom_tag:
-        # This will override the global image setting just for this container
-        template.image = custom_image if custom_image else None
-        template.image_tag = custom_tag if custom_tag else None  # type: ignore[attr-defined]
-
     return template
 
 
 def make_publish_template(
     recipe_id: str,
-    custom_image: str | None = None,
-    custom_tag: str | None = None,
 ) -> Container:
     """Creates a container template that will move final output data into the
     OGDC data storage volume under a subpath named for the recipe_id."""
@@ -114,20 +96,12 @@ def make_publish_template(
         ],
     )
 
-    # Set custom image if provided
-    if custom_image or custom_tag:
-        # This will override the global image setting just for this container
-        template.image = custom_image if custom_image else None
-        template.image_tag = custom_tag if custom_tag else None  # type: ignore[attr-defined]
-
     return template
 
 
 def remove_existing_published_data(
     *,
     recipe_config: RecipeConfig,
-    custom_image: str | None = None,
-    custom_tag: str | None = None,
 ) -> None:
     """Executes an argo workflow that removes published data for a recipe if it
     exists."""
@@ -150,12 +124,6 @@ def remove_existing_published_data(
             ],
         )
 
-        # Set custom image if provided
-        if custom_image or custom_tag:
-            # This will override the global image setting just for this container
-            overwrite_template.image = custom_image if custom_image else None
-            overwrite_template.image_tag = custom_tag if custom_tag else None  # type: ignore[attr-defined]
-
         with Steps(name="steps"):
             overwrite_template()
 
@@ -168,8 +136,6 @@ def remove_existing_published_data(
 def check_for_existing_published_data(
     *,
     recipe_config: RecipeConfig,
-    custom_image: str | None = None,
-    custom_tag: str | None = None,
 ) -> bool:
     """Execute argo workflow that checks if the given recipe has published data.
 
@@ -205,12 +171,6 @@ def check_for_existing_published_data(
             ],
         )
 
-        # Set custom image if provided
-        if custom_image or custom_tag:
-            # This will override the global image setting just for this container
-            check_dir_template.image = custom_image if custom_image else None
-            check_dir_template.image_tag = custom_tag if custom_tag else None  # type: ignore[attr-defined]
-
         with Steps(name="steps"):
             check_dir_template()
 
@@ -245,8 +205,6 @@ def data_already_published(
     *,
     recipe_config: RecipeConfig,
     overwrite: bool,
-    custom_image: str | None = None,
-    custom_tag: str | None = None,
 ) -> bool:
     """Check for the existence of published data for the given
     recipe and optionally remove it.
@@ -261,13 +219,9 @@ def data_already_published(
         # If `overwrite` is True, remove the existing data and return `False`.
         remove_existing_published_data(
             recipe_config=recipe_config,
-            custom_image=custom_image,
-            custom_tag=custom_tag,
         )
         return False
 
     return check_for_existing_published_data(
         recipe_config=recipe_config,
-        custom_image=custom_image,
-        custom_tag=custom_tag,
     )
