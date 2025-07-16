@@ -42,6 +42,28 @@ class RecipeConfig(BaseModel):
     input: RecipeInput
     output: RecipeOutput
 
+    # Optional Docker image (supports both local and hosted images)
+    # Examples: "my-local-image", "ghcr.io/owner/image:latest"
+    image: str | None = Field(
+        default=None, description="Docker image with optional tag"
+    )
+
     # ffspec-compatible recipe directory string.
     # This is where the rest of the config was set from.
     recipe_directory: str
+
+
+class RecipeImage(BaseModel):
+    """
+    Image configuration for the recipe.
+
+    Supports both local and hosted Docker images.
+    """
+
+    image: str = Field(..., description="Docker image name")
+    tag: str = Field(default="latest", description="Docker image tag")
+
+    @property
+    def full_image_path(self) -> str:
+        """Return the full image path including tag."""
+        return f"{self.image}:{self.tag}"

@@ -7,3 +7,5 @@ RECIPE_CONFIG_FILENAME = "meta.yml"
 
 # filename for driving the viz workflow
 VIZ_RECIPE_FILENAME = "config.json"
+
+VIZ_RECIPE_BATCH_SIZE = 50

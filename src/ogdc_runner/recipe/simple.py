@@ -100,9 +100,6 @@ def submit_ogdc_recipe(
         recipe_dir: Path to the recipe directory
         wait: Whether to wait for the workflow to complete
         overwrite: Whether to overwrite existing published data
-        custom_image: Optional custom image to use for all containers
-        custom_tag: Optional custom tag for the image
-        update_global: If True, update the global image config; if False, only apply to this workflow
 
     Returns the name of the OGDC simple recipe submitted to Argo.
     """
@@ -122,6 +119,7 @@ def submit_ogdc_recipe(
         return submit_viz_workflow_recipe(
             recipe_dir=recipe_dir,
             wait=wait,
+            overwrite=overwrite,
         )
 
     # We currently expect all recipes to be "simple"
