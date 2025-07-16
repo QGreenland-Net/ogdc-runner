@@ -100,30 +100,32 @@ def test_update_runner_image(monkeypatch):
     assert Container().image_pull_policy == "Always"
 
 
-def test_update_namespace(monkeypatch):
-    """Test update_namespace updates global_config.namespace and workflow_service."""
+def test_argo_manager_config_access(monkeypatch):
+    """Test that ArgoManager config can be accessed and has correct properties."""
     monkeypatch.setenv("ENVIRONMENT", "dev")
     argo = reload_argo_module(monkeypatch)
-    argo.update_namespace("new-namespace")
-    assert argo.global_config.namespace == "new-namespace"
-    # Fetch the updated workflow service from the manager
-    workflow_service = argo.argo_manager.workflow_service
-    assert workflow_service.namespace == "new-namespace"
+
+    # Test that we can access the manager and its config
+    manager = argo.argo_manager
+    config = manager.config
+
+    assert config.namespace == "qgnet"
+    assert config.service_account_name == "argo-workflow"
+    assert config.workflows_service_url == "http://localhost:2746"
+    assert config.runner_image == "ogdc-runner"
+    assert config.runner_image_tag == "latest"
+    assert config.image_pull_policy == "Never"
 
 
-def test_update_service_account(monkeypatch):
-    """Test update_service_account updates global_config.service_account_name."""
+def test_argo_manager_update_image(monkeypatch):
+    """Test ArgoManager.update_image method directly."""
     monkeypatch.setenv("ENVIRONMENT", "dev")
     argo = reload_argo_module(monkeypatch)
-    argo.update_service_account("new-sa")
-    assert argo.global_config.service_account_name == "new-sa"
 
+    # Test direct method call on manager
+    argo.argo_manager.update_image(
+        image="test-image", tag="test-tag", pull_policy="Always"
+    )
 
-def test_update_workflow_service_url(monkeypatch):
-    """Test update_workflow_service_url updates workflow_service.host."""
-    monkeypatch.setenv("ENVIRONMENT", "dev")
-    argo = reload_argo_module(monkeypatch)
-    argo.update_workflow_service_url("http://new-url")
-    # Fetch the updated workflow service from the manager
-    workflow_service = argo.argo_manager.workflow_service
-    assert workflow_service.host == "http://new-url"
+    assert argo.global_config.image == "test-image:test-tag"
+    assert Container().image_pull_policy == "Always"

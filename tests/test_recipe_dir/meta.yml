@@ -2,6 +2,7 @@ name: "Test argo workflow"
 id: "test-argo-workflow"
 input:
   params:
-    - "https://raw.githubusercontent.com/nsidc/qgreenland/refs/heads/main/qgreenland/assets/arctic_circle.geojson"
+    - value: "https://raw.githubusercontent.com/nsidc/qgreenland/refs/heads/main/qgreenland/assets/arctic_circle.geojson"
+      type: "url"
 output:
   dataone_id: "TODO"
