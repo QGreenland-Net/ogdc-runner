@@ -37,7 +37,7 @@ from ogdc_runner.recipe import get_recipe_config
         Parameter(name="recipe_id"),
         HTTPArtifact(
             name="batch-input",
-            path="/mnt/workflow/{{inputs.parameters.recipe_id}}/input/ice_basins.gpkg",
+            path="/mnt/workflow/{{inputs.parameters.recipe_id}}/input/input.gpkg",
             url="{{inputs.parameters.input_url}}",
         ),
     ],
@@ -193,9 +193,10 @@ EOF"""
 
         # Set up the DAG
         with DAG(name="main"):
-            # Step 1: Download viz-config.json
-            # download_task = download_viz_config(arguments={"config_url": config_url})
-
+            # Step1: Stage the viz-config.json file
+            # This is the configuration file for the visualization workflow
+            # It also creates necessary directories required for the workflow
+            # to run successfully
             stage_config_task = Task(
                 name="stage-viz-config",
                 template=stage_config_file_template,
@@ -210,6 +211,9 @@ EOF"""
                 },
             )
 
+            # Step 3: Tiling step
+            # This step processes each chunk of vector data in parallel
+            # using the tiling_process script defined above
             stage_task = tiling_process(
                 arguments={
                     "chunk-filepath": "{{item}}",
@@ -218,11 +222,12 @@ EOF"""
                 with_param=batch_task.get_result_as("result"),
             )
 
+            # Define the workflow structure
+            # tiling depends on both download and batch tasks
             [  # type: ignore[operator]
                 stage_config_task,
                 batch_task,
             ] >> stage_task
-            # tiling depends on both download and batch tasks
 
     # Submit the workflow
     workflow_name = submit_workflow(w, wait=wait)
