@@ -13,9 +13,9 @@ def reload_argo_module(_: object) -> Any:
     # Remove ogdc_runner.argo from sys.modules so it reloads with new env vars
     sys.modules.pop("ogdc_runner.argo", None)
     sys.modules.pop("src.ogdc_runner.argo", None)
-    # Remove ARGO_WORKFLOW_SERVICE and argo_manager from global namespace if present
+    # Remove ARGO_WORKFLOW_SERVICE and ARGO_MANAGER from global namespace if present
     globals().pop("ARGO_WORKFLOW_SERVICE", None)
-    globals().pop("argo_manager", None)
+    globals().pop("ARGO_MANAGER", None)
     # Import fresh
     import ogdc_runner.argo
 
@@ -100,13 +100,13 @@ def test_update_runner_image(monkeypatch):
     assert Container().image_pull_policy == "Always"
 
 
-def test_argo_manager_config_access(monkeypatch):
+def test_ARGO_MANAGER_config_access(monkeypatch):
     """Test that ArgoManager config can be accessed and has correct properties."""
     monkeypatch.setenv("ENVIRONMENT", "dev")
     argo = reload_argo_module(monkeypatch)
 
     # Test that we can access the manager and its config
-    manager = argo.argo_manager
+    manager = argo.ARGO_MANAGER
     config = manager.config
 
     assert config.namespace == "qgnet"
@@ -117,13 +117,13 @@ def test_argo_manager_config_access(monkeypatch):
     assert config.image_pull_policy == "Never"
 
 
-def test_argo_manager_update_image(monkeypatch):
+def test_ARGO_MANAGER_update_image(monkeypatch):
     """Test ArgoManager.update_image method directly."""
     monkeypatch.setenv("ENVIRONMENT", "dev")
     argo = reload_argo_module(monkeypatch)
 
     # Test direct method call on manager
-    argo.argo_manager.update_image(
+    argo.ARGO_MANAGER.update_image(
         image="test-image", tag="test-tag", pull_policy="Always"
     )
 

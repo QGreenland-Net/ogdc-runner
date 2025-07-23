@@ -150,8 +150,8 @@ class ArgoManager:
 
 
 # Initialize the ArgoManager as a singleton
-argo_manager: ArgoManager = ArgoManager()
-ARGO_WORKFLOW_SERVICE: WorkflowsService = argo_manager.workflow_service
+ARGO_MANAGER: ArgoManager = ArgoManager()
+ARGO_WORKFLOW_SERVICE: WorkflowsService = ARGO_MANAGER.workflow_service
 
 
 def get_workflow_status(workflow_name: str) -> str | None:
@@ -210,7 +210,7 @@ def update_runner_image(
         tag: New image tag
         pull_policy: New image pull policy
     """
-    argo_manager.update_image(image, tag, pull_policy)
+    ARGO_MANAGER.update_image(image, tag, pull_policy)
 
 
 def apply_custom_container_config(
