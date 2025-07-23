@@ -20,6 +20,7 @@ from loguru import logger
 from pydantic import AnyUrl
 
 from ogdc_runner.argo import (
+    ARGO_MANAGER,
     ARGO_WORKFLOW_SERVICE,
     OGDC_WORKFLOW_PVC,
     submit_workflow,
@@ -155,7 +156,7 @@ def make_and_submit_viz_workflow(
     with Workflow(
         generate_name=f"{recipe_config.id}-",
         entrypoint="main",
-        namespace="qgnet",
+        namespace=ARGO_MANAGER.config.namespace,
         service_account_name="argo-workflow",
         workflows_service=ARGO_WORKFLOW_SERVICE,
         volumes=[OGDC_WORKFLOW_PVC],
