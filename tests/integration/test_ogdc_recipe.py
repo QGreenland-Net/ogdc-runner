@@ -3,8 +3,18 @@ from __future__ import annotations
 import pytest
 
 from ogdc_runner.argo import ARGO_WORKFLOW_SERVICE
-from ogdc_runner.exceptions import OgdcDataAlreadyPublished
+from ogdc_runner.exceptions import OgdcDataAlreadyPublished, OgdcInvalidRecipeDir
 from ogdc_runner.recipe.simple import submit_ogdc_recipe
+
+
+def test_submit_ogdc_recipe_with_invalid_dir(tmp_path):
+    """Test submitting a recipe from a non-existent directory raises an error."""
+    with pytest.raises(OgdcInvalidRecipeDir):
+        submit_ogdc_recipe(
+            recipe_dir=str(tmp_path / "nonexistent"),
+            overwrite=True,
+            wait=True,
+        )
 
 
 def test_submit_ogdc_recipe(test_recipe_directory):

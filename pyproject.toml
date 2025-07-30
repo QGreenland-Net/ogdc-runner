@@ -94,6 +94,9 @@ log_cli_level = "INFO"
 testpaths = [
   "tests",
 ]
+markers = [
+  "order: mark test to run in a specific order"
+]
 
 
 [tool.coverage]
