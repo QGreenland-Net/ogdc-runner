@@ -29,6 +29,8 @@ from ogdc_runner.constants import VIZ_RECIPE_BATCH_SIZE
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.recipe import get_recipe_config
 
+# ruff: noqa: PLC0415
+
 
 @script(
     name="batching",
@@ -101,7 +103,9 @@ def tiling_process() -> None:
     import sys
     from pathlib import Path
 
-    from pdgstaging import TileStager  # type: ignore[import-not-found]
+    from pdgstaging import (
+        TileStager,  # type: ignore[import-not-found]
+    )
 
     # Log to stderr
     def print_log(message: str) -> None:
@@ -251,13 +255,14 @@ def submit_viz_workflow_recipe(
     # Get the recipe configuration
     recipe_config = get_recipe_config(recipe_dir)
 
-    if recipe_config.image is not None:
-        # Update Argo custom image
-        pass
-
     input_param = recipe_config.input.params[0]
     if input_param.type == "url":
         input_url = input_param.value
+    else:
+        raise NotImplementedError(
+            f"Input type '{input_param.type}' is not supported for visualization workflows. "
+            f"Only 'url' input type is currently supported."
+        )
 
     # Submit the workflow
     workflow_name = make_and_submit_viz_workflow(
