@@ -112,6 +112,9 @@ def tiling_process() -> None:
         print(message, file=sys.stderr)
 
     # Read the viz-config.json from the PVC
+    # This configuration controls how VizWorkflow processes the visualization data.
+    # For available configuration options, see:
+    # https://github.com/PermafrostDiscoveryGateway/viz-workflow/blob/feature-wf-k8s/pdgworkflow/ConfigManager.py
     workflow_config = json.loads(
         Path("/mnt/workflow/{{inputs.parameters.recipe_id}}/config.json").read_text()
     )
@@ -126,16 +129,24 @@ def tiling_process() -> None:
 def read_config_file_content(recipe_config: RecipeConfig) -> str:
     """Read the config.json file content from the recipe directory.
 
+    This configuration file is used by the pdgworkflow for visualization workflows.
+    When an empty config ({}) is returned, WorkflowManager will use its default behavior.
+
+    For documentation on available configuration options, see:
+    - ConfigManager documentation: https://github.com/PermafrostDiscoveryGateway/viz-workflow/blob/feature-wf-k8s/pdgworkflow/ConfigManager.py
+    - Example config: https://github.com/QGreenland-Net/ogdc-recipes/blob/main/recipes/viz-workflow/config.json
+
     Args:
         recipe_config: The recipe configuration containing the directory path
 
     Returns:
-        The content of the config.json file as a string, or empty JSON if file doesn't exist
+        The content of the config.json file as a string, or empty JSON if file doesn't exist.
+        An empty config ({}) will cause ConfigManager to use default behavior.
     """
     config_file_path = Path(recipe_config.recipe_directory) / "config.json"
     if config_file_path.exists():
         return config_file_path.read_text()
-    # Fallback to empty config if file doesn't exist
+    # Fallback to empty config if file doesn't exist - ConfigManager will use defaults
     return "{}"
 
 
