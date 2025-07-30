@@ -103,8 +103,8 @@ def tiling_process() -> None:
     import sys
     from pathlib import Path
 
-    from pdgstaging import (
-        TileStager,  # type: ignore[import-not-found]
+    from pdgstaging import (  # type: ignore[import-not-found]
+        TileStager,
     )
 
     # Log to stderr
