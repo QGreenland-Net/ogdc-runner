@@ -7,6 +7,8 @@ from typing import Any
 import pytest
 from hera.workflows import Container
 
+import ogdc_runner.argo
+
 
 # Patch sys.modules to allow re-importing the argo module after env changes
 def reload_argo_module(_: object) -> Any:
@@ -16,9 +18,6 @@ def reload_argo_module(_: object) -> Any:
     # Remove ARGO_WORKFLOW_SERVICE and ARGO_MANAGER from global namespace if present
     globals().pop("ARGO_WORKFLOW_SERVICE", None)
     globals().pop("ARGO_MANAGER", None)
-    # Import fresh
-    import ogdc_runner.argo
-
     importlib.reload(ogdc_runner.argo)
     return ogdc_runner.argo
 
@@ -89,15 +88,6 @@ def test__configure_argo_settings_prod(monkeypatch):
     assert Container().image_pull_policy == "IfNotPresent"
     assert argo.global_config.namespace == "qgnet"
     assert argo.global_config.service_account_name == "argo-workflow"
-
-
-def test_update_runner_image(monkeypatch):
-    """Test update_runner_image updates global_config.image and pull policy."""
-    monkeypatch.setenv("ENVIRONMENT", "production")
-    argo = reload_argo_module(monkeypatch)
-    argo.update_runner_image(image="foo/bar", tag="baz", pull_policy="Always")
-    assert argo.global_config.image == "foo/bar:baz"
-    assert Container().image_pull_policy == "Always"
 
 
 def test_ARGO_MANAGER_config_access(monkeypatch):

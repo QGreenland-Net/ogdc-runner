@@ -197,34 +197,3 @@ def submit_workflow(workflow: Workflow, *, wait: bool = False) -> str:
         wait_for_workflow_completion(workflow_name)
 
     return workflow_name
-
-
-def update_runner_image(
-    image: str | None = None, tag: str | None = None, pull_policy: str | None = None
-) -> None:
-    """
-    Update the OGDC runner image configuration.
-
-    Args:
-        image: New image path (without tag)
-        tag: New image tag
-        pull_policy: New image pull policy
-    """
-    ARGO_MANAGER.update_image(image, tag, pull_policy)
-
-
-def apply_custom_container_config(
-    custom_image: str | None = None,
-    custom_tag: str | None = None,
-    update_global: bool = False,
-) -> None:
-    """Apply custom configuration to a workflow.
-
-    Args:
-        custom_image: Optional custom image to use
-        custom_tag: Optional custom tag for the image
-        custom_namespace: Optional custom namespace
-        update_global: If True, update the global config
-    """
-    if update_global and (custom_image or custom_tag):
-        update_runner_image(image=custom_image, tag=custom_tag)
