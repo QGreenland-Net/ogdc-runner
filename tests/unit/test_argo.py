@@ -7,8 +7,6 @@ from typing import Any
 import pytest
 from hera.workflows import Container
 
-import ogdc_runner.argo
-
 
 # Patch sys.modules to allow re-importing the argo module after env changes
 def reload_argo_module(_: object) -> Any:
@@ -18,6 +16,9 @@ def reload_argo_module(_: object) -> Any:
     # Remove ARGO_WORKFLOW_SERVICE and ARGO_MANAGER from global namespace if present
     globals().pop("ARGO_WORKFLOW_SERVICE", None)
     globals().pop("ARGO_MANAGER", None)
+    # Import fresh
+    import ogdc_runner.argo  # noqa: PLC0415
+
     importlib.reload(ogdc_runner.argo)
     return ogdc_runner.argo
 
