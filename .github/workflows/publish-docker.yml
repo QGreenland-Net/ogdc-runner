@@ -22,7 +22,7 @@ jobs:
         "${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}"
     steps:
       - name: "Check out repository"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v5"
 
       - name: "Build container image"
         run: |
