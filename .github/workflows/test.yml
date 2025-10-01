@@ -24,7 +24,7 @@ jobs:
       - uses: "actions/checkout@v5"
         with:
           fetch-depth: 0
-      - uses: "actions/setup-python@v5"
+      - uses: "actions/setup-python@v6"
         with:
           python-version: "3.11"
 
@@ -48,7 +48,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: "actions/setup-python@v5"
+      - uses: "actions/setup-python@v6"
         with:
           python-version: "${{ matrix.python-version }}"
           allow-prereleases: true
@@ -61,6 +61,6 @@ jobs:
         run: "python -m pytest -ra --durations=20 --cov --cov-report=xml --cov-report=term tests/unit"
 
       - name: "Upload coverage report"
-        uses: "codecov/codecov-action@v5.5.0"
+        uses: "codecov/codecov-action@v5.5.1"
         with:
           token: "${{ secrets.CODECOV_TOKEN }}"
