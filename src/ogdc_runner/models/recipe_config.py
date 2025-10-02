@@ -36,8 +36,8 @@ class RecipeConfig(BaseModel):
     # allowable characters in k8s object names. `id` to construct such names.
     id: str = Field(..., pattern=r"^[a-z0-9.-]+$")
 
-    # Type of recipe, e.g., "simple", "visualization", etc.
-    type: Literal["simple", "visualization"] = Field(default="simple")
+    # Type of recipe, e.g., "shell", "visualization", etc.
+    type: Literal["shell", "visualization"] = Field(default="shell")
 
     input: RecipeInput
     output: RecipeOutput

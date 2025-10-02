@@ -24,7 +24,7 @@ pip install -v --editable ".[dev]"
 
 ## Running the CLI in dev
 
-To use the CLI to run simple ogdc recipes with argo:
+To use the CLI to run ogdc recipes with argo:
 
 ```
 $ ogdc-runner submit --wait ~/code/ogdc-recipes/recipes/seal-tags/

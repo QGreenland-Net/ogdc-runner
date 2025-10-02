@@ -3,7 +3,7 @@ from __future__ import annotations
 import click
 
 from ogdc_runner.argo import get_workflow_status
-from ogdc_runner.recipe.simple import submit_ogdc_recipe
+from ogdc_runner.recipe.shell import submit_ogdc_recipe
 
 
 @click.group
