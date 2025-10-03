@@ -34,6 +34,19 @@ def tests(session: nox.Session) -> None:
     session.run("pytest", *session.posargs)
 
 
+def _apidoc_cmd() -> tuple[str]:
+    return (
+        "sphinx-apidoc",
+        "-o",
+        "api/",
+        "--no-toc",
+        "--module-first",
+        "--implicit-namespaces",
+        "--force",
+        "../src/ogdc_runner",
+    )
+
+
 @nox.session(reuse_venv=True)
 def docs(session: nox.Session) -> None:
     """Build the docs. Pass "--serve" to serve. Pass "-b linkcheck" to check links."""
@@ -69,8 +82,16 @@ def docs(session: nox.Session) -> None:
     )
 
     if args.serve:
-        session.run("sphinx-autobuild", *shared_args)
+        session.run(
+            "sphinx-autobuild",
+            "--pre-build",
+            " ".join(_apidoc_cmd()),
+            *shared_args,
+        )
     else:
+        # First, re-build API docs
+        session.run(*_apidoc_cmd())
+        # Then build the html
         session.run("sphinx-build", "--keep-going", *shared_args)
 
 
@@ -80,15 +101,7 @@ def build_api_docs(session: nox.Session) -> None:
 
     session.install("sphinx")
     session.chdir("docs")
-    session.run(
-        "sphinx-apidoc",
-        "-o",
-        "api/",
-        "--module-first",
-        "--no-toc",
-        "--force",
-        "../src/ogdc_runner",
-    )
+    session.run(*_apidoc_cmd())
 
 
 @nox.session

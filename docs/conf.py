@@ -4,7 +4,7 @@ import datetime as dt
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path("../").resolve()))
+sys.path.insert(0, str(Path("../src/").resolve()))
 
 project = "ogdc-runner"
 copyright = f"{dt.date.today().year}, NSIDC and ADC"
@@ -38,9 +38,19 @@ myst_enable_extensions = [
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
+    "pydantic": ("https://docs.pydantic.dev/latest/", None),
 }
 
+autodoc_mock_imports = [
+    "hera",
+    "jinja",
+]
+
+
 nitpick_ignore = [
+    ("py:class", "hera.workflows.WorkflowsService"),
+    ("py:class", "hera.workflows.Workflow"),
+    ("py:class", "hera.workflows.Container"),
     ("py:class", "_io.StringIO"),
     ("py:class", "_io.BytesIO"),
 ]
@@ -51,4 +61,4 @@ always_document_param_types = True
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
-html_static_path = ["_static"]
+# html_static_path = ["_static"]
