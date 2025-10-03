@@ -14,10 +14,10 @@ nox.options.sessions = ["typecheck", "tests"]
 nox.options.default_venv_backend = "uv|virtualenv"
 if os.environ.get("ENVIRONMENT") == "dev":
     # Use existing venvs where possible in dev
-    nox.options.reuse_existing_virtualenvs = "yes"
+    nox.options.reuse_existing_virtualenvs = True
 else:
     # All other envs should have the nox venvs recreated.
-    nox.options.reuse_existing_virtualenvs = "no"
+    nox.options.reuse_existing_virtualenvs = False
 
 
 @nox.session

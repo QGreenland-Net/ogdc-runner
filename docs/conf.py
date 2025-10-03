@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import datetime as dt
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path("../").resolve()))
 
 project = "ogdc-runner"
-copyright = "2024, NSIDC & ADC"
+copyright = f"{dt.date.today().year}, NSIDC and ADC"
 author = "QGreenland-Net team"
 
 extensions = [

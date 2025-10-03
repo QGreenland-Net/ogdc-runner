@@ -5,7 +5,9 @@ description of best practices for developing scientific packages.
 
 [spc-dev-intro]: https://learn.scientific-python.org/development/
 
-> [!NOTE] Add yourself as an author in [pyproject.toml](../pyproject.toml)
+```{note}
+Add yourself as an author in `pyproject.toml`
+```
 
 ## Setting up a development environment manually
 
@@ -24,7 +26,7 @@ pip install -v --editable ".[dev]"
 
 ## Running the CLI in dev
 
-To use the CLI to run simple ogdc recipes with argo:
+To use the CLI to run ogdc recipes with argo:
 
 ```
 $ ogdc-runner submit --wait ~/code/ogdc-recipes/recipes/seal-tags/
