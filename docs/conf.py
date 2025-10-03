@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import subprocess
 import sys
 from pathlib import Path
 
@@ -68,3 +69,31 @@ templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # html_static_path = ["_static"]
+
+
+def _run_apidoc_cmd(app) -> tuple[str]:
+    this_dir = Path(app.srcdir)
+    src_dir = (Path(app.srcdir) / "../src/ogdc_runner").resolve()
+    api_output_dir = (this_dir / "api/").resolve()
+    subprocess.run(
+        [
+            "sphinx-apidoc",
+            "--separate",
+            "-o",
+            api_output_dir,
+            "--no-toc",
+            "--module-first",
+            "--implicit-namespaces",
+            "--force",
+            src_dir,
+        ],
+        check=True,
+    )
+
+
+def setup(app):
+    """Setup build-initialization action to run `sphinx-apidoc` command
+
+    This ensures the api docs are up-to-date each time the build is run.
+    """
+    app.connect("builder-inited", _run_apidoc_cmd)
