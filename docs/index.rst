@@ -12,3 +12,5 @@ ogdc-runner documentation
    :hidden:
 
    CONTRIBUTING.md
+
+   API Docs <api/ogdc_runner>
