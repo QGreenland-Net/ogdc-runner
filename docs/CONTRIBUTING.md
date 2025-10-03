@@ -5,7 +5,9 @@ description of best practices for developing scientific packages.
 
 [spc-dev-intro]: https://learn.scientific-python.org/development/
 
-> [!NOTE] Add yourself as an author in [pyproject.toml](../pyproject.toml)
+```{note}
+Add yourself as an author in `pyproject.toml`
+```
 
 ## Setting up a development environment manually
 
