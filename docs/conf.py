@@ -23,6 +23,8 @@ extensions = [
 ]
 
 autodoc_pydantic_model_show_field_summary = False
+autodoc_pydantic_model_show_json = False
+
 
 typehints_use_signature = True
 typehints_use_signature_return = True

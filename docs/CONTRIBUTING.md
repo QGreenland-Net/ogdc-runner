@@ -24,19 +24,6 @@ source ./.venv/bin/activate
 pip install -v --editable ".[dev]"
 ```
 
-## Running the CLI in dev
-
-To use the CLI to run ogdc recipes with argo:
-
-```
-$ ogdc-runner submit --wait ~/code/ogdc-recipes/recipes/seal-tags/
-Successfully submitted recipe with workflow name seal-tags-6gxfw
-Workflow status: Running
-Workflow status: Running
-Workflow status: Running
-Workflow status: Succeeded
-```
-
 ### Using a local docker image for workflow execution
 
 The `ogdc-runner` supports using a local `ogdc-runner` image for development
@@ -49,9 +36,11 @@ First, build a local image:
 docker build . -t ogdc-runner
 ```
 
-> [!NOTE] The docker image must be built in the `rancher-desktop` context so
-> that it is available to the Argo deployment on the developer's local machine.
-> Check that you have the correct context selected with `docker context ls`.
+```{note}
+The docker image must be built in the `rancher-desktop` context so
+that it is available to the Argo deployment on the developer's local machine.
+Check that you have the correct context selected with `docker context ls`.
+```
 
 Next, set the `ENVIRONMENT` envvar to `dev`. This will tell `ogdc-runner` to use
 the locally built image instead of the one hosted on the GHCR:
