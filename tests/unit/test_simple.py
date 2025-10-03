@@ -9,4 +9,4 @@ def test_get_recipe_config(test_recipe_directory):
     )
 
     assert config.recipe_directory == test_recipe_directory
-    assert config.id == "test-argo-workflow"
+    assert config.id == "test-ogdc-workflow"

@@ -1,9 +1,7 @@
-name: "Test argo workflow"
-id: "test-argo-workflow"
+name: "Test ogdc workflow"
+id: "test-ogdc-workflow"
 type: "shell"
 input:
   params:
     - value: "https://raw.githubusercontent.com/nsidc/qgreenland/refs/heads/main/qgreenland/assets/arctic_circle.geojson"
       type: "url"
-output:
-  dataone_id: "TODO"

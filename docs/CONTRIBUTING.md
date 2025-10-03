@@ -24,19 +24,6 @@ source ./.venv/bin/activate
 pip install -v --editable ".[dev]"
 ```
 
-## Running the CLI in dev
-
-To use the CLI to run ogdc recipes with argo:
-
-```
-$ ogdc-runner submit --wait ~/code/ogdc-recipes/recipes/seal-tags/
-Successfully submitted recipe with workflow name seal-tags-6gxfw
-Workflow status: Running
-Workflow status: Running
-Workflow status: Running
-Workflow status: Succeeded
-```
-
 ### Using a local docker image for workflow execution
 
 The `ogdc-runner` supports using a local `ogdc-runner` image for development
