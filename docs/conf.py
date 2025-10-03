@@ -18,7 +18,10 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
     "sphinx_copybutton",
+    "sphinxcontrib.autodoc_pydantic",
 ]
+
+autodoc_pydantic_model_show_field_summary = False
 
 source_suffix = [".rst", ".md"]
 exclude_patterns = [
