@@ -23,6 +23,9 @@ extensions = [
 
 autodoc_pydantic_model_show_field_summary = False
 
+typehints_use_signature = True
+typehints_use_signature_return = True
+
 source_suffix = [".rst", ".md"]
 exclude_patterns = [
     "_build",
