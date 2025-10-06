@@ -55,8 +55,11 @@ def make_fetch_input_template(
             filename = str(param.value).split("/")[-1]
             fetch_commands.append(f"cp {param.value} /output_dir/{filename}")
         elif param.type == "pvc_mount":
-            # It's a PVC path, no need to move
-            pass
+            # TODO: support PVC paths as input.
+            # Because it is a PVC, we expect it to be mounted to the first
+            # step's container, so no move should be necessary.
+            err_msg = "PVC mounts are not yet supported"
+            raise NotImplementedError(err_msg)
         else:
             raise OgdcWorkflowExecutionError(
                 f"Unsupported input type: {param.type} for parameter {param.value}"
