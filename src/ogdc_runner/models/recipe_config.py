@@ -25,7 +25,7 @@ class RecipeInput(BaseModel):
 
 
 class RecipeOutput(BaseModel):
-    dataone_id: str
+    dataone_id: str = "TODO"
 
 
 # Create a model for the recipe configuration
@@ -40,7 +40,7 @@ class RecipeConfig(BaseModel):
     type: Literal["shell", "visualization"] = Field(default="shell")
 
     input: RecipeInput
-    output: RecipeOutput
+    output: RecipeOutput = RecipeOutput()
 
     # Optional Docker image (supports both local and hosted images)
     # Examples: "my-local-image", "ghcr.io/owner/image:latest"
