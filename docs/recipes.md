@@ -27,11 +27,37 @@ An example recipe `meta.yml` is shown below:
 :language: yaml
 ```
 
-TODOs:
+Key configuration options are:
 
-- Document how inputs work
-- Document out outputs (to PVC) work. Note that additional output types are
-  planned (e.g., publish to DataONE)
+#### `name`
+
+Each recipe must have a `name`, which is a string of characters providing a
+human-readable name for the given recipe.
+
+Example: `"Water measurements from seal tag data"`
+
+#### `id`
+
+Machine-readable string that should uniquely identify this recipe. Only
+lower-case alphanumeric characters, `.`, and `,` are allowed.
+
+Example: `"seal-tags"`
+
+#### `type`
+
+What type of recipe this is. See [Recipe types](#recipe-types) below for more
+information about different recipe types.
+
+#### `input`
+
+The input data source. See the
+{class}`ogdc_runner.models.recipe_config.RecipeInput` class for details.
+
+#### `output`
+
+```{warning}
+Although `dataone_id` is a documented output type, it is currently **unused**. As of this  writing, outputs are stored on the `qgnet-ogdc-workflow-pvc`, under a directory named after the `recipe_id`. This is an evolving part of the API, and we expect new output types to be supported soon.
+```
 
 ## Recipe types
 
