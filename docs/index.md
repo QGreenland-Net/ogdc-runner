@@ -6,6 +6,7 @@
 
 Contributor Guide <CONTRIBUTING.md>
 user_guide.md
+recipes.md
 
 API Docs <api/ogdc_runner>
 ```
