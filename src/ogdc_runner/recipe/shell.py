@@ -19,18 +19,18 @@ from ogdc_runner.common import (
     make_fetch_input_template,
     make_publish_template,
 )
-from ogdc_runner.constants import SIMPLE_RECIPE_FILENAME
+from ogdc_runner.constants import SHELL_RECIPE_FILENAME
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.recipe import get_recipe_config
 from ogdc_runner.recipe.viz_workflow import submit_viz_workflow_recipe
 
 
-def make_and_submit_simple_workflow(
+def make_and_submit_shell_workflow(
     recipe_config: RecipeConfig,
     wait: bool,
 ) -> str:
-    """Create and submit an argo workflow based on a simple recipe.
+    """Create and submit an argo workflow based on a shell recipe.
 
     Args:
         recipe_config: The recipe configuration
@@ -38,10 +38,10 @@ def make_and_submit_simple_workflow(
 
     Returns the name of the workflow as a str.
     """
-    # Parse commands from the simple recipe file
+    # Parse commands from the shell recipe file
     commands = parse_commands_from_recipe_file(
         recipe_config.recipe_directory,
-        SIMPLE_RECIPE_FILENAME,
+        SHELL_RECIPE_FILENAME,
     )
 
     with Workflow(
@@ -101,7 +101,7 @@ def submit_ogdc_recipe(
         wait: Whether to wait for the workflow to complete
         overwrite: Whether to overwrite existing published data
 
-    Returns the name of the OGDC simple recipe submitted to Argo.
+    Returns the name of the OGDC shell recipe submitted to Argo.
     """
     # Get the recipe configuration
     recipe_config = get_recipe_config(recipe_dir)
@@ -121,13 +121,13 @@ def submit_ogdc_recipe(
             wait=wait,
         )
 
-    # We currently expect all recipes to be "simple"
-    simple_recipe_workflow_name = make_and_submit_simple_workflow(
+    # We currently expect all recipes to be "shell"
+    shell_recipe_workflow_name = make_and_submit_shell_workflow(
         recipe_config=recipe_config,
         wait=wait,
     )
 
-    return simple_recipe_workflow_name
+    return shell_recipe_workflow_name
 
 
 def parse_commands_from_recipe_file(recipe_dir: str, filename: str) -> list[str]:
