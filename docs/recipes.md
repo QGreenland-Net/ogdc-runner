@@ -18,8 +18,8 @@ on configuration options.
 ### `meta.yaml`
 
 The `meta.yaml` provides key metadata that drive the OGDC recipe's execution and
-is defined by the {class}`ogdc_runner.models.recipe_config.RecipeConfig`
-Pydantic model.
+is defined by the {class}`ogdc_runner.models.recipe_config.RecipeMeta` Pydantic
+model.
 
 An example recipe `meta.yml` is shown below:
 
