@@ -44,7 +44,7 @@ def make_fetch_input_template(
     # Create commands to fetch each input
     fetch_commands = []
 
-    for _i, param in enumerate(recipe_config.input.params):
+    for param in recipe_config.input.params:
         # Check if the parameter is a URL
         if param.type == "url":
             # It's a URL, use wget
