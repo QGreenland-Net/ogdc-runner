@@ -28,8 +28,9 @@ class RecipeOutput(BaseModel):
     dataone_id: str = "TODO"
 
 
-# Create a model for the recipe configuration
-class RecipeConfig(BaseModel):
+class RecipeMeta(BaseModel):
+    """Model for a recipe's metadata (`meta.yaml`)."""
+
     name: str
 
     # Allow lower-case alphanumeric characters, `.`, and `,`. These are the only
@@ -47,6 +48,14 @@ class RecipeConfig(BaseModel):
     image: str | None = Field(
         default=None, description="Docker image with optional tag"
     )
+
+
+class RecipeConfig(RecipeMeta):
+    """Model for a recipe's configuration.
+
+    This includes the data in `meta.yaml`, plus some internal metadata/config
+    that is generated dynamically at runtime (e.g., `recipe_directory`).
+    """
 
     # ffspec-compatible recipe directory string.
     # This is where the rest of the config was set from.
