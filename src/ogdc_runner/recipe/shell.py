@@ -17,10 +17,10 @@ from ogdc_runner.argo import (
 # Import common utilities
 from ogdc_runner.common import (
     make_fetch_input_template,
-    make_publish_template,
 )
 from ogdc_runner.constants import SHELL_RECIPE_FILENAME
 from ogdc_runner.models.recipe_config import RecipeConfig
+from ogdc_runner.publish import make_publish_template
 
 
 def make_cmd_template(

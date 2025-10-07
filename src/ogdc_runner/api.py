@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ogdc_runner.common import data_already_published
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished
+from ogdc_runner.publish import data_already_published
 from ogdc_runner.recipe import get_recipe_config
 from ogdc_runner.recipe.shell import make_and_submit_shell_workflow
 from ogdc_runner.recipe.viz_workflow import submit_viz_workflow_recipe
