@@ -14,24 +14,6 @@ from ogdc_runner.exceptions import OgdcWorkflowExecutionError
 from ogdc_runner.models.recipe_config import RecipeConfig
 
 
-def make_cmd_template(
-    name: str,
-    command: str,
-) -> Container:
-    """Creates a command template with an optional custom image."""
-    template = Container(
-        name=name,
-        command=["sh", "-c"],
-        args=[
-            f"mkdir -p /output_dir/ && {command}",
-        ],
-        inputs=[Artifact(name="input-dir", path="/input_dir/")],
-        outputs=[Artifact(name="output-dir", path="/output_dir/")],
-    )
-
-    return template
-
-
 def make_fetch_input_template(
     recipe_config: RecipeConfig,
 ) -> Container:
