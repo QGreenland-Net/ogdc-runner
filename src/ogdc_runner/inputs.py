@@ -1,3 +1,5 @@
+"""Code for accessing input data of OGDC recipes"""
+
 from __future__ import annotations
 
 from hera.workflows import (

@@ -13,12 +13,8 @@ from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
     submit_workflow,
 )
-
-# Import common utilities
-from ogdc_runner.common import (
-    make_fetch_input_template,
-)
 from ogdc_runner.constants import SHELL_RECIPE_FILENAME
+from ogdc_runner.inputs import make_fetch_input_template
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.publish import make_publish_template
 
