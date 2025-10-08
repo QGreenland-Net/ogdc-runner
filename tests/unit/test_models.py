@@ -24,6 +24,7 @@ def test_recipe_meta():
         id=recipe_id,
         input=recipe_input,
         output=recipe_output,
+        type="shell",
         recipe_directory="/foo/",
     )
 
@@ -48,5 +49,6 @@ def test_recipe_meta_failure_bad_id():
             id=recipe_id,
             input=recipe_input,
             output=recipe_output,
+            type="shell",
             recipe_directory="/foo/",
         )

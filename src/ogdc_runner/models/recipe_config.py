@@ -38,7 +38,7 @@ class RecipeMeta(BaseModel):
     id: str = Field(..., pattern=r"^[a-z0-9.-]+$")
 
     # Type of recipe, e.g., "shell", "visualization", etc.
-    type: Literal["shell", "visualization"] = Field(default="shell")
+    type: Literal["shell", "visualization"]
 
     input: RecipeInput
     output: RecipeOutput = RecipeOutput()
