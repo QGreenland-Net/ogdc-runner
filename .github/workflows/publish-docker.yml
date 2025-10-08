@@ -35,7 +35,7 @@ jobs:
           username: "${{ github.repository_owner }}"
           password: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: "Push to image registries (DockerHub, GHCR)"
+      - name: "Push to image registry (GHCR)"
         run: |
           # Push to GHCR
           docker push "ghcr.io/qgreenland-net/${IMAGE_NAME}:${IMAGE_TAG}"
