@@ -149,7 +149,7 @@ Once `main` is ready for a release (feature branches are merged and the
 CHANGELOG is up-to-date), tag the latest commit with the version to be released
 (e.g., `v0.1.0`) and push it to GitHub:
 
-```
+```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
