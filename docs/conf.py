@@ -20,6 +20,7 @@ extensions = [
     "sphinx_autodoc_typehints",
     "sphinx_copybutton",
     "sphinxcontrib.autodoc_pydantic",
+    "sphinxcontrib.mermaid",
 ]
 
 autodoc_pydantic_model_show_field_summary = False
