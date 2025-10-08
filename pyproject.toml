@@ -57,6 +57,7 @@ docs = [
   "sphinx_autodoc_typehints",
   "furo>=2023.08.17",
   "autodoc_pydantic",
+  "sphinxcontrib-mermaid",
 ]
 
 [project.urls]

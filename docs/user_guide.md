@@ -1,5 +1,12 @@
 # User Guide
 
+```{warning}
+The `ogdc-runner` and other associated components of the OGDC are under active
+development and currently intended for internal users (QGreenland-Net team
+members). We are working hard to finalize APIs and expose functionality for a
+wider audience. In the meantime, frequent breaking changes are expected.
+```
+
 ## Installing
 
 Use `pip` to install the `ogdc-runner`:
