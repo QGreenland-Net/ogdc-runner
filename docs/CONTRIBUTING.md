@@ -131,3 +131,32 @@ You can see a preview with:
 ```bash
 nox -s docs -- --serve
 ```
+
+## Releasing
+
+### Versioning
+
+This project uses [semantic versioning](https://semver.org/).
+
+> Given a version number MAJOR.MINOR.PATCH, increment the:
+>
+> 1. MAJOR version when you make incompatible API changes
+> 2. MINOR version when you add functionality in a backward compatible manner
+> 3. PATCH version when you make backward compatible bug fixes
+
+Decide what the version will be for your release, and ensure that the CHANGELOG
+contains an entry for the planned release.
+
+Once `main` is ready for a release (feature branches are merged and the
+CHANGELOG is up-to-date), tag the latest commit with the version to be released
+(e.g., `v0.1.0`) and push it to GitHub:
+
+```
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The git tag is used during the package build to set the version number. This is
+accomplished via the use of `hatch-vcs`. When a build is run,
+`src/ogdc_runner/_version.py` is generated automatically with the version
+number.
