@@ -1,4 +1,4 @@
-name: "Build & release"
+name: "Build & release PyPi package"
 
 on:
   workflow_dispatch:
