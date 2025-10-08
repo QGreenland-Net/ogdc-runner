@@ -134,8 +134,6 @@ nox -s docs -- --serve
 
 ## Releasing
 
-### Versioning
-
 This project uses [semantic versioning](https://semver.org/).
 
 > Given a version number MAJOR.MINOR.PATCH, increment the:
@@ -156,7 +154,15 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+```{note}
 The git tag is used during the package build to set the version number. This is
 accomplished via the use of `hatch-vcs`. When a build is run,
 `src/ogdc_runner/_version.py` is generated automatically with the version
 number.
+```
+
+Pushing a tag will then trigger GitHub actions to:
+
+- Build `ogdc-runner` python package and push to PyPi
+- Build `ogdc-runner` Docker image tagged with the version and push to GitHub
+  Container Registry.
