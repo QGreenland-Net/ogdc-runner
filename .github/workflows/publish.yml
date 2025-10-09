@@ -1,4 +1,4 @@
-name: "Build & release PyPi package"
+name: "Build and optionally release PyPi and docker packages"
 
 on:
   workflow_dispatch:
@@ -15,10 +15,21 @@ env:
   # Many color libraries just need this to be set to any value, but at least
   # one distinguishes color depth, where "3" -> "256-bit color".
   FORCE_COLOR: 3
+  DOCKER_IMAGE_NAME: "ogdc-runner"
+  # GitHub Actions expressions don't have great conditional support, so
+  # writing a ternary expression looks a lot like bash. In Python, this
+  # would read as:
+  #     github.ref_name if github.ref_type == 'tag' else 'latest'
+  #     https://docs.github.com/en/actions/learn-github-actions/expressions
+  DOCKER_IMAGE_TAG:
+    "${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}"
 
 jobs:
-  build:
-    name: "Build distributions (wheel & sdist)"
+  #######################################################################
+  # Build Python
+  #######################################################################
+  build-python:
+    name: "Build python distributions (wheel & sdist)"
     runs-on: "ubuntu-latest"
 
     steps:
@@ -28,9 +39,33 @@ jobs:
 
       - uses: "hynek/build-and-inspect-python-package@v2"
 
-  publish:
+  #######################################################################
+  # Build Docker
+  #######################################################################
+  build-docker:
+    name: "Build docker container image"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Check out repository"
+        uses: "actions/checkout@v5"
+
+      - name: "Build container image"
+        run: |
+          docker build --tag "ghcr.io/qgreenland-net/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}" .
+          docker save "ghcr.io/qgreenland-net/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}" -o docker-image.tar
+      - name: "Upload image tarball as artifact"
+        uses: "actions/upload-artifact@v4"
+        with:
+          name: "docker-image-tar"
+          path: "docker-image.tar"
+
+  #######################################################################
+  # Publish python
+  #######################################################################
+  publish-python:
     if: github.ref_type == 'tag'
-    needs: ["build"]
+    # Only publish if both Python and Docker builds are successful.
+    needs: ["build-python", "build-docker"]
     name: "Publish to PyPI"
     environment: "pypi"
     permissions:
@@ -44,3 +79,52 @@ jobs:
           path: "dist"
 
       - uses: "pypa/gh-action-pypi-publish@release/v1"
+
+  #######################################################################
+  # Publish Docker
+  #######################################################################
+  publish-docker:
+    # Only push on tag or push to main.
+    if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
+    name: "Push docker container image"
+    runs-on: "ubuntu-latest"
+    # Only publish if both Python and Docker builds are successful.
+    needs: ["build-python", "build-docker"]
+    steps:
+      - name: "Download image tarball"
+        uses: "actions/download-artifact@v4"
+        with:
+          name: "docker-image-tar"
+
+      - name: "Load Docker image"
+        run: "docker load -i docker-image.tar"
+
+      - name: "GHCR login"
+        uses: "docker/login-action@v3"
+        with:
+          registry: "ghcr.io"
+          username: "${{ github.repository_owner }}"
+          password: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: "Push to image registry (GHCR)"
+        run: |
+          # Push to GHCR
+          docker push "ghcr.io/qgreenland-net/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
+
+  #######################################################################
+  # GitHub release
+  #######################################################################
+  publish-gh-release:
+    # Only publish a GH release when publish-python and publish-docker tasks are
+    # complete and the ref type is a tag (e.g,. v0.1.0).
+    if: github.ref_type == 'tag'
+    name: "Create GitHub release"
+    needs: ["publish-python", "publish-docker"]
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Checkout"
+        uses: "actions/checkout@v5"
+      - name: "Release"
+        uses: "softprops/action-gh-release@v2"
+        with:
+          generate_release_notes: true
