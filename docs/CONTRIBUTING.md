@@ -134,8 +134,8 @@ nox -s docs -- --serve
 
 ## Continuous Integration
 
-This project uses [GitHub Actions]() to automatically test, build, and publish
-the `ogdc-runner`.
+This project uses [GitHub Actions](https://docs.github.com/en/actions) to
+automatically test, build, and publish the `ogdc-runner`.
 
 See the `ogdc-runner` repository's
 [.github/workflows/](https://github.com/QGreenland-Net/ogdc-runner/tree/main/.github/workflows)
