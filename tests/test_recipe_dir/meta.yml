@@ -1,5 +1,4 @@
 name: "Test ogdc workflow"
-id: "test-ogdc-workflow"
 type: "shell"
 input:
   params:
