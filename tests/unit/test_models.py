@@ -41,14 +41,13 @@ def test_recipe_meta_failure_bad_id():
     recipe_output = RecipeOutput(dataone_id="12345")
     name = "Test Recipe"
 
-    recipe_id = "test_recipe"
     with pytest.raises(ValidationError):
-        # Underscores are not allowed, this should trigger the validation error.
         RecipeConfig(
             name=name,
-            id=recipe_id,
             input=recipe_input,
             output=recipe_output,
-            type="shell",
+            # "shellz" is not a valid recipe type. This should raise a
+            # validation error.
+            type="shellz",
             recipe_directory="/foo/",
         )
