@@ -61,7 +61,7 @@ class RecipeConfig(RecipeMeta):
     # This is where the rest of the config was set from.
     recipe_directory: str
 
-    @computed_field
+    @computed_field  # type: ignore[misc]
     @cached_property
     def id(self) -> str:
         k8s_name = self.name.lower().replace(" ", "-")
