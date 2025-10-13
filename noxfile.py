@@ -27,7 +27,7 @@ def typecheck(session: nox.Session) -> None:
     session.run("mypy", *session.posargs)
 
 
-@nox.session
+@nox.session(requires=["typecheck"])
 def tests(session: nox.Session) -> None:
     """Run the unit and regular tests."""
     session.install(".[test]")
