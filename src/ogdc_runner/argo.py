@@ -17,7 +17,7 @@ from ogdc_runner.exceptions import OgdcWorkflowExecutionError
 OGDC_WORKFLOW_PVC = models.Volume(
     name="workflow-volume",
     persistent_volume_claim=models.PersistentVolumeClaimVolumeSource(
-        claim_name="qgnet-ogdc-workflow-pvc",
+        claim_name="cephfs-qgnet-ogdc-workflow-pvc",
     ),
 )
 

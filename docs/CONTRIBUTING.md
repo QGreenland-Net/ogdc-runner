@@ -32,14 +32,21 @@ needing to release it to the GHCR).
 
 First, build a local image:
 
-```
-docker build . -t ogdc-runner
-```
-
 ```{note}
 The docker image must be built in the `rancher-desktop` context so
 that it is available to the Argo deployment on the developer's local machine.
 Check that you have the correct context selected with `docker context ls`.
+```
+
+```{warning}
+The `ogdc-runner` docker image (and any others intended to be run on the k8s
+cluster as part of the OGDC) **MUST NOT** be based on busybox/alpine Linux due
+to a known networking issue in non-local environments. For context, see:
+<https://github.com/QGreenland-Net/ogdc-helm/issues/31>
+```
+
+```
+docker build . -t ogdc-runner
 ```
 
 Next, set the `ENVIRONMENT` envvar to `dev`. This will tell `ogdc-runner` to use
