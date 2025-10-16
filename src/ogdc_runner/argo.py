@@ -107,17 +107,6 @@ class ArgoManager:
             ),
             # Setup default OGDC workflow pvc
             volumes=[OGDC_WORKFLOW_PVC],
-            # DNS settings. Setting `ndots` to 1 fixes an issue with DNS
-            # resolution on alpine/busybox-based images.
-            # See: https://github.com/QGreenland-Net/ogdc-helm/issues/31
-            dns_config=models.PodDNSConfig(
-                options=[
-                    models.PodDNSConfigOption(
-                        name="ndots",
-                        value="1",
-                    ),
-                ],
-            ),
         )
 
     @property
