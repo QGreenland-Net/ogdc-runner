@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from functools import cached_property
 from typing import Literal
 
-from pydantic import AnyUrl, BaseModel, Field, field_validator
+from pydantic import AnyUrl, BaseModel, Field, computed_field, field_validator
 
 
 # Input parameter with type and value
@@ -31,14 +32,13 @@ class RecipeOutput(BaseModel):
 class RecipeMeta(BaseModel):
     """Model for a recipe's metadata (`meta.yaml`)."""
 
-    name: str
-
-    # Allow lower-case alphanumeric characters, `.`, and `,`. These are the only
-    # allowable characters in k8s object names. `id` to construct such names.
-    id: str = Field(..., pattern=r"^[a-z0-9.-]+$")
+    # Allow alphanumeric characters, `.`, ` ` (space), and `,`.
+    # The name is used to create an ID for the recipe that must be k8s-compliant
+    # (lower-case, alphanumeric characters, `.`, and `,`).
+    name: str = Field(..., pattern=r"^[a-zA-Z0-9 .-]+$")
 
     # Type of recipe, e.g., "shell", "visualization", etc.
-    type: Literal["shell", "visualization"] = Field(default="shell")
+    type: Literal["shell", "visualization"]
 
     input: RecipeInput
     output: RecipeOutput = RecipeOutput()
@@ -60,6 +60,13 @@ class RecipeConfig(RecipeMeta):
     # ffspec-compatible recipe directory string.
     # This is where the rest of the config was set from.
     recipe_directory: str
+
+    @computed_field  # type: ignore[misc]
+    @cached_property
+    def id(self) -> str:
+        k8s_name = self.name.lower().replace(" ", "-")
+
+        return k8s_name
 
 
 class RecipeImage(BaseModel):

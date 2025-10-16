@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import sys
+
 import click
+from pydantic import ValidationError
 
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
+from ogdc_runner.recipe import get_recipe_config
 
 
 @click.group
@@ -50,3 +54,21 @@ def check_workflow_status(workflow_name: str) -> None:
     """Check an argo workflow's status."""
     status = get_workflow_status(workflow_name)
     print(f"Workflow {workflow_name} has status {status}.")
+
+
+@cli.command
+@click.argument(
+    "recipe_path",
+    required=True,
+    metavar="RECIPE-PATH",
+    type=str,
+)
+def validate_recipe(recipe_path: str) -> None:
+    """Validate an OGDC recipe directory."""
+    try:
+        get_recipe_config(recipe_path)
+        print(f"Recipe {recipe_path} is valid.")
+    except ValidationError as err:
+        print(f"Recipe {recipe_path} is invalid.")
+        print(err)
+        sys.exit(1)

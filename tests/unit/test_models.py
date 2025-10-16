@@ -21,9 +21,9 @@ def test_recipe_meta():
 
     recipe_meta = RecipeConfig(
         name=name,
-        id=recipe_id,
         input=recipe_input,
         output=recipe_output,
+        type="shell",
         recipe_directory="/foo/",
     )
 
@@ -38,15 +38,15 @@ def test_recipe_meta_failure_bad_id():
         params=[InputParam(value=AnyUrl("http://www.example.com"), type="url")]
     )
     recipe_output = RecipeOutput(dataone_id="12345")
-    name = "Test Recipe"
 
-    recipe_id = "test_recipe"
+    # This name should raise a validation error, as `*` is not allowed.
+    name = "Test Recipe*"
+
     with pytest.raises(ValidationError):
-        # Underscores are not allowed, this should trigger the validation error.
         RecipeConfig(
             name=name,
-            id=recipe_id,
             input=recipe_input,
             output=recipe_output,
+            type="shell",
             recipe_directory="/foo/",
         )
