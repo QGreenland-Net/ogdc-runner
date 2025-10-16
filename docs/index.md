@@ -9,6 +9,7 @@ user_guide.md
 recipes.md
 
 API Docs <api/ogdc_runner>
+architecture.md
 ```
 
 The `ogdc-runner` provides an API and CLI for submitting OGDC data
