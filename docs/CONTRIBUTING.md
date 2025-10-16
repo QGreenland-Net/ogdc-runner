@@ -132,6 +132,23 @@ You can see a preview with:
 nox -s docs -- --serve
 ```
 
+## Continuous Integration
+
+This project uses [GitHub Actions](https://docs.github.com/en/actions) to
+automatically test, build, and publish the `ogdc-runner`.
+
+See the `ogdc-runner` repository's
+[.github/workflows/](https://github.com/QGreenland-Net/ogdc-runner/tree/main/.github/workflows)
+directory to see configured actions.
+
+In short, GHA are setup to:
+
+- Run tests/package builds on PRs and merges with `main`
+- Publish the latest Docker image with merges to `main`
+- Publish version tagged Docker image and publish PyPi package on version tags
+  (e.g., `v0.1.0`). Upon successflu publication of the Docker image and Python
+  package, a GitHub release for the version tag is automatically created.
+
 ## Releasing
 
 This project uses [semantic versioning](https://semver.org/).
@@ -166,3 +183,4 @@ Pushing a tag will then trigger GitHub actions to:
 - Build `ogdc-runner` python package and push to PyPi
 - Build `ogdc-runner` Docker image tagged with the version and push to GitHub
   Container Registry.
+- Create a GitHub Release for the tag version
