@@ -23,3 +23,9 @@ class OgdcInvalidRecipeDir(OgdcRunnerException):
     """Exception that is raised when recipe directory is not available/valid."""
 
     pass
+
+
+class OgdcInvalidRecipeConfig(OgdcRunnerException):
+    """Exception raised if invalid OGDC recipe configuration is encountered."""
+
+    pass

@@ -36,7 +36,7 @@ def submit_ogdc_recipe(
         raise OgdcDataAlreadyPublished(err_msg)
 
     # Check if the recipe is a visualization workflow
-    if recipe_config.id == "viz-workflow":
+    if recipe_config.workflow.type == "visualization":
         return submit_viz_workflow_recipe(
             recipe_dir=recipe_dir,
             wait=wait,

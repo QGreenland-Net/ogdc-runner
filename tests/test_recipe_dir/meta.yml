@@ -4,3 +4,5 @@ input:
   params:
     - value: "https://raw.githubusercontent.com/nsidc/qgreenland/refs/heads/main/qgreenland/assets/arctic_circle.geojson"
       type: "url"
+workflow:
+  type: "shell"

@@ -29,6 +29,25 @@ class RecipeOutput(BaseModel):
     dataone_id: str = "TODO"
 
 
+class Workflow(BaseModel):
+    type: Literal["shell", "visualization"]
+
+
+class ShellWorkflow(Workflow):
+    type: Literal["shell"] = "shell"
+    # the name of the `.sh` file containing the list of commands to run.
+    sh_file: str = "recipe.sh"
+
+
+class VizWorkflow(Workflow):
+    type: Literal["visualization"] = "visualization"
+    # the name of the viz workflow json configuration file
+
+    config_file: str = "config.json"
+
+    batch_size: int = 250
+
+
 class RecipeMeta(BaseModel):
     """Model for a recipe's metadata (`meta.yaml`)."""
 
@@ -37,8 +56,8 @@ class RecipeMeta(BaseModel):
     # (lower-case, alphanumeric characters, `.`, and `,`).
     name: str = Field(..., pattern=r"^[a-zA-Z0-9 .-]+$")
 
-    # Type of recipe, e.g., "shell", "visualization", etc.
-    type: Literal["shell", "visualization"]
+    # Workflow-specific configuration
+    workflow: ShellWorkflow | VizWorkflow
 
     input: RecipeInput
     output: RecipeOutput = RecipeOutput()

@@ -13,7 +13,7 @@ from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
     submit_workflow,
 )
-from ogdc_runner.constants import SHELL_RECIPE_FILENAME
+from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
 from ogdc_runner.inputs import make_fetch_input_template
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.publish import make_publish_template
@@ -49,10 +49,14 @@ def make_and_submit_shell_workflow(
 
     Returns the name of the workflow as a str.
     """
+    if recipe_config.workflow.type != "shell":
+        err_msg = f"Expected recipe configuration with workflow type `shell`. Got: {recipe_config.workflow.type}"
+        raise OgdcInvalidRecipeConfig(err_msg)
+
     # Parse commands from the shell recipe file
     commands = parse_commands_from_recipe_file(
         recipe_config.recipe_directory,
-        SHELL_RECIPE_FILENAME,
+        recipe_config.workflow.sh_file,
     )
 
     with Workflow(
