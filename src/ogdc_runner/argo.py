@@ -58,15 +58,21 @@ class ArgoManager:
     def _initialize_config(self) -> ArgoConfig:
         """Initialize Argo configuration from environment variables with defaults."""
         is_dev_environment = os.environ.get("ENVIRONMENT") == "dev"
+        is_local_environment = os.environ.get("ENVIRONMENT") == "local"
 
         # Default runner image configuration
         runner_image = (
             "ogdc-runner"
-            if is_dev_environment
+            if is_local_environment
             else "ghcr.io/qgreenland-net/ogdc-runner"
         )
         runner_image_tag = os.environ.get("OGDC_RUNNER_IMAGE_TAG", "latest")
-        image_pull_policy = "Never" if is_dev_environment else "IfNotPresent"
+
+        image_pull_policy = "IfNotPresent"
+        if is_dev_environment:
+            image_pull_policy = "Always"
+        elif is_local_environment:
+            image_pull_policy = "Never"
 
         return ArgoConfig(
             namespace=os.environ.get("ARGO_NAMESPACE", "qgnet"),

@@ -9,11 +9,11 @@ description of best practices for developing scientific packages.
 Add yourself as an author in `pyproject.toml`
 ```
 
-## Setting up a development environment manually
+## Setting up a local development environment
 
 First, ensure you have [ogdc-helm](https://github.com/QGreenland-Net/ogdc-helm)
-setup for development. The argo server ports are expected to be forwarded for
-access via localhost.
+setup for local development with `rancher-desktop`. The argo server ports are
+expected to be forwarded for access via localhost.
 
 Now you can set up a python development environment for `ogdc-runner` by
 running:
@@ -49,12 +49,34 @@ to a known networking issue in non-local environments. For context, see:
 docker build . -t ogdc-runner
 ```
 
-Next, set the `ENVIRONMENT` envvar to `dev`. This will tell `ogdc-runner` to use
-the locally built image instead of the one hosted on the GHCR:
+Next, set the `ENVIRONMENT` envvar to `local`. This will tell `ogdc-runner` to
+use the locally built image instead of the one hosted on the GHCR:
+
+```
+export ENVIRONMENT=local
+```
+
+## Using `ogdc-runner` with a remote cluster
+
+If using `ogdc-runner` with a remote cluster (e.g,. `dev-qgnet` at the ADC)
+
+Set the `ARGO_WORKFLOWS_URL` to point to the cluster. E.g.,:
+
+```
+export ARGO_WORKFLOWS_SERVICE_URL=https://api.test.dataone.org/ogdc/
+```
+
+### Dev clusters
+
+If using the `latest` `ogdc-runner` image on a remote dev cluster, set the
+`ENVIRONMENT` envvar to `dev`:
 
 ```
 export ENVIRONMENT=dev
 ```
+
+This will cause the `ghcr.io/qgreenland-net/ogdc-runner:latest` image to always
+be re-pulled, ensuring that the latest `main` branch image is being used.
 
 ## Testing, linting, rendering docs with Nox
 
