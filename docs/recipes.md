@@ -36,13 +36,6 @@ human-readable name for the given recipe.
 
 Example: `"Water measurements from seal tag data"`
 
-#### `id`
-
-Machine-readable string that should uniquely identify this recipe. Only
-lower-case alphanumeric characters, `.`, and `,` are allowed.
-
-Example: `"seal-tags"`
-
 #### `type`
 
 What type of recipe this is. See [Recipe types](#recipe-types) below for more
