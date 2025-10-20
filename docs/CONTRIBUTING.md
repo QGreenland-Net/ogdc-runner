@@ -53,7 +53,7 @@ Next, set the `ENVIRONMENT` envvar to `dev`. This will tell `ogdc-runner` to use
 the locally built image instead of the one hosted on the GHCR:
 
 ```
-export ENNVIRONMENT=dev
+export ENVIRONMENT=dev
 ```
 
 ## Testing, linting, rendering docs with Nox
