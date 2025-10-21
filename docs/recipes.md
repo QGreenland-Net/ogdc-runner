@@ -107,7 +107,7 @@ example.
 The `visualization` workflow takes a geospatial data file as input and produces
 3D web-tiles of the data for visualization in a web-map.
 
-See {class}`ogdc_runner.models.recipe_config.ShellWorkflow` for details on
+See {class}`ogdc_runner.models.recipe_config.VizWorkflow` for details on
 configuration options.
 
 ```{warning}
