@@ -24,8 +24,8 @@ def reload_argo_module(_: object) -> Any:
 
 
 env_test_settings = [
-    # when ENVIRONMENT=dev, the `ogdc-runner` image should be used
-    ("dev", "ogdc-runner:ogdc_runner_image_tag_test", "Never"),
+    # when ENVIRONMENT=local, the `ogdc-runner` image should be used
+    ("local", "ogdc-runner:ogdc_runner_image_tag_test", "Never"),
     # when ENVIRONMENT=production, the `ogdc-runner` image hosted on ghcr should be used
     (
         "production",
@@ -63,7 +63,7 @@ def test__configure_argo_settings_envvar_override(
 
 def test__configure_argo_settings_dev(monkeypatch):
     """Test ArgoManager config for dev environment defaults."""
-    monkeypatch.setenv("ENVIRONMENT", "dev")
+    monkeypatch.setenv("ENVIRONMENT", "local")
     monkeypatch.delenv("OGDC_RUNNER_IMAGE_TAG", raising=False)
     monkeypatch.delenv("ARGO_NAMESPACE", raising=False)
     monkeypatch.delenv("ARGO_SERVICE_ACCOUNT_NAME", raising=False)
@@ -93,7 +93,7 @@ def test__configure_argo_settings_prod(monkeypatch):
 
 def test_ARGO_MANAGER_config_access(monkeypatch):
     """Test that ArgoManager config can be accessed and has correct properties."""
-    monkeypatch.setenv("ENVIRONMENT", "dev")
+    monkeypatch.setenv("ENVIRONMENT", "local")
     argo = reload_argo_module(monkeypatch)
 
     # Test that we can access the manager and its config
@@ -110,7 +110,7 @@ def test_ARGO_MANAGER_config_access(monkeypatch):
 
 def test_ARGO_MANAGER_update_image(monkeypatch):
     """Test ArgoManager.update_image method directly."""
-    monkeypatch.setenv("ENVIRONMENT", "dev")
+    monkeypatch.setenv("ENVIRONMENT", "local")
     argo = reload_argo_module(monkeypatch)
 
     # Test direct method call on manager
