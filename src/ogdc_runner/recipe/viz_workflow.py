@@ -148,7 +148,8 @@ def read_config_file_content(
     config_file_path = recipe_directory / workflow_config.config_file
     # TODO: this should utilize fsspec like `get_recipe_config`! We expect to be
     # able to access config that's stored on a Git Repo. If that's used here,
-    # the defaults will be returned.
+    # the defaults will be returned. See:
+    # https://github.com/QGreenland-Net/ogdc-runner/issues/101
     if config_file_path.exists():
         return config_file_path.read_text()
     # Fallback to empty config if file doesn't exist - ConfigManager will use defaults
