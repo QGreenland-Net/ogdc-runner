@@ -27,7 +27,7 @@ from ogdc_runner.argo import (
 )
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
 from ogdc_runner.models.recipe_config import RecipeConfig, VizWorkflow
-from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.workflow import get_recipe_config
 
 # ruff: noqa: PLC0415
 

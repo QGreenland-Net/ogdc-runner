@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.workflow import get_recipe_config
 
 
 def test_get_recipe_config(test_recipe_directory):
