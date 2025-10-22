@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
-from ogdc_runner.workflow import get_recipe_config
+from ogdc_runner.recipe import get_recipe_config
 
 
 @click.group
