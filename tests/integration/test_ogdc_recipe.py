@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from ogdc_runner.api import submit_ogdc_recipe
@@ -11,7 +13,7 @@ def test_submit_ogdc_recipe_with_invalid_dir(tmp_path):
     """Test submitting a recipe from a non-existent directory raises an error."""
     with pytest.raises(OgdcInvalidRecipeDir):
         submit_ogdc_recipe(
-            recipe_dir=str(tmp_path / "nonexistent"),
+            recipe_dir=Path(tmp_path / "nonexistent"),
             overwrite=True,
             wait=True,
         )

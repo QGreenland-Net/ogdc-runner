@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-SHELL_RECIPE_TEST_PATH = str(Path(__file__).parent / "test_recipe_dir")
+SHELL_RECIPE_TEST_PATH = Path(__file__).parent / "test_recipe_dir"
 
 
 @pytest.fixture
-def test_recipe_directory() -> str:
+def test_recipe_directory() -> Path:
     return SHELL_RECIPE_TEST_PATH

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property
+from pathlib import Path
 from typing import Literal
 
 from pydantic import (
@@ -91,9 +92,9 @@ class RecipeConfig(RecipeMeta):
     that is generated dynamically at runtime (e.g., `recipe_directory`).
     """
 
-    # fsspec-compatible recipe directory string.
+    # Path to recipe directory on disk
     # This is where the rest of the config was set from.
-    recipe_directory: str
+    recipe_directory: Path
 
     @computed_field  # type: ignore[misc]
     @cached_property

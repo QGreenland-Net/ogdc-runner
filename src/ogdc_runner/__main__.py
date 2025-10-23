@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
-from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.recipe import get_recipe_config, stage_ogdc_recipe
 
 
 @click.group
@@ -41,7 +41,12 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     RECIPE-PATH: Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
     or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
     """
-    submit_ogdc_recipe(recipe_dir=recipe_path, wait=wait, overwrite=overwrite)
+    with stage_ogdc_recipe(recipe_path) as recipe_dir:
+        submit_ogdc_recipe(
+            recipe_dir=recipe_dir,
+            wait=wait,
+            overwrite=overwrite,
+        )
 
 
 @cli.command
@@ -65,10 +70,11 @@ def check_workflow_status(workflow_name: str) -> None:
 )
 def validate_recipe(recipe_path: str) -> None:
     """Validate an OGDC recipe directory."""
-    try:
-        get_recipe_config(recipe_path)
-        print(f"Recipe {recipe_path} is valid.")
-    except ValidationError as err:
-        print(f"Recipe {recipe_path} is invalid.")
-        print(err)
-        sys.exit(1)
+    with stage_ogdc_recipe(recipe_path) as recipe_dir:
+        try:
+            get_recipe_config(recipe_dir)
+            print(f"Recipe {recipe_path} is valid.")
+        except ValidationError as err:
+            print(f"Recipe {recipe_path} is invalid.")
+            print(err)
+            sys.exit(1)
