@@ -91,7 +91,7 @@ class RecipeConfig(RecipeMeta):
     that is generated dynamically at runtime (e.g., `recipe_directory`).
     """
 
-    # ffspec-compatible recipe directory string.
+    # fsspec-compatible recipe directory string.
     # This is where the rest of the config was set from.
     recipe_directory: str
 
