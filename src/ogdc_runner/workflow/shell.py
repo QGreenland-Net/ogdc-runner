@@ -53,8 +53,8 @@ def make_and_submit_shell_workflow(
         err_msg = f"Expected recipe configuration with workflow type `shell`. Got: {recipe_config.workflow.type}"
         raise OgdcInvalidRecipeConfig(err_msg)
 
-    # Parse commands from the shell recipe file
-    commands = parse_commands_from_recipe_file(
+    # Parse commands from the recipe's shell file
+    commands = parse_commands_from_shell_file(
         recipe_config.recipe_directory,
         recipe_config.workflow.sh_file,
     )
@@ -103,12 +103,12 @@ def make_and_submit_shell_workflow(
     return workflow_name
 
 
-def parse_commands_from_recipe_file(recipe_dir: str, filename: str) -> list[str]:
-    """Read commands from a recipe file.
+def parse_commands_from_shell_file(recipe_dir: str, filename: str) -> list[str]:
+    """Read commands from an OGDC shell file.
 
     Args:
-        recipe_dir: The directory containing the recipe file
-        filename: The name of the recipe file to parse
+        recipe_dir: The directory containing the shell file
+        filename: The name of the shell file to parse
 
     Returns:
         A list of commands from the recipe file, with comments removed

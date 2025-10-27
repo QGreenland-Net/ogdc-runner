@@ -5,8 +5,8 @@ from __future__ import annotations
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished
 from ogdc_runner.publish import data_already_published
 from ogdc_runner.recipe import get_recipe_config
-from ogdc_runner.recipe.shell import make_and_submit_shell_workflow
-from ogdc_runner.recipe.viz_workflow import submit_viz_workflow_recipe
+from ogdc_runner.workflow.shell import make_and_submit_shell_workflow
+from ogdc_runner.workflow.viz_workflow import make_and_submit_viz_workflow
 
 
 def submit_ogdc_recipe(
@@ -37,8 +37,8 @@ def submit_ogdc_recipe(
 
     # Check if the recipe is a visualization workflow
     if recipe_config.workflow.type == "visualization":
-        return submit_viz_workflow_recipe(
-            recipe_dir=recipe_dir,
+        return make_and_submit_viz_workflow(
+            recipe_config=recipe_config,
             wait=wait,
         )
 
