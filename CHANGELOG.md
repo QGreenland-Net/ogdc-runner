@@ -5,6 +5,9 @@
   a locally-built `ogdc-runner` image to be used for executing argo workflows.
   `ENVIRONMENT=dev` will tell argo to use the most recent `latest`-tagged
   `ghcr.io/qgreenland-net/ogdc-runner` image.
+- Bugfix: allow viz workflow recipes to use an `id` other than `viz-workflow`.
+- `meta.yaml`: Add `workflow` config that defines workflow-specifc configuration
+  options (e.g., `shell` workflows have the `sh_file` config option).
 
 # v0.1.0
 

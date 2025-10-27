@@ -16,8 +16,6 @@ from hera.workflows import (
 from hera.workflows.models import (
     VolumeMount,
 )
-from loguru import logger
-from pydantic import AnyUrl
 
 from ogdc_runner.argo import (
     ARGO_MANAGER,
@@ -25,9 +23,8 @@ from ogdc_runner.argo import (
     OGDC_WORKFLOW_PVC,
     submit_workflow,
 )
-from ogdc_runner.constants import VIZ_RECIPE_BATCH_SIZE
-from ogdc_runner.models.recipe_config import RecipeConfig
-from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
+from ogdc_runner.models.recipe_config import RecipeConfig, VizWorkflow
 
 # ruff: noqa: PLC0415
 
@@ -126,8 +123,10 @@ def tiling_process() -> None:
     print_log("Staging done")
 
 
-def read_config_file_content(recipe_config: RecipeConfig) -> str:
-    """Read the config.json file content from the recipe directory.
+def read_config_file_content(
+    recipe_directory: Path, workflow_config: VizWorkflow
+) -> str:
+    """Read the viz workflow config json file content from the recipe directory.
 
     This configuration file is used by the pdgworkflow for visualization workflows.
     When an empty config ({}) is returned, WorkflowManager will use its default behavior.
@@ -143,7 +142,11 @@ def read_config_file_content(recipe_config: RecipeConfig) -> str:
         The content of the config.json file as a string, or empty JSON if file doesn't exist.
         An empty config ({}) will cause ConfigManager to use default behavior.
     """
-    config_file_path = Path(recipe_config.recipe_directory) / "config.json"
+    config_file_path = recipe_directory / workflow_config.config_file
+    # TODO: this should utilize fsspec like `get_recipe_config`! We expect to be
+    # able to access config that's stored on a Git Repo. If that's used here,
+    # the defaults will be returned. See:
+    # https://github.com/QGreenland-Net/ogdc-runner/issues/101
     if config_file_path.exists():
         return config_file_path.read_text()
     # Fallback to empty config if file doesn't exist - ConfigManager will use defaults
@@ -153,7 +156,6 @@ def read_config_file_content(recipe_config: RecipeConfig) -> str:
 def make_and_submit_viz_workflow(
     recipe_config: RecipeConfig,
     wait: bool,
-    input_url: AnyUrl | str | None = None,
 ) -> str:
     """Create and submit an Argo workflow for parallel processing of geospatial data.
 
@@ -168,6 +170,19 @@ def make_and_submit_viz_workflow(
     Returns:
         The name of the submitted workflow
     """
+    if recipe_config.workflow.type != "visualization":
+        err_msg = f"Expected recipe configuration with workflow type `visualization`. Got: {recipe_config.workflow.type}"
+        raise OgdcInvalidRecipeConfig(err_msg)
+
+    input_param = recipe_config.input.params[0]
+    if input_param.type == "url":
+        input_url = input_param.value
+    else:
+        raise NotImplementedError(
+            f"Input type '{input_param.type}' is not supported for visualization workflows. "
+            f"Only 'url' input type is currently supported."
+        )
+
     with Workflow(
         generate_name=f"{recipe_config.id}-",
         entrypoint="main",
@@ -182,7 +197,10 @@ def make_and_submit_viz_workflow(
     ) as w:
         # Create templates outside the DAG context
         # Read the config.json file content from the recipe directory
-        config_content = read_config_file_content(recipe_config)
+        config_content = read_config_file_content(
+            Path(recipe_config.recipe_directory),
+            recipe_config.workflow,
+        )
 
         stage_config_file_template = Container(
             name="stage-viz-config",
@@ -222,7 +240,7 @@ EOF"""
                 arguments={
                     "input_url": input_url,
                     "recipe_id": recipe_config.id,
-                    "num_features": VIZ_RECIPE_BATCH_SIZE,
+                    "num_features": recipe_config.workflow.batch_size,
                 },
             )
 
@@ -246,41 +264,4 @@ EOF"""
 
     # Submit the workflow
     workflow_name = submit_workflow(w, wait=wait)
-    return workflow_name
-
-
-def submit_viz_workflow_recipe(
-    *,
-    recipe_dir: str,
-    wait: bool,
-) -> str:
-    """Submit an OGDC recipe for parallel processing via Argo workflows.
-
-    Args:
-        recipe_dir: Path to the recipe directory
-        wait: Whether to wait for the workflow to complete
-
-    Returns:
-        The name of the submitted workflow
-    """
-    # Get the recipe configuration
-    recipe_config = get_recipe_config(recipe_dir)
-
-    input_param = recipe_config.input.params[0]
-    if input_param.type == "url":
-        input_url = input_param.value
-    else:
-        raise NotImplementedError(
-            f"Input type '{input_param.type}' is not supported for visualization workflows. "
-            f"Only 'url' input type is currently supported."
-        )
-
-    # Submit the workflow
-    workflow_name = make_and_submit_viz_workflow(
-        recipe_config=recipe_config,
-        wait=wait,
-        input_url=input_url,
-    )
-
-    logger.info(f"Completed workflow: {workflow_name}")
     return workflow_name

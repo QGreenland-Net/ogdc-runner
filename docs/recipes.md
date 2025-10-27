@@ -36,17 +36,14 @@ human-readable name for the given recipe.
 
 Example: `"Water measurements from seal tag data"`
 
-#### `id`
+#### `workflow`
 
-Machine-readable string that should uniquely identify this recipe. Only
-lower-case alphanumeric characters, `.`, and `,` are allowed.
+Section containing configuration on what type of workflow this recipe uses, and
+any workflow-specific configuration options. See
+[Workflow types](#workflow-types) below for more information about different
+workflow types.
 
-Example: `"seal-tags"`
-
-#### `type`
-
-What type of recipe this is. See [Recipe types](#recipe-types) below for more
-information about different recipe types.
+See the {class}`ogdc_runner.models.recipe_config.Workflow` class for details.
 
 #### `input`
 
@@ -59,18 +56,21 @@ The input data source. See the
 Although `dataone_id` is a documented output type, it is currently **unused**. As of this  writing, outputs are stored on the `qgnet-ogdc-workflow-pvc`, under a directory named after the `recipe_id`. This is an evolving part of the API, and we expect new output types to be supported soon.
 ```
 
-## Recipe types
+## Workflow types
 
-There are multiple types of OGDC recipe. Which an author should use depends on
+There are multiple types of OGDC workflow. Which an author should use depends on
 the data processing use-case.
 
-### Shell Recipe
+### Shell Workflow
 
-`shell` is a recipe type that involves executing a series of `sh` commands in
-sequence, much like a shell script. This recipe type is best suited for
+`shell` is a workflow type that involves executing a series of `sh` commands in
+sequence, much like a shell script. This workflow type is best suited for
 relatively simple transformations on small/medium sized data.
 
-In addition to `meta.yaml`, `shell` recipes expect a `recipe.sh` file that
+See {class}`ogdc_runner.models.recipe_config.ShellWorkflow` for details on
+configuration options.
+
+In addition to `meta.yaml`, `shell` workflows expect a `recipe.sh` file that
 defines the series of commands to be run against the input data.
 
 It is expected that most of the commands included in the `recipe.sh` be `gdal`
@@ -97,20 +97,25 @@ Although `recipe.sh` file should contain valid `sh` commands such as `ogr2ogr`, 
 - Each command is executed in isolation. Do not expect envvars (e.g.,
   `export ENVVAR=foo`) to persist between lines.
 
-For an example of a `shell` recipe, we recommend taking a look at the
+For an example of a recipe using the `shell` workflow, we recommend taking a
+look at the
 [ogdc-recipes seal-tags recipe](https://github.com/QGreenland-Net/ogdc-recipes/tree/main/recipes/seal-tags)
 example.
 
-### Visualization Recipe
+### Visualization Workflow
 
-The `visualization` recipe type takes a geospatial data file as input and
-produces 3D web-tiles of the data for visualization in a web-map.
+The `visualization` workflow takes a geospatial data file as input and produces
+3D web-tiles of the data for visualization in a web-map.
+
+See {class}`ogdc_runner.models.recipe_config.VizWorkflow` for details on
+configuration options.
 
 ```{warning}
 This section of the documentation is incomplete!
 **TODO**: more detail / link to viz workflow documentation.
 ```
 
-For an example of a `visualization` recipe, we recommend taking a look at the
+For an example of a recipe using the `visualization` workflow, we recommend
+taking a look at the
 [ogdc-recipes viz-workflow recipe](https://github.com/QGreenland-Net/ogdc-recipes/tree/main/recipes/viz-workflow)
 example.

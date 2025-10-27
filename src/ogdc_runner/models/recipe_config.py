@@ -3,17 +3,32 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Literal
 
-from pydantic import AnyUrl, BaseModel, Field, computed_field, field_validator
+from pydantic import (
+    AnyUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+)
+
+
+class OgdcBaseModel(BaseModel):
+    """Base pydantic model for the ogdc-runner."""
+
+    # Disallow "extra" config that we do not expect. We want users to know if
+    # they've made a mistake and added something that has no effect.
+    model_config = ConfigDict(extra="forbid")
 
 
 # Input parameter with type and value
-class InputParam(BaseModel):
+class InputParam(OgdcBaseModel):
     value: AnyUrl | str
     type: Literal["url", "pvc_mount", "file_system"]
 
 
 # Create a model for the recipe input
-class RecipeInput(BaseModel):
+class RecipeInput(OgdcBaseModel):
     params: list[InputParam]
 
     @field_validator("params")
@@ -25,11 +40,30 @@ class RecipeInput(BaseModel):
         return params
 
 
-class RecipeOutput(BaseModel):
+class RecipeOutput(OgdcBaseModel):
     dataone_id: str = "TODO"
 
 
-class RecipeMeta(BaseModel):
+class Workflow(OgdcBaseModel):
+    type: Literal["shell", "visualization"]
+
+
+class ShellWorkflow(Workflow):
+    type: Literal["shell"] = "shell"
+    # the name of the `.sh` file containing the list of commands to run.
+    sh_file: str = "recipe.sh"
+
+
+class VizWorkflow(Workflow):
+    type: Literal["visualization"] = "visualization"
+    # the name of the viz workflow json configuration file
+
+    config_file: str = "config.json"
+
+    batch_size: int = 250
+
+
+class RecipeMeta(OgdcBaseModel):
     """Model for a recipe's metadata (`meta.yaml`)."""
 
     # Allow alphanumeric characters, `.`, ` ` (space), and `,`.
@@ -37,8 +71,8 @@ class RecipeMeta(BaseModel):
     # (lower-case, alphanumeric characters, `.`, and `,`).
     name: str = Field(..., pattern=r"^[a-zA-Z0-9 .-]+$")
 
-    # Type of recipe, e.g., "shell", "visualization", etc.
-    type: Literal["shell", "visualization"]
+    # Workflow-specific configuration
+    workflow: ShellWorkflow | VizWorkflow
 
     input: RecipeInput
     output: RecipeOutput = RecipeOutput()
@@ -69,7 +103,7 @@ class RecipeConfig(RecipeMeta):
         return k8s_name
 
 
-class RecipeImage(BaseModel):
+class RecipeImage(OgdcBaseModel):
     """
     Image configuration for the recipe.
 

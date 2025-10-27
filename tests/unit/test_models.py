@@ -8,6 +8,7 @@ from ogdc_runner.models.recipe_config import (
     RecipeConfig,
     RecipeInput,
     RecipeOutput,
+    ShellWorkflow,
 )
 
 
@@ -23,7 +24,7 @@ def test_recipe_meta():
         name=name,
         input=recipe_input,
         output=recipe_output,
-        type="shell",
+        workflow=ShellWorkflow(),
         recipe_directory="/foo/",
     )
 
@@ -47,6 +48,6 @@ def test_recipe_meta_failure_bad_id():
             name=name,
             input=recipe_input,
             output=recipe_output,
-            type="shell",
+            workflow=ShellWorkflow(),
             recipe_directory="/foo/",
         )
