@@ -57,9 +57,11 @@ class ShellWorkflow(Workflow):
 
 class VizWorkflow(Workflow):
     type: Literal["visualization"] = "visualization"
-    # the name of the viz workflow json configuration file
 
-    config_file: str = "config.json"
+    # the name of the viz workflow json configuration file. By default, this is
+    # `None`, which means that the viz workflow will use its default
+    # configuration.
+    config_file: str | None = None
 
     batch_size: int = 250
 

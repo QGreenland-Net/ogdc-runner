@@ -19,14 +19,14 @@ def test_submit_ogdc_recipe_with_invalid_dir(tmp_path):
         )
 
 
-def test_submit_ogdc_recipe(test_recipe_directory):
+def test_submit_ogdc_recipe(test_shell_workflow_recipe_directory):
     """Test that an ogdc recipe can be submitted and executed successfully."""
 
     # Note: `overwrite` is set here to ensure that outptus from a previous test
     # run are overwritten. This is not ideal. Tests that create data should
     # cleanup after themselves.
     workflow_name = submit_ogdc_recipe(
-        recipe_dir=test_recipe_directory,
+        recipe_dir=test_shell_workflow_recipe_directory,
         overwrite=True,
         wait=True,
     )
@@ -36,12 +36,14 @@ def test_submit_ogdc_recipe(test_recipe_directory):
 
 
 @pytest.mark.order(after="test_submit_ogdc_recipe")
-def test_submit_ogdc_recipe_fails_already_published(test_recipe_directory):
+def test_submit_ogdc_recipe_fails_already_published(
+    test_shell_workflow_recipe_directory,
+):
     """Test that the ogdc recipe has been published and an exception is raised
     on re-submission (without overwrite option)."""
     with pytest.raises(OgdcDataAlreadyPublished):
         submit_ogdc_recipe(
-            recipe_dir=test_recipe_directory,
+            recipe_dir=test_shell_workflow_recipe_directory,
             overwrite=False,
             wait=True,
         )
