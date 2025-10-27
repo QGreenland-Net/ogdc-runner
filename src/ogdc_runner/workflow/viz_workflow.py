@@ -16,6 +16,7 @@ from hera.workflows import (
 from hera.workflows.models import (
     VolumeMount,
 )
+from loguru import logger
 
 from ogdc_runner.argo import (
     ARGO_MANAGER,
@@ -161,9 +162,13 @@ def get_viz_config_json(
                 f"Failed to read json from {recipe_config.workflow.config_file}"
             ) from e
 
+        logger.info(
+            f"Using viz-workflow json configuration from {recipe_config.workflow.config_file}."
+        )
         return config_text
 
     # Fallback to empty config if file doesn't exist - ConfigManager will use defaults
+    logger.info('Using default viz-workflow json configuration (`"{}"`).')
     return "{}"
 
 
