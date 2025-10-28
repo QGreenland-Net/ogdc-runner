@@ -122,9 +122,7 @@ def tiling_process() -> None:
     print_log("Staging done")
 
 
-def get_viz_config_json(
-    recipe_config: RecipeConfig,
-) -> str:
+def get_viz_config_json(workflow_config: VizWorkflow) -> str:
     """Get the viz workflow config as json.
 
     If passed a JSON file, read the file content and return. Otherwise, an empty
@@ -144,26 +142,10 @@ def get_viz_config_json(
         The content of the config.json file as a string, or empty JSON if file doesn't exist.
         An empty config ({}) will cause ConfigManager to use default behavior.
     """
-    assert isinstance(recipe_config.workflow, VizWorkflow)
-    if recipe_config.workflow.config_file:
-        config_file_path = (
-            recipe_config.recipe_directory / recipe_config.workflow.config_file
-        )
-        if not config_file_path.exists():
-            raise OgdcInvalidRecipeConfig(
-                f"Failed to find expected configuration file {recipe_config.workflow.config_file}."
-            )
-
-        config_text = config_file_path.read_text()
-        try:
-            json.loads(config_text)
-        except json.JSONDecodeError as e:
-            raise OgdcInvalidRecipeConfig(
-                f"Failed to read json from {recipe_config.workflow.config_file}"
-            ) from e
-
+    if isinstance(workflow_config.config_file, Path):
+        config_text = workflow_config.config_file.read_text()
         logger.info(
-            f"Using viz-workflow json configuration from {recipe_config.workflow.config_file}."
+            f"Using viz-workflow json configuration from {workflow_config.config_file.name}."
         )
         return config_text
 
