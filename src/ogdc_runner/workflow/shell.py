@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import fsspec
 from hera.workflows import (
     Artifact,
     Container,
     Steps,
     Workflow,
 )
-from loguru import logger
 
 from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
@@ -56,10 +52,7 @@ def make_and_submit_shell_workflow(
         raise OgdcInvalidRecipeConfig(err_msg)
 
     # Parse commands from the recipe's shell file
-    commands = parse_commands_from_shell_file(
-        recipe_config.recipe_directory,
-        recipe_config.workflow.sh_file,
-    )
+    commands = recipe_config.workflow.get_commands_from_sh_file()
 
     with Workflow(
         generate_name=f"{recipe_config.id}-",
@@ -103,23 +96,3 @@ def make_and_submit_shell_workflow(
     workflow_name = submit_workflow(w, wait=wait)
 
     return workflow_name
-
-
-def parse_commands_from_shell_file(recipe_dir: Path, filename: str) -> list[str]:
-    """Read commands from an OGDC shell file.
-
-    Args:
-        recipe_dir: The directory containing the shell file
-        filename: The name of the shell file to parse
-
-    Returns:
-        A list of commands from the recipe file, with comments removed
-    """
-    recipe_path = f"{recipe_dir}/{filename}"
-    logger.info(f"Reading recipe from {recipe_path}")
-
-    with fsspec.open(recipe_path, "rt") as f:
-        lines = f.read().split("\n")
-    commands = [line for line in lines if line and not line.startswith("#")]
-
-    return commands
