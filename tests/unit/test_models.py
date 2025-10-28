@@ -26,7 +26,7 @@ def test_recipe_meta():
         name=name,
         input=recipe_input,
         output=recipe_output,
-        workflow=ShellWorkflow(),
+        workflow=ShellWorkflow(sh_file="foo.txt"),
         recipe_directory=Path("/foo/"),
     )
 
