@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from functools import cached_property
 from pathlib import Path
 from typing import Literal
@@ -9,8 +10,10 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    ValidationInfo,
     computed_field,
     field_validator,
+    model_validator,
 )
 
 
@@ -61,9 +64,38 @@ class VizWorkflow(Workflow):
     # the name of the viz workflow json configuration file. By default, this is
     # `None`, which means that the viz workflow will use its default
     # configuration.
-    config_file: str | None = None
+    config_file: str | Path | None = None
 
     batch_size: int = 250
+
+    @field_validator("config_file", mode="after")
+    @classmethod
+    def config_file_path(
+        cls, value: str | Path | None, info: ValidationInfo
+    ) -> Path | None:
+        if (value is None) or isinstance(value, Path):
+            return value
+
+        if isinstance(info.context, dict) and (
+            recipe_directory := info.context.get("recipe_directory")
+        ):
+            assert isinstance(recipe_directory, Path)
+            config_filepath = recipe_directory / value
+            if not config_filepath.exists():
+                raise ValueError(
+                    f"The file {value} is not present in the recipe directory"
+                )
+
+            config_text = config_filepath.read_text()
+
+            try:
+                json.loads(config_text)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Failed to read json from {value}") from e
+
+            return config_filepath
+
+        return Path(value)
 
 
 class RecipeMeta(OgdcBaseModel):
@@ -104,6 +136,15 @@ class RecipeConfig(RecipeMeta):
         k8s_name = self.name.lower().replace(" ", "-")
 
         return k8s_name
+
+    @model_validator(mode="after")
+    def inject_recipe_directory(self):  # type: ignore[no-untyped-def]
+        self.workflow = self.workflow.model_validate(
+            self.workflow,
+            context={"recipe_directory": self.recipe_directory},
+        )
+
+        return self
 
 
 class RecipeImage(OgdcBaseModel):
