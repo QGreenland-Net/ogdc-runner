@@ -16,7 +16,6 @@ from hera.workflows import (
 from hera.workflows.models import (
     VolumeMount,
 )
-from loguru import logger
 
 from ogdc_runner.argo import (
     ARGO_MANAGER,
@@ -25,7 +24,7 @@ from ogdc_runner.argo import (
     submit_workflow,
 )
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
-from ogdc_runner.models.recipe_config import RecipeConfig, VizWorkflow
+from ogdc_runner.models.recipe_config import RecipeConfig
 
 # ruff: noqa: PLC0415
 
@@ -122,38 +121,6 @@ def tiling_process() -> None:
     print_log("Staging done")
 
 
-def get_viz_config_json(workflow_config: VizWorkflow) -> str:
-    """Get the viz workflow config as json.
-
-    If passed a JSON file, read the file content and return. Otherwise, an empty
-    configuration will be returned (`"{}"`).
-
-    This configuration is used by the pdgworkflow for visualization workflows.
-    When an empty config ({}) is returned, WorkflowManager will use its default behavior.
-
-    For documentation on available configuration options, see:
-    - ConfigManager documentation: https://github.com/PermafrostDiscoveryGateway/viz-workflow/blob/feature-wf-k8s/pdgworkflow/ConfigManager.py
-    - Example config: https://github.com/QGreenland-Net/ogdc-recipes/blob/main/recipes/viz-workflow/config.json
-
-    Args:
-        recipe_directory: The recipe's configuration containing the directory path
-
-    Returns:
-        The content of the config.json file as a string, or empty JSON if file doesn't exist.
-        An empty config ({}) will cause ConfigManager to use default behavior.
-    """
-    if isinstance(workflow_config.config_file, Path):
-        config_text = workflow_config.config_file.read_text()
-        logger.info(
-            f"Using viz-workflow json configuration from {workflow_config.config_file.name}."
-        )
-        return config_text
-
-    # Fallback to empty config if file doesn't exist - ConfigManager will use defaults
-    logger.info('Using default viz-workflow json configuration (`"{}"`).')
-    return "{}"
-
-
 def make_and_submit_viz_workflow(
     recipe_config: RecipeConfig,
     wait: bool,
@@ -198,7 +165,7 @@ def make_and_submit_viz_workflow(
     ) as w:
         # Create templates outside the DAG context
         # Read the config.json file content from the recipe directory
-        config_content = get_viz_config_json(recipe_config)
+        config_content = recipe_config.workflow.get_config_file_json()
 
         stage_config_file_template = Container(
             name="stage-viz-config",

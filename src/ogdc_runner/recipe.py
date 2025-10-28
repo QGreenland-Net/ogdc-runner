@@ -39,6 +39,9 @@ def get_recipe_config(recipe_directory: Path) -> RecipeConfig:
             f"Recipe directory not found: {recipe_directory}"
         ) from err
 
-    config = RecipeConfig(**config_dict, recipe_directory=recipe_directory)
+    config = RecipeConfig.model_validate(
+        dict(**config_dict, recipe_directory=recipe_directory),
+        context={"recipe_directory": recipe_directory},
+    )
 
     return config

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from functools import cached_property
+from functools import cache, cached_property
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import (
     AnyUrl,
@@ -15,6 +15,8 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+
+from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
 
 
 class OgdcBaseModel(BaseModel):
@@ -52,10 +54,71 @@ class Workflow(OgdcBaseModel):
     type: Literal["shell", "visualization"]
 
 
+def _validate_filename_with_directory(
+    filename: str,
+    info: ValidationInfo,
+) -> Path:
+    if not isinstance(info.context, dict) or "recipe_directory" not in info.context:
+        err_str = "`recipe_directory` is required context."
+        raise ValueError(err_str)
+
+    recipe_directory = Path(info.context["recipe_directory"])
+
+    config_filepath = recipe_directory / filename
+
+    if not config_filepath.exists():
+        raise FileNotFoundError(
+            f"The file {filename} is not present in the recipe directory"
+        )
+
+    return config_filepath
+
+
 class ShellWorkflow(Workflow):
     type: Literal["shell"] = "shell"
     # the name of the `.sh` file containing the list of commands to run.
-    sh_file: str = "recipe.sh"
+    sh_file: str | Path = "recipe.sh"
+
+    @model_validator(mode="after")
+    def sh_file_path(
+        self,
+        info: ValidationInfo,
+    ) -> Self:
+        if isinstance(self.sh_file, Path):
+            return self
+
+        filepath = _validate_filename_with_directory(self.sh_file, info)
+
+        self.sh_file = filepath
+
+        return self
+
+    def get_commands_from_sh_file(self) -> list[str]:
+        if not isinstance(self.sh_file, Path):
+            raise ValueError(
+                "`sh_file` must be a fully qualified `Path`."
+                f" Got: {self.sh_file} (type: {type(self.sh_file)})."
+            )
+
+        lines = self.sh_file.read_text().split("\n")
+        commands = [line for line in lines if line and not line.startswith("#")]
+
+        return commands
+
+
+@cache
+def _read_config_json(config_filepath: Path) -> str:
+    # Validate that the config filepath has valid text.
+    config_text = config_filepath.read_text()
+
+    try:
+        json.loads(config_text)
+    except json.JSONDecodeError as e:
+        raise OgdcInvalidRecipeConfig(
+            f"Failed to read json from {config_filepath}"
+        ) from e
+
+    return config_text
 
 
 class VizWorkflow(Workflow):
@@ -68,34 +131,44 @@ class VizWorkflow(Workflow):
 
     batch_size: int = 250
 
-    @field_validator("config_file", mode="after")
-    @classmethod
+    @model_validator(mode="after")
     def config_file_path(
-        cls, value: str | Path | None, info: ValidationInfo
-    ) -> Path | None:
-        if (value is None) or isinstance(value, Path):
-            return value
+        self,
+        info: ValidationInfo,
+    ) -> Self:
+        if self.config_file is None or isinstance(self.config_file, Path):
+            return self
 
-        if isinstance(info.context, dict) and (
-            recipe_directory := info.context.get("recipe_directory")
-        ):
-            assert isinstance(recipe_directory, Path)
-            config_filepath = recipe_directory / value
-            if not config_filepath.exists():
-                raise ValueError(
-                    f"The file {value} is not present in the recipe directory"
-                )
+        config_filepath = _validate_filename_with_directory(self.config_file, info)
 
-            config_text = config_filepath.read_text()
+        # Verify that the file can be read and returns valid json.
+        _read_config_json(config_filepath)
 
-            try:
-                json.loads(config_text)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Failed to read json from {value}") from e
+        self.config_file = config_filepath
 
-            return config_filepath
+        return self
 
-        return Path(value)
+    def get_config_file_json(self) -> str:
+        """Get the viz workflow config as json.
+
+        If passed a JSON file, read the file content and return. Otherwise, an empty
+        configuration will be returned (`"{}"`).
+
+        This configuration is used by the pdgworkflow for visualization workflows.
+        When an empty config ({}) is returned, WorkflowManager will use its default behavior.
+
+        For documentation on available configuration options, see:
+        - ConfigManager documentation: https://github.com/PermafrostDiscoveryGateway/viz-workflow/blob/feature-wf-k8s/pdgworkflow/ConfigManager.py
+        - Example config: https://github.com/QGreenland-Net/ogdc-recipes/blob/main/recipes/viz-workflow/config.json
+
+        Returns:
+            The content of the config.json file as a string, or empty JSON if file doesn't exist.
+            An empty config ({}) will cause ConfigManager to use default behavior.
+        """
+        if isinstance(self.config_file, Path):
+            return _read_config_json(self.config_file)
+
+        return "{}"
 
 
 class RecipeMeta(OgdcBaseModel):
@@ -136,15 +209,6 @@ class RecipeConfig(RecipeMeta):
         k8s_name = self.name.lower().replace(" ", "-")
 
         return k8s_name
-
-    @model_validator(mode="after")
-    def inject_recipe_directory(self):  # type: ignore[no-untyped-def]
-        self.workflow = self.workflow.model_validate(
-            self.workflow,
-            context={"recipe_directory": self.recipe_directory},
-        )
-
-        return self
 
 
 class RecipeImage(OgdcBaseModel):
