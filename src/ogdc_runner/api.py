@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished
 from ogdc_runner.publish import data_already_published
 from ogdc_runner.recipe import get_recipe_config
@@ -11,7 +13,7 @@ from ogdc_runner.workflow.viz_workflow import make_and_submit_viz_workflow
 
 def submit_ogdc_recipe(
     *,
-    recipe_dir: str,
+    recipe_dir: Path,
     wait: bool,
     overwrite: bool,
 ) -> str:
