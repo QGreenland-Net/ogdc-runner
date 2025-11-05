@@ -296,7 +296,6 @@ def make_and_submit_viz_workflow(
 
         stage_config_file_template = Container(
             name="stage-viz-config",
-            image="alpine:latest",
             command=["sh", "-c"],
             args=[
                 f"""mkdir -p /mnt/workflow/{recipe_config.id}/input && \\
