@@ -122,6 +122,50 @@ def tiling_process() -> None:
     print_log("Staging done")
 
 
+@script(
+    name="batching",
+    inputs=[Parameter(name="data_dir"), Parameter(name="recipe_id")],
+    image="ghcr.io/permafrostdiscoverygateway/pdgworkflow:latest",
+    command=["python"],
+    volume_mounts=[
+        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
+    ],
+)
+def batch_by_files(batch_size: int) -> None:  # type: ignore[no-untyped-def]
+    """Processes list of files into batches based on batch_size."""
+    import sys
+
+    from pdgworkflow import (  # type: ignore[import-not-found]
+        WorkflowManager,
+    )
+
+    # Redirect print statements to stderr instead of stdout
+    # This way they won't interfere with the JSON output
+    def print_log(message: str) -> None:
+        print(message, file=sys.stderr)
+
+    # Read the viz-config.json from the PVC
+    # This configuration controls how VizWorkflow processes the visualization data.
+    # For available configuration options, see:
+    # https://github.com/PermafrostDiscoveryGateway/viz-workflow/blob/feature-wf-k8s/pdgworkflow/ConfigManager.py
+    workflow_config = json.loads(
+        Path("/mnt/workflow/{{inputs.parameters.recipe_id}}/config.json").read_text()
+    )
+
+    workflow_manager = WorkflowManager(workflow_config)
+
+    list_files = workflow_manager.tiles.get_files_from_directory(
+        "{{inputs.parameters.data_dir}}"
+    )
+    results = []
+    for i in range(0, len(list_files), batch_size):
+        batch = list_files[i : i + batch_size]
+        results.append(batch)
+
+    # Output only the JSON to stdout
+    print(json.dumps(results))
+
+
 def get_viz_config_json(
     recipe_config: RecipeConfig,
 ) -> str:
