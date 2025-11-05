@@ -47,7 +47,7 @@ from ogdc_runner.models.recipe_config import RecipeConfig, VizWorkflow
             path="/mnt/workflow/{{inputs.parameters.recipe_id}}/batch",
         ),
     ],
-    image="ghcr.io/rushirajnenuji/viz-staging:latest",
+    image="ghcr.io/permafrostdiscoverygateway/pdgworkflow:latest",
     command=["python"],
     volume_mounts=[
         VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
@@ -88,7 +88,7 @@ def batch_process(num_features) -> None:  # type: ignore[no-untyped-def]
         Parameter(name="chunk-filepath"),
         Parameter(name="recipe_id"),
     ],
-    image="ghcr.io/rushirajnenuji/viz-staging:latest",
+    image="ghcr.io/permafrostdiscoverygateway/pdgworkflow:latest",
     command=["python"],
     volume_mounts=[
         VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
@@ -99,8 +99,8 @@ def tiling_process() -> None:
     import json
     import sys
 
-    from pdgstaging import (  # type: ignore[import-not-found]
-        TileStager,
+    from pdgworkflow import (  # type: ignore[import-not-found]
+        WorkflowManager,
     )
 
     # Log to stderr
@@ -115,10 +115,10 @@ def tiling_process() -> None:
         Path("/mnt/workflow/{{inputs.parameters.recipe_id}}/config.json").read_text()
     )
 
-    tiler = TileStager(workflow_config, check_footprints=False)
+    workflow_manager = WorkflowManager(workflow_config)
     print_log("Staging chunk file")
     print_log("{{inputs.parameters.chunk-filepath}}")
-    tiler.stage("{{inputs.parameters.chunk-filepath}}")
+    workflow_manager.stage("{{inputs.parameters.chunk-filepath}}")
     print_log("Staging done")
 
 
