@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property
+from pathlib import Path
 from typing import Literal
 
 from pydantic import (
@@ -56,9 +57,11 @@ class ShellWorkflow(Workflow):
 
 class VizWorkflow(Workflow):
     type: Literal["visualization"] = "visualization"
-    # the name of the viz workflow json configuration file
 
-    config_file: str = "config.json"
+    # the name of the viz workflow json configuration file. By default, this is
+    # `None`, which means that the viz workflow will use its default
+    # configuration.
+    config_file: str | None = None
 
     batch_size: int = 250
 
@@ -91,9 +94,9 @@ class RecipeConfig(RecipeMeta):
     that is generated dynamically at runtime (e.g., `recipe_directory`).
     """
 
-    # ffspec-compatible recipe directory string.
+    # Path to recipe directory on disk
     # This is where the rest of the config was set from.
-    recipe_directory: str
+    recipe_directory: Path
 
     @computed_field  # type: ignore[misc]
     @cached_property

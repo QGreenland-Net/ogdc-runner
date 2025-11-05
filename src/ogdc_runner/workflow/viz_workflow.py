@@ -16,6 +16,7 @@ from hera.workflows import (
 from hera.workflows.models import (
     VolumeMount,
 )
+from loguru import logger
 
 from ogdc_runner.argo import (
     ARGO_MANAGER,
@@ -46,7 +47,7 @@ from ogdc_runner.models.recipe_config import RecipeConfig, VizWorkflow
             path="/mnt/workflow/{{inputs.parameters.recipe_id}}/batch",
         ),
     ],
-    image="ghcr.io/rushirajnenuji/viz-staging:latest",
+    image="ghcr.io/permafrostdiscoverygateway/pdgworkflow:latest",
     command=["python"],
     volume_mounts=[
         VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
@@ -55,7 +56,6 @@ from ogdc_runner.models.recipe_config import RecipeConfig, VizWorkflow
 def batch_process(num_features) -> None:  # type: ignore[no-untyped-def]
     """Processes data in batches."""
     import sys
-    from pathlib import Path
 
     import geopandas as gpd  # type: ignore[import-not-found]
 
@@ -88,7 +88,7 @@ def batch_process(num_features) -> None:  # type: ignore[no-untyped-def]
         Parameter(name="chunk-filepath"),
         Parameter(name="recipe_id"),
     ],
-    image="ghcr.io/rushirajnenuji/viz-staging:latest",
+    image="ghcr.io/permafrostdiscoverygateway/pdgworkflow:latest",
     command=["python"],
     volume_mounts=[
         VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
@@ -98,10 +98,9 @@ def tiling_process() -> None:
     """Creates tiles from a geospatial data chunk."""
     import json
     import sys
-    from pathlib import Path
 
-    from pdgstaging import (  # type: ignore[import-not-found]
-        TileStager,
+    from pdgworkflow import (  # type: ignore[import-not-found]
+        WorkflowManager,
     )
 
     # Log to stderr
@@ -116,19 +115,100 @@ def tiling_process() -> None:
         Path("/mnt/workflow/{{inputs.parameters.recipe_id}}/config.json").read_text()
     )
 
-    tiler = TileStager(workflow_config, check_footprints=False)
+    workflow_manager = WorkflowManager(workflow_config)
     print_log("Staging chunk file")
     print_log("{{inputs.parameters.chunk-filepath}}")
-    tiler.stage("{{inputs.parameters.chunk-filepath}}")
+    workflow_manager.stage("{{inputs.parameters.chunk-filepath}}")
     print_log("Staging done")
 
 
-def read_config_file_content(
-    recipe_directory: Path, workflow_config: VizWorkflow
-) -> str:
-    """Read the viz workflow config json file content from the recipe directory.
+@script(
+    name="rasterization",
+    inputs=[
+        Parameter(name="recipe_id"),
+    ],
+    image="ghcr.io/permafrostdiscoverygateway/pdgworkflow:latest",
+    command=["python"],
+    volume_mounts=[
+        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
+    ],
+)
+def rasterization_process() -> None:
+    """
+    Creates geotiff and summary web tiles (png) from a geospatial vector data tile.
+    """
+    import json
+    import sys
 
-    This configuration file is used by the pdgworkflow for visualization workflows.
+    from pdgworkflow import (  # type: ignore[import-not-found]
+        WorkflowManager,
+    )
+
+    # Log to stderr
+    def print_log(message: str) -> None:
+        print(message, file=sys.stderr)
+
+    # Read the viz-config.json from the PVC
+    # This configuration controls how VizWorkflow processes the visualization data.
+    # For available configuration options, see:
+    # https://github.com/PermafrostDiscoveryGateway/viz-workflow/blob/feature-wf-k8s/pdgworkflow/ConfigManager.py
+    workflow_config = json.loads(
+        Path("/mnt/workflow/{{inputs.parameters.recipe_id}}/config.json").read_text()
+    )
+
+    workflow_manager = WorkflowManager(workflow_config)
+    print_log("Rasterizing files..")
+    workflow_manager.rasterize_all()
+    print_log("Rasterizing done")
+
+
+@script(
+    name="b3dm-tiling",
+    inputs=[
+        Parameter(name="recipe_id"),
+    ],
+    image="ghcr.io/permafrostdiscoverygateway/pdgworkflow:latest",
+    command=["python"],
+    volume_mounts=[
+        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
+    ],
+)
+def b3dm_tiling_process() -> None:
+    """Creates B3DM tiles (3D Tiles) from a geospatial vector data tile."""
+    import json
+    import sys
+
+    from pdgworkflow import (  # type: ignore[import-not-found]
+        WorkflowManager,
+    )
+
+    # Log to stderr
+    def print_log(message: str) -> None:
+        print(message, file=sys.stderr)
+
+    # Read the viz-config.json from the PVC
+    # This configuration controls how VizWorkflow processes the visualization data.
+    # For available configuration options, see:
+    # https://github.com/PermafrostDiscoveryGateway/viz-workflow/blob/feature-wf-k8s/pdgworkflow/ConfigManager.py
+    workflow_config = json.loads(
+        Path("/mnt/workflow/{{inputs.parameters.recipe_id}}/config.json").read_text()
+    )
+
+    workflow_manager = WorkflowManager(workflow_config)
+    print_log("Generating b3dm 3D tiles..")
+    workflow_manager.run_3d_tiling()
+    print_log("b3dm 3D tiles generation completed.")
+
+
+def get_viz_config_json(
+    recipe_config: RecipeConfig,
+) -> str:
+    """Get the viz workflow config as json.
+
+    If passed a JSON file, read the file content and return. Otherwise, an empty
+    configuration will be returned (`"{}"`).
+
+    This configuration is used by the pdgworkflow for visualization workflows.
     When an empty config ({}) is returned, WorkflowManager will use its default behavior.
 
     For documentation on available configuration options, see:
@@ -136,20 +216,37 @@ def read_config_file_content(
     - Example config: https://github.com/QGreenland-Net/ogdc-recipes/blob/main/recipes/viz-workflow/config.json
 
     Args:
-        recipe_config: The recipe configuration containing the directory path
+        recipe_directory: The recipe's configuration containing the directory path
 
     Returns:
         The content of the config.json file as a string, or empty JSON if file doesn't exist.
         An empty config ({}) will cause ConfigManager to use default behavior.
     """
-    config_file_path = recipe_directory / workflow_config.config_file
-    # TODO: this should utilize fsspec like `get_recipe_config`! We expect to be
-    # able to access config that's stored on a Git Repo. If that's used here,
-    # the defaults will be returned. See:
-    # https://github.com/QGreenland-Net/ogdc-runner/issues/101
-    if config_file_path.exists():
-        return config_file_path.read_text()
+    assert isinstance(recipe_config.workflow, VizWorkflow)
+    if recipe_config.workflow.config_file:
+        config_file_path = (
+            recipe_config.recipe_directory / recipe_config.workflow.config_file
+        )
+        if not config_file_path.exists():
+            raise OgdcInvalidRecipeConfig(
+                f"Failed to find expected configuration file {recipe_config.workflow.config_file}."
+            )
+
+        config_text = config_file_path.read_text()
+        try:
+            json.loads(config_text)
+        except json.JSONDecodeError as e:
+            raise OgdcInvalidRecipeConfig(
+                f"Failed to read json from {recipe_config.workflow.config_file}"
+            ) from e
+
+        logger.info(
+            f"Using viz-workflow json configuration from {recipe_config.workflow.config_file}."
+        )
+        return config_text
+
     # Fallback to empty config if file doesn't exist - ConfigManager will use defaults
+    logger.info('Using default viz-workflow json configuration (`"{}"`).')
     return "{}"
 
 
@@ -197,14 +294,10 @@ def make_and_submit_viz_workflow(
     ) as w:
         # Create templates outside the DAG context
         # Read the config.json file content from the recipe directory
-        config_content = read_config_file_content(
-            Path(recipe_config.recipe_directory),
-            recipe_config.workflow,
-        )
+        config_content = get_viz_config_json(recipe_config)
 
         stage_config_file_template = Container(
             name="stage-viz-config",
-            image="alpine:latest",
             command=["sh", "-c"],
             args=[
                 f"""mkdir -p /mnt/workflow/{recipe_config.id}/input && \\
@@ -255,12 +348,39 @@ EOF"""
                 with_param=batch_task.get_result_as("result"),
             )
 
+            # Step 4: Rasterization step
+            # This step processes each chunk of vector data
+            # using the rasterization script defined above
+            rasterization_task = rasterization_process(
+                arguments={
+                    "recipe_id": recipe_config.id,
+                }
+            )
+
+            # Step 5: B3DM Tiling step
+            # This step processes each chunk of vector data
+            # and generates 3D tiles using the b3dm_tiling script defined above
+            b3dm_tiling_task = tiling_process(
+                arguments={
+                    "recipe_id": recipe_config.id,
+                }
+            )
+
             # Define the workflow structure
             # tiling depends on both download and batch tasks
-            [  # type: ignore[operator]
-                stage_config_task,
-                batch_task,
-            ] >> stage_task
+            # rasterization and b3dm_tiling get executed in parallel
+            # and have a dependency on the staging task
+            (
+                [  # type: ignore[operator]
+                    stage_config_task,
+                    batch_task,
+                ]
+                >> stage_task
+                >> [
+                    rasterization_task,
+                    b3dm_tiling_task,
+                ]
+            )
 
     # Submit the workflow
     workflow_name = submit_workflow(w, wait=wait)
