@@ -134,7 +134,9 @@ def tiling_process() -> None:
     ],
 )
 def rasterization_process() -> None:
-    """Creates tiles from a geospatial data chunk."""
+    """
+    Creates geotiff and summary web tiles (png) from a geospatial vector data tile.
+    """
     import json
     import sys
 
@@ -172,7 +174,7 @@ def rasterization_process() -> None:
     ],
 )
 def b3dm_tiling_process() -> None:
-    """Creates tiles from a geospatial data chunk."""
+    """Creates B3DM tiles (3D Tiles) from a geospatial vector data tile."""
     import json
     import sys
 
@@ -346,12 +348,39 @@ EOF"""
                 with_param=batch_task.get_result_as("result"),
             )
 
+            # Step 4: Rasterization step
+            # This step processes each chunk of vector data
+            # using the rasterization script defined above
+            rasterization_task = rasterization_process(
+                arguments={
+                    "recipe_id": recipe_config.id,
+                }
+            )
+
+            # Step 5: B3DM Tiling step
+            # This step processes each chunk of vector data
+            # and generates 3D tiles using the b3dm_tiling script defined above
+            b3dm_tiling_task = tiling_process(
+                arguments={
+                    "recipe_id": recipe_config.id,
+                }
+            )
+
             # Define the workflow structure
             # tiling depends on both download and batch tasks
-            [  # type: ignore[operator]
-                stage_config_task,
-                batch_task,
-            ] >> stage_task
+            # rasterization and b3dm_tiling get executed in parallel
+            # and have a dependency on the staging task
+            (
+                [  # type: ignore[operator]
+                    stage_config_task,
+                    batch_task,
+                ]
+                >> stage_task
+                >> [
+                    rasterization_task,
+                    b3dm_tiling_task,
+                ]
+            )
 
     # Submit the workflow
     workflow_name = submit_workflow(w, wait=wait)
