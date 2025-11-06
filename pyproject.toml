@@ -29,6 +29,7 @@ dependencies = [
   "click >=8",
   "hera >=5.18.0",
   "pydantic >=2.7.1",
+  "pydantic-settings >=2.0",
   "pyyaml",
   "fsspec",
   "loguru",
