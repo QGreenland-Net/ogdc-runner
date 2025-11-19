@@ -10,6 +10,10 @@
   options (e.g., `shell` workflows have the `sh_file` config option).
 - Resolve bug that prevented viz-workflow `config.json` file from being used if
   the `ogdc-runner` was passed a remote (GitHub) recipe directory (#101).
+- Move validation of all recipe configuration (including sidecar files like
+  `sh_file` for `ShellWorkflow` and `config_file` for `VizWorkflow` to Pydantic
+  models. This requires that some models (`Shell` and `Viz`-`Workflow`) be
+  provided the `recipe_directory` context on instantiation.
 
 # v0.1.0
 
