@@ -58,6 +58,7 @@ def _validate_filename_with_directory(
     filename: str,
     info: ValidationInfo,
 ) -> Path:
+    """Validate that the given filename is a file that exists in the `info.context["recipe_directory"]`."""
     if not isinstance(info.context, dict) or "recipe_directory" not in info.context:
         err_str = "`recipe_directory` is required context."
         raise ValueError(err_str)
@@ -75,6 +76,18 @@ def _validate_filename_with_directory(
 
 
 class ShellWorkflow(Workflow):
+    """Model representing the shell workflow configuration.
+
+    Requires that the `recipe_directory` context be set when instantiating
+    the class. E.g.,:
+
+        workflow = ShellWorkflow.model_validate(
+            {"sh_file": "recipe.sh"},
+            context={"recipe_directory": Path("/path/to/recipe_directory")},
+        ),
+
+    """
+
     type: Literal["shell"] = "shell"
     # the name of the `.sh` file containing the list of commands to run.
     sh_file: str | Path = "recipe.sh"
@@ -84,6 +97,7 @@ class ShellWorkflow(Workflow):
         self,
         info: ValidationInfo,
     ) -> Self:
+        """Model-level validator that constructs a full path to `sh_file`."""
         if isinstance(self.sh_file, Path):
             return self
 
@@ -94,6 +108,7 @@ class ShellWorkflow(Workflow):
         return self
 
     def get_commands_from_sh_file(self) -> list[str]:
+        """Returns a list of commands run from the workflow `sh_file`."""
         if not isinstance(self.sh_file, Path):
             raise ValueError(
                 "`sh_file` must be a fully qualified `Path`."
@@ -108,7 +123,7 @@ class ShellWorkflow(Workflow):
 
 @cache
 def _read_config_json(config_filepath: Path) -> str:
-    # Validate that the config filepath has valid text.
+    """Validate that the config filepath has valid json."""
     config_text = config_filepath.read_text()
 
     try:
@@ -122,6 +137,18 @@ def _read_config_json(config_filepath: Path) -> str:
 
 
 class VizWorkflow(Workflow):
+    """Model representing the visualization workflow configuration.
+
+    Requires that the `recipe_directory` context be set when instantiating
+    the class. E.g.,:
+
+        workflow = VizWorkflow.model_validate(
+            {"config_file": "config.json"},
+            context={"recipe_directory": Path("/path/to/recipe_directory")},
+        ),
+
+    """
+
     type: Literal["visualization"] = "visualization"
 
     # the name of the viz workflow json configuration file. By default, this is
@@ -136,6 +163,7 @@ class VizWorkflow(Workflow):
         self,
         info: ValidationInfo,
     ) -> Self:
+        """Model-level validator that constructs a full path to `sh_file`."""
         if self.config_file is None or isinstance(self.config_file, Path):
             return self
 
