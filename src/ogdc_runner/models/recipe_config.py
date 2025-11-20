@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import (
     AnyUrl,
@@ -11,6 +11,9 @@ from pydantic import (
     computed_field,
     field_validator,
 )
+
+if TYPE_CHECKING:
+    from ogdc_runner.models.parallel import ParallelConfig
 
 
 class OgdcBaseModel(BaseModel):
@@ -52,6 +55,11 @@ class ShellWorkflow(Workflow):
     type: Literal["shell"] = "shell"
     # the name of the `.sh` file containing the list of commands to run.
     sh_file: str = "recipe.sh"
+    # Optional parallel execution configuration
+    parallel: ParallelConfig = Field(  # type: ignore[valid-type]
+        default_factory=lambda: _get_parallel_config_default(),
+        description="Configuration for parallel execution",
+    )
 
 
 class VizWorkflow(Workflow):
@@ -61,6 +69,21 @@ class VizWorkflow(Workflow):
     config_file: str = "config.json"
 
     batch_size: int = 250
+    # Optional parallel execution configuration
+    parallel: ParallelConfig = Field(  # type: ignore[valid-type]
+        default_factory=lambda: _get_parallel_config_default(),
+        description="Configuration for parallel execution",
+    )
+
+
+def _get_parallel_config_default() -> ParallelConfig:
+    """Get default ParallelConfig instance.
+
+    Import at runtime to avoid circular imports.
+    """
+    from ogdc_runner.models.parallel import ParallelConfig  # noqa: PLC0415
+
+    return ParallelConfig()
 
 
 class RecipeMeta(OgdcBaseModel):
@@ -117,3 +140,17 @@ class RecipeImage(OgdcBaseModel):
     def full_image_path(self) -> str:
         """Return the full image path including tag."""
         return f"{self.image}:{self.tag}"
+
+
+def get_parallel_config(
+    workflow: ShellWorkflow | VizWorkflow,
+) -> ParallelConfig:
+    """Get parallel configuration from a workflow.
+
+    Args:
+        workflow: Shell or Viz workflow instance
+
+    Returns:
+        ParallelConfig instance (always present)
+    """
+    return workflow.parallel
