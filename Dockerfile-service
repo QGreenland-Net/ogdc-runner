@@ -1,0 +1,11 @@
+FROM mambaorg/micromamba:2.3.3
+
+WORKDIR /ogdc_runner/
+
+RUN micromamba install -y pip git
+COPY --chown=$MAMBA_USER:$MAMBA_USER . /ogdc_runner
+RUN micromamba run pip install .[service]
+
+EXPOSE 8000
+
+CMD micromamba run fastapi dev --port 8000 --host 0.0.0.0 src/ogdc_runner/service.py
