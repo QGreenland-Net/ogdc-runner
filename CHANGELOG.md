@@ -8,6 +8,8 @@
 - Bugfix: allow viz workflow recipes to use an `id` other than `viz-workflow`.
 - `meta.yaml`: Add `workflow` config that defines workflow-specifc configuration
   options (e.g., `shell` workflows have the `sh_file` config option).
+- Resolve bug that prevented viz-workflow `config.json` file from being used if
+  the `ogdc-runner` was passed a remote (GitHub) recipe directory (#101).
 
 # v0.1.0
 

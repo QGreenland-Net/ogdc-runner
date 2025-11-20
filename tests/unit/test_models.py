@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from pydantic import AnyUrl, ValidationError
 
@@ -25,7 +27,7 @@ def test_recipe_meta():
         input=recipe_input,
         output=recipe_output,
         workflow=ShellWorkflow(),
-        recipe_directory="/foo/",
+        recipe_directory=Path("/foo/"),
     )
 
     assert recipe_meta.name == name
@@ -49,5 +51,5 @@ def test_recipe_meta_failure_bad_id():
             input=recipe_input,
             output=recipe_output,
             workflow=ShellWorkflow(),
-            recipe_directory="/foo/",
+            recipe_directory=Path("/foo/"),
         )
