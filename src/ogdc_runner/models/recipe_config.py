@@ -13,7 +13,7 @@ from pydantic import (
 )
 
 if TYPE_CHECKING:
-    from ogdc_runner.models.parallel import ParallelConfig
+    from ogdc_runner.models.parallel_config import ParallelConfig
 
 
 class OgdcBaseModel(BaseModel):
@@ -81,7 +81,7 @@ def _get_parallel_config_default() -> ParallelConfig:
 
     Import at runtime to avoid circular imports.
     """
-    from ogdc_runner.models.parallel import ParallelConfig  # noqa: PLC0415
+    from ogdc_runner.models.parallel_config import ParallelConfig  # noqa: PLC0415
 
     return ParallelConfig()
 
