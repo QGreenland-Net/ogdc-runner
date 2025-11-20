@@ -14,7 +14,6 @@ from hera.workflows import (
 from hera.workflows.models import (
     VolumeMount,
 )
-from loguru import logger
 
 from ogdc_runner.argo import (
     ARGO_MANAGER,
@@ -23,7 +22,7 @@ from ogdc_runner.argo import (
     submit_workflow,
 )
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
-from ogdc_runner.models.recipe_config import RecipeConfig, VizWorkflow
+from ogdc_runner.models.recipe_config import RecipeConfig
 
 # ruff: noqa: PLC0415
 
@@ -169,56 +168,6 @@ def b3dm_tiling_process() -> None:
     print_log("b3dm 3D tiles generation completed.")
 
 
-def get_viz_config_json(
-    recipe_config: RecipeConfig,
-) -> str:
-    """Get the viz workflow config as json.
-
-    If passed a JSON file, read the file content and return. Otherwise, an empty
-    configuration will be returned (`"{}"`).
-
-    This configuration is used by the pdgworkflow for visualization workflows.
-    When an empty config ({}) is returned, WorkflowManager will use its default behavior.
-
-    For documentation on available configuration options, see:
-    - ConfigManager documentation: https://github.com/PermafrostDiscoveryGateway/viz-workflow/blob/feature-wf-k8s/pdgworkflow/ConfigManager.py
-    - Example config: https://github.com/QGreenland-Net/ogdc-recipes/blob/main/recipes/viz-workflow/config.json
-
-    Args:
-        recipe_directory: The recipe's configuration containing the directory path
-
-    Returns:
-        The content of the config.json file as a string, or empty JSON if file doesn't exist.
-        An empty config ({}) will cause ConfigManager to use default behavior.
-    """
-    assert isinstance(recipe_config.workflow, VizWorkflow)
-    if recipe_config.workflow.config_file:
-        config_file_path = (
-            recipe_config.recipe_directory / recipe_config.workflow.config_file
-        )
-        if not config_file_path.exists():
-            raise OgdcInvalidRecipeConfig(
-                f"Failed to find expected configuration file {recipe_config.workflow.config_file}."
-            )
-
-        config_text = config_file_path.read_text()
-        try:
-            json.loads(config_text)
-        except json.JSONDecodeError as e:
-            raise OgdcInvalidRecipeConfig(
-                f"Failed to read json from {recipe_config.workflow.config_file}"
-            ) from e
-
-        logger.info(
-            f"Using viz-workflow json configuration from {recipe_config.workflow.config_file}."
-        )
-        return config_text
-
-    # Fallback to empty config if file doesn't exist - ConfigManager will use defaults
-    logger.info('Using default viz-workflow json configuration (`"{}"`).')
-    return "{}"
-
-
 def make_and_submit_viz_workflow(
     recipe_config: RecipeConfig,
     wait: bool,
@@ -263,7 +212,7 @@ def make_and_submit_viz_workflow(
     ) as w:
         # Create templates outside the DAG context
         # Read the config.json file content from the recipe directory
-        config_content = get_viz_config_json(recipe_config)
+        config_content = recipe_config.workflow.get_config_file_json()
 
         stage_config_file_template = Container(
             name="stage-viz-config",

@@ -14,7 +14,9 @@ from ogdc_runner.models.recipe_config import (
 )
 
 
-def test_recipe_meta():
+def test_recipe_meta(tmpdir):
+    fake_sh_file = tmpdir / "foo.sh"
+    fake_sh_file.write('echo "FAKE PROCESSING"')
     recipe_input = RecipeInput(
         params=[InputParam(value=AnyUrl("http://www.example.com"), type="url")]
     )
@@ -26,8 +28,11 @@ def test_recipe_meta():
         name=name,
         input=recipe_input,
         output=recipe_output,
-        workflow=ShellWorkflow(),
-        recipe_directory=Path("/foo/"),
+        workflow=ShellWorkflow.model_validate(
+            {"sh_file": Path(fake_sh_file).name},
+            context={"recipe_directory": Path(tmpdir)},
+        ),
+        recipe_directory=Path(tmpdir),
     )
 
     assert recipe_meta.name == name
