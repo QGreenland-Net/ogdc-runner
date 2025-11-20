@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from hera.workflows import (
     DAG,
@@ -56,6 +55,7 @@ from ogdc_runner.models.recipe_config import RecipeConfig, VizWorkflow
 def batch_process(num_features) -> None:  # type: ignore[no-untyped-def]
     """Processes data in batches."""
     import sys
+    from pathlib import Path
 
     import geopandas as gpd  # type: ignore[import-not-found]
 
@@ -98,12 +98,12 @@ def tiling_process() -> None:
     """Creates tiles from a geospatial data chunk."""
     import json
     import sys
+    from pathlib import Path
 
     from pdgstaging import (  # type: ignore[import-not-found]
         TileStager,
-    )
+    )  # Log to stderr
 
-    # Log to stderr
     def print_log(message: str) -> None:
         print(message, file=sys.stderr)
 
