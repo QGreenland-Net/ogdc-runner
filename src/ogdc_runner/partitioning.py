@@ -90,7 +90,7 @@ def create_partitions(
     artifact_path: str | None = None,
     file_patterns: list[str] | None = None,
 ) -> list[FilePartition]:
-    """Create partitions by grouping files based on num_files_per_partition.
+    """Create partitions by grouping files based on partition_size.
 
     Args:
         inputs: List of input parameters or list of file paths
@@ -128,10 +128,20 @@ def create_partitions(
         msg = "Either 'inputs' or 'artifact_path' must be provided"
         raise ValueError(msg)
 
+    # Validate that we have files to partition
+    if not files:
+        func_name = execution_function.name
+        msg = f"No files discovered/provided for execution function '{func_name}'"
+        raise ValueError(msg)
+
     # Determine number of files per partition
-    num_files = parallel_config.num_files_per_partition if parallel_config else 1
+    if parallel_config and parallel_config.partition_size is not None:
+        num_files = parallel_config.partition_size
+    else:
+        num_files = 1
+
     if num_files < 1:
-        logger.warning(f"Invalid num_files_per_partition {num_files}, using 1")
+        logger.warning(f"Invalid partition_size {num_files}, using 1")
         num_files = 1
 
     # Create partitions for the single execution function
@@ -151,7 +161,7 @@ def create_partitions(
         partitions.append(partition)
 
     logger.info(
-        f"Created {len(partitions)} partitions for {func_name} (num_files_per_partition={num_files})"
+        f"Created {len(partitions)} partitions for {func_name} (partition_size={num_files})"
     )
 
     return partitions

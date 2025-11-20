@@ -21,6 +21,7 @@ while remaining tasks are automatically queued and scheduled.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from hera.workflows import (
     Artifact,
@@ -136,11 +137,11 @@ class ParallelExecutionOrchestrator:
 
         return partitions
 
-    def _create_execution_template(self) -> Container:
+    def _create_execution_template(self) -> Container | Any:
         """Create Argo Container template for the execution function.
 
         Returns:
-            Container template
+            Container template, or Hera @script decorated function
         """
         func = self.execution_function
 
@@ -148,11 +149,15 @@ class ParallelExecutionOrchestrator:
             # Shell command execution
             template = self._create_shell_template(func)
         elif func.script_module:
-            # Python script execution (for viz workflows)
+            # Python script execution (module-based)
             template = self._create_script_template(func)
+        elif func.function:
+            # Python callable (Hera @script decorated function)
+            # The function is already a Hera template, return it directly
+            return func.function
         else:
             raise ValueError(
-                f"ExecutionFunction {func.name} must have either 'command' or 'script_module'"
+                f"ExecutionFunction {func.name} must have either 'command', 'script_module', or 'function'"
             )
 
         return template
@@ -199,7 +204,6 @@ class ParallelExecutionOrchestrator:
                 Artifact(name="partition-manifest", path="/partition/manifest.json"),
             ],
             outputs=[Artifact(name="output-dir", path="/output_dir/")],
-            env=func.environment,
         )
 
         return template
@@ -224,7 +228,6 @@ class ParallelExecutionOrchestrator:
                 Artifact(name="partition-manifest", path="/partition/manifest.json"),
             ],
             outputs=[Artifact(name="output-dir", path="/output_dir/")],
-            env=func.environment,
         )
 
         return template
@@ -282,47 +285,6 @@ class ParallelExecutionOrchestrator:
         )
         return tasks
 
-    def create_collection_task(
-        self,
-        parallel_tasks: list[Task],  # noqa: ARG002
-        output_path: str = "/collected_output/",
-    ) -> Task:
-        """Create a task that collects outputs from all parallel tasks.
-
-        This is useful for aggregating results before publishing, though
-        the current design focuses on map-only without reduce.
-
-        Args:
-            parallel_tasks: List of parallel tasks whose outputs to collect
-            output_path: Path where collected outputs will be stored
-
-        Returns:
-            Task that collects all outputs
-        """
-        # Create a simple collection template
-        collect_template = Container(
-            name="collect-outputs",
-            command=["sh", "-c"],
-            args=[
-                f"""
-                mkdir -p {output_path}
-                # Copy all inputs to output
-                # In DAG, we'll pass all parallel task outputs as inputs
-                cp -r /inputs/* {output_path}/
-                """
-            ],
-            inputs=[Artifact(name="inputs", path="/inputs/")],
-            outputs=[Artifact(name="collected", path=output_path)],
-        )
-
-        # Create task (actual artifact wiring happens in workflow DAG construction)
-        collect_task = Task(
-            name="collect-outputs",
-            template=collect_template,
-        )
-
-        return collect_task
-
 
 class SequentialExecutionOrchestrator:
     """Orchestrates sequential (non-parallel) execution for a single function.
@@ -367,8 +329,10 @@ class SequentialExecutionOrchestrator:
                 args=[f"mkdir -p /output_dir/ && {func.command}"],
                 inputs=[Artifact(name="input-dir", path="/input_dir/")],
                 outputs=[Artifact(name="output-dir", path="/output_dir/")],
-                env=func.environment,
             )
+        else:
+            msg = f"Sequential execution currently only supports 'command' type for ExecutionFunction '{func.name}'"
+            raise ValueError(msg)
 
         task = Task(name=func.name, template=template)
 
