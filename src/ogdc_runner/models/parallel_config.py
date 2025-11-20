@@ -23,13 +23,16 @@ class ParallelConfig(OgdcBaseModel):
         default=False,
         description="Enable parallel execution for this workflow",
     )
-    partition_strategy: Literal["files", "file_chunks"] = Field(
+
+    # Partitioning strategy for parallel execution
+    # "files": One or more files per partition based on partition_size
+    partition_strategy: Literal["files"] = Field(
         default="files",
         description="Strategy for partitioning work across parallel tasks",
     )
     partition_size: int | None = Field(
         default=None,
-        description="For file_chunks strategy: number of files per chunk",
+        description="Size parameter for the chosen partitioning strategy",
     )
 
 
@@ -41,7 +44,7 @@ class ExecutionFunction(OgdcBaseModel):
     Attributes:
         name: Unique identifier for this execution function
         command: Shell command to execute (for shell workflows)
-        script_module: Python script module name (for visualization workflows)
+        script_module: Python script module name
         function: Python callable/function to execute (for Hera script-decorated functions)
     """
 
