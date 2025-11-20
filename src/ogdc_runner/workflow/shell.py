@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from hera.workflows import (
+    DAG,
     Artifact,
     Container,
     Steps,
+    Task,
     Workflow,
 )
 
@@ -11,9 +13,10 @@ from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
     submit_workflow,
 )
-from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
 from ogdc_runner.inputs import make_fetch_input_template
+from ogdc_runner.models.parallel_config import ExecutionFunction
 from ogdc_runner.models.recipe_config import RecipeConfig
+from ogdc_runner.parallel import ParallelExecutionOrchestrator, get_max_parallelism
 from ogdc_runner.publish import make_publish_template
 
 
@@ -39,60 +42,70 @@ def make_and_submit_shell_workflow(
     recipe_config: RecipeConfig,
     wait: bool,
 ) -> str:
-    """Create and submit an argo workflow based on a shell recipe.
+    """Create and submit an argo workflow based on a shell recipe."""
 
-    Args:
-        recipe_config: The recipe configuration
-        wait: Whether to wait for the workflow to complete
-
-    Returns the name of the workflow as a str.
-    """
-    if recipe_config.workflow.type != "shell":
-        err_msg = f"Expected recipe configuration with workflow type `shell`. Got: {recipe_config.workflow.type}"
-        raise OgdcInvalidRecipeConfig(err_msg)
-
-    # Parse commands from the recipe's shell file
     commands = recipe_config.workflow.get_commands_from_sh_file()
+    parallel_config = recipe_config.workflow.parallel
 
     with Workflow(
         generate_name=f"{recipe_config.id}-",
-        entrypoint="steps",
+        entrypoint="main",
         workflows_service=ARGO_WORKFLOW_SERVICE,
+        parallelism=get_max_parallelism() if parallel_config.enabled else None,
     ) as w:
-        # Create command templates
-        cmd_templates = []
-        for idx, command in enumerate(commands):
-            cmd_template = make_cmd_template(
-                name=f"run-cmd-{idx}",
-                command=command,
-            )
-            cmd_templates.append(cmd_template)
+        fetch_template = make_fetch_input_template(recipe_config)
+        publish_template = make_publish_template(recipe_id=recipe_config.id)
 
-        # Use the multi-input fetch template
-        fetch_template = make_fetch_input_template(
-            recipe_config=recipe_config,
-        )
+        if parallel_config.enabled:
+            # PARALLEL MODE: Create orchestrators for each command
+            with DAG(name="main"):
+                fetch_task = Task(name="fetch", template=fetch_template)
 
-        # Create publication template
-        publish_template = make_publish_template(
-            recipe_id=recipe_config.id,
-        )
+                previous_tasks = [fetch_task]
+                for idx, command in enumerate(commands):
+                    exec_func = ExecutionFunction(
+                        name=f"cmd-{idx}",
+                        command=command,
+                    )
+                    orchestrator = ParallelExecutionOrchestrator(
+                        recipe_config=recipe_config,
+                        execution_function=exec_func,
+                    )
 
-        # Create the workflow steps
-        with Steps(name="steps"):
-            step = fetch_template()
-            for idx, cmd_template in enumerate(cmd_templates):
-                step = cmd_template(
-                    name=f"step-{idx}",
-                    arguments=step.get_artifact("output-dir").with_name("input-dir"),  # type: ignore[union-attr]
+                    # Create parallel tasks for this command
+                    parallel_tasks = orchestrator.create_parallel_tasks(
+                        input_artifact_name="input-dir",
+                    )
+
+                    # Set dependencies
+                    for prev_task in previous_tasks:
+                        for parallel_task in parallel_tasks:
+                            prev_task >> parallel_task
+
+                    previous_tasks = parallel_tasks
+
+                # Publish step
+                publish_task = Task(name="publish", template=publish_template)
+                for prev_task in previous_tasks:
+                    prev_task >> publish_task
+        else:
+            # SEQUENTIAL MODE: Keep existing Steps-based approach
+            with Steps(name="main"):
+                step = fetch_template()
+                for idx, command in enumerate(commands):
+                    cmd_template = make_cmd_template(
+                        name=f"run-cmd-{idx}",
+                        command=command,
+                    )
+                    step = cmd_template(
+                        name=f"step-{idx}",
+                        arguments=step.get_artifact("output-dir").with_name(
+                            "input-dir"
+                        ),
+                    )
+                publish_template(
+                    name="publish-data",
+                    arguments=step.get_artifact("output-dir").with_name("input-dir"),
                 )
-            # Publish final data
-            publish_template(
-                name="publish-data",
-                arguments=step.get_artifact("output-dir").with_name("input-dir"),  # type: ignore[union-attr]
-            )
 
-    # Submit the workflow
-    workflow_name = submit_workflow(w, wait=wait)
-
-    return workflow_name
+    return submit_workflow(w, wait=wait)
