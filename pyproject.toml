@@ -25,16 +25,25 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Typing :: Typed",
 ]
+# CLI dependencies live here.
+# TODO: separate the packages more clearly? Does it make sense to have one
+# python project for the CLI and the service?
 dependencies = [
   "click >=8",
-  "hera >=5.18.0",
   "pydantic >=2.7.1",
   "pyyaml",
-  "fsspec",
   "loguru",
 ]
 
 [project.optional-dependencies]
+
+# Service-specific requirements go here.
+service = [
+  "fastapi[standard]",
+  "hera >=5.18.0",
+  "fsspec",
+]
+
 # NOTE: "test" and "dev" are duplicated; why do we need both?
 test = [
   "mypy ~=1.10.0",
