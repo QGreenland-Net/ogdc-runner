@@ -23,7 +23,7 @@ def stage_ogdc_recipe(recipe_location: str):  # type: ignore[no-untyped-def]
         recipe_fs, recipe_fs_path = fsspec.core.url_to_fs(recipe_location)
 
         recipe_fs.get([recipe_fs_path], str(temp_path), recursive=True)
-        logger.success("staged recipe directory from {recipe_location} to {temp_dir}")
+        logger.success(f"staged recipe directory from {recipe_location} to {temp_dir}")
 
         yield temp_path
 
@@ -39,6 +39,9 @@ def get_recipe_config(recipe_directory: Path) -> RecipeConfig:
             f"Recipe directory not found: {recipe_directory}"
         ) from err
 
-    config = RecipeConfig(**config_dict, recipe_directory=recipe_directory)
+    config = RecipeConfig.model_validate(
+        dict(**config_dict, recipe_directory=recipe_directory),
+        context={"recipe_directory": recipe_directory},
+    )
 
     return config
