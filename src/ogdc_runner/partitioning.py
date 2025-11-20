@@ -21,9 +21,8 @@ from loguru import logger
 from ogdc_runner.models.parallel_config import (
     ExecutionFunction,
     FilePartition,
-    ParallelConfig,
 )
-from ogdc_runner.models.recipe_config import InputParam
+from ogdc_runner.models.recipe_config import InputParam, ParallelConfig
 
 
 def _discover_files_from_artifact(

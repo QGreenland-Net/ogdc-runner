@@ -1,39 +1,17 @@
-"""Models for parallel execution configuration and orchestration."""
+"""Models for parallel execution orchestration.
+
+Note: ParallelConfig is in recipe_config.py since it's recipe configuration.
+This module contains execution-related models used by the parallel orchestrator.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import Field, field_validator
 
-from ogdc_runner.models.recipe_config import OgdcBaseModel
-
-
-class ParallelConfig(OgdcBaseModel):
-    """Configuration for parallel execution behavior.
-
-    Attributes:
-        enabled: Whether parallel execution is enabled
-        partition_strategy: Strategy for dividing work ("files" or "file_chunks")
-        partition_size: Number of partitions or items per chunk, depending on strategy
-    """
-
-    enabled: bool = Field(
-        default=False,
-        description="Enable parallel execution for this workflow",
-    )
-
-    # Partitioning strategy for parallel execution
-    # "files": One or more files per partition based on partition_size
-    partition_strategy: Literal["files"] = Field(
-        default="files",
-        description="Strategy for partitioning work across parallel tasks",
-    )
-    partition_size: int | None = Field(
-        default=None,
-        description="Size parameter for the chosen partitioning strategy",
-    )
+from ogdc_runner.models.base import OgdcBaseModel
 
 
 class ExecutionFunction(OgdcBaseModel):
