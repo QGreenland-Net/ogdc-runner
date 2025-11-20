@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import fsspec
 from hera.workflows import (
     Artifact,
@@ -103,7 +105,7 @@ def make_and_submit_shell_workflow(
     return workflow_name
 
 
-def parse_commands_from_shell_file(recipe_dir: str, filename: str) -> list[str]:
+def parse_commands_from_shell_file(recipe_dir: Path, filename: str) -> list[str]:
     """Read commands from an OGDC shell file.
 
     Args:

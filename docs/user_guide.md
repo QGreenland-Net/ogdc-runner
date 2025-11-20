@@ -43,7 +43,7 @@ ogdc-runner submit --wait github://qgreenland-net:ogdc-recipes@main/recipes/seal
 ```
 
 `submit` takes the path to an OGDC-recipe directory (this can be a local path or
-an `ffspec`-compatible directory string).
+an `fsspec`-compatible directory string).
 
 ## OGDC Recipes
 
