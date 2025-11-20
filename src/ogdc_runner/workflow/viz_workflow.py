@@ -5,7 +5,6 @@ from pathlib import Path
 
 from hera.workflows import (
     DAG,
-    Artifact,
     Container,
     HTTPArtifact,
     Parameter,
@@ -30,73 +29,24 @@ from ogdc_runner.models.recipe_config import RecipeConfig, VizWorkflow
 
 
 @script(
-    name="batching",
+    name="staging",
     inputs=[
         Parameter(name="input_url"),
         Parameter(name="recipe_id"),
         HTTPArtifact(
-            name="batch-input",
+            name="staging-input",
             path="/mnt/workflow/{{inputs.parameters.recipe_id}}/input/input.gpkg",
             url="{{inputs.parameters.input_url}}",
         ),
     ],
-    outputs=[
-        Artifact(
-            name="batch-output",
-            path="/mnt/workflow/{{inputs.parameters.recipe_id}}/batch",
-        ),
-    ],
     image="ghcr.io/rushirajnenuji/viz-staging:latest",
     command=["python"],
     volume_mounts=[
         VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
     ],
 )
-def batch_process(num_features) -> None:  # type: ignore[no-untyped-def]
-    """Processes data in batches."""
-    import sys
-    from pathlib import Path
-
-    import geopandas as gpd  # type: ignore[import-not-found]
-
-    # Redirect print statements to stderr instead of stdout
-    # This way they won't interfere with the JSON output
-    def print_log(message: str) -> None:
-        print(message, file=sys.stderr)
-
-    gdf = gpd.read_file("{{inputs.artifacts.batch-input.path}}")
-    results = []
-    for idx, start in enumerate(range(0, len(gdf), num_features)):
-        output_fp = Path(
-            "{{outputs.artifacts.batch-output.path}}/" + f"chunk-{idx}.gpkg"
-        )
-        print_log(f"Writing chunk {idx} to {output_fp}")
-        output_fp.parent.mkdir(parents=True, exist_ok=True)
-        gdf[start : start + num_features].to_file(
-            filename=output_fp,
-            driver="GPKG",
-        )
-        results.append(str(output_fp))
-
-    # Output only the JSON to stdout
-    print(json.dumps(results))
-
-
-@script(
-    name="tiling",
-    inputs=[
-        Parameter(name="chunk-filepath"),
-        Parameter(name="recipe_id"),
-    ],
-    image="ghcr.io/rushirajnenuji/viz-staging:latest",
-    command=["python"],
-    volume_mounts=[
-        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
-    ],
-)
-def tiling_process() -> None:
-    """Creates tiles from a geospatial data chunk."""
-    import json
+def staging_process() -> None:
+    """Stages the input file directly for visualization."""
     import sys
     from pathlib import Path
 
@@ -117,9 +67,9 @@ def tiling_process() -> None:
     )
 
     tiler = TileStager(workflow_config, check_footprints=False)
-    print_log("Staging chunk file")
-    print_log("{{inputs.parameters.chunk-filepath}}")
-    tiler.stage("{{inputs.parameters.chunk-filepath}}")
+    print_log("Staging input file")
+    print_log("{{inputs.artifacts.staging-input.path}}")
+    tiler.stage("{{inputs.artifacts.staging-input.path}}")
     print_log("Staging done")
 
 
@@ -204,11 +154,9 @@ def make_and_submit_viz_workflow(
 
         stage_config_file_template = Container(
             name="stage-viz-config",
-            image="alpine:latest",
             command=["sh", "-c"],
             args=[
                 f"""mkdir -p /mnt/workflow/{recipe_config.id}/input && \\
-mkdir -p /mnt/workflow/{recipe_config.id}/batch && \\
 mkdir -p /mnt/workflow/{recipe_config.id}/output/staged && \\
 mkdir -p /mnt/workflow/{recipe_config.id}/output/geotiff && \\
 mkdir -p /mnt/workflow/{recipe_config.id}/output/3dtiles && \\
@@ -235,32 +183,18 @@ EOF"""
                 template=stage_config_file_template,
             )
 
-            # Step 2: Batching step
-            batch_task = batch_process(
+            # Step 2: Staging step
+            # Directly stage the input file for visualization
+            stage_task = staging_process(
                 arguments={
                     "input_url": input_url,
                     "recipe_id": recipe_config.id,
-                    "num_features": recipe_config.workflow.batch_size,
                 },
-            )
-
-            # Step 3: Tiling step
-            # This step processes each chunk of vector data in parallel
-            # using the tiling_process script defined above
-            stage_task = tiling_process(
-                arguments={
-                    "chunk-filepath": "{{item}}",
-                    "recipe_id": recipe_config.id,
-                },
-                with_param=batch_task.get_result_as("result"),
             )
 
             # Define the workflow structure
-            # tiling depends on both download and batch tasks
-            [  # type: ignore[operator]
-                stage_config_task,
-                batch_task,
-            ] >> stage_task
+            # staging depends on config staging
+            stage_config_task >> stage_task
 
     # Submit the workflow
     workflow_name = submit_workflow(w, wait=wait)

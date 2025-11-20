@@ -68,7 +68,6 @@ class VizWorkflow(Workflow):
 
     config_file: str = "config.json"
 
-    batch_size: int = 250
     # Optional parallel execution configuration
     parallel: ParallelConfig = Field(  # type: ignore[valid-type]
         default_factory=lambda: _get_parallel_config_default(),
