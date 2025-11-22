@@ -1,0 +1,35 @@
+# https://skaffold.dev/docs/references/yaml/
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: ogdc
+build:
+  local:
+    push: false
+
+  artifacts:
+    - image: ogdc-service
+      # https://skaffold.dev/docs/builders/builder-types/docker/
+      context: ./
+      sync:
+        manual:
+          - src: "src/**/*"
+            dest: "/ogdc_runner/"
+      docker:
+        dockerfile: Dockerfile-service
+        cacheFrom:
+          # Local Docker builder replaces cache references to the artifact image with
+          # the tagged image reference, useful for caching from the previous build.
+          - ogdc-service
+        # See: https://skaffold.dev/docs/filesync/#manual-sync-mode
+
+deploy:
+  helm:
+    releases:
+      - name: qgnet-ogdc
+        namespace: qgnet
+        chartPath: ../ogdc-helm/helm
+        valuesFiles:
+          # TODO: consider if we should have a local pre-rendered values file
+          # for this purpose.
+          - ../ogdc-helm/helm/examples/dev-values-rendered.yaml
