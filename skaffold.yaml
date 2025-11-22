@@ -1,0 +1,56 @@
+# https://skaffold.dev/docs/references/yaml/
+apiVersion: skaffold/v4beta13
+kind: Config
+metadata:
+  name: ogdc
+build:
+  local:
+    push: false
+
+  artifacts:
+    - image: ogdc-service
+      # https://skaffold.dev/docs/builders/builder-types/docker/
+      context: ./
+      sync:
+        # See: https://skaffold.dev/docs/filesync/#manual-sync-mode
+        manual:
+          - src: "src/**/*"
+            dest: "/ogdc_runner/"
+          # Sync .git because it is required for the build, and if it is not
+          # manually synced then every change to the git history will trigger a
+          # re-build of the application.
+          # TODO: remove reliance on .git (see Dockerfile-service for details on why)
+          - src: ".git/**/*"
+            dest: "/ogdc_runner/"
+      docker:
+        dockerfile: Dockerfile-service
+        cacheFrom:
+          # Local Docker builder replaces cache references to the artifact image with
+          # the tagged image reference, useful for caching from the previous build.
+          - ogdc-service
+
+deploy:
+  helm:
+    releases:
+      - name: qgnet-ogdc
+        namespace: qgnet
+        chartPath: ../ogdc-helm/helm
+        valuesFiles:
+          - ../ogdc-helm/helm/examples/values-local-cluster-ogdc-example.yaml
+        setValues:
+          global.passwordsSecret: qgnet-ogdc-secrets
+          argo-workflows.artifactRepository.accessKeySecret.name: qgnet-ogdc-secrets
+          argo-workflows.artifactRepository.secretKeySecret.name: qgnet-ogdc-secrets
+          minio.existingSecret: qgnet-ogdc-secrets
+
+portForward:
+  - resourceType: service
+    resourceName: ogdc-service-service
+    namespace: qgnet
+    port: 8000
+    localPort: 8000
+  - resourceType: service
+    resourceName: qgnet-ogdc-argo-workflows-server
+    namespace: qgnet
+    port: 2746
+    localPort: 2746

@@ -1,0 +1,11 @@
+# Ignore everything by default
+**
+
+# Allow only build-required files
+
+!Dockerfile*
+!src/
+!pyproject.toml
+!.git/
+!LICENSE
+!README.md
