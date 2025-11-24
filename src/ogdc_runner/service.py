@@ -13,6 +13,6 @@ app = FastAPI()
 
 
 @app.get("/")
-def hello():
+def hello() -> dict[str, str]:
     """Proof of concept hello-world route."""
     return {"message": "Hello World!"}
