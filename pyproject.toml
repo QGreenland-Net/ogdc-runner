@@ -33,16 +33,12 @@ dependencies = [
   "pydantic >=2.7.1",
   "pyyaml",
   "loguru",
-]
-
-[project.optional-dependencies]
-
-# Service-specific requirements go here.
-service = [
   "fastapi[standard]",
   "hera >=5.18.0",
   "fsspec",
 ]
+
+[project.optional-dependencies]
 
 # NOTE: "test" and "dev" are duplicated; why do we need both?
 test = [
