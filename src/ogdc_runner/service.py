@@ -15,4 +15,4 @@ app = FastAPI()
 @app.get("/")
 def hello():
     """Proof of concept hello-world route."""
-    return {"message": "Hello World"}
+    return {"message": "Hello World!"}
