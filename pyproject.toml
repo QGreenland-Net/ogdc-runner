@@ -6,7 +6,7 @@ authors = [
   { name = "Trey Stafford", email = "trey.stafford@colorado.edu" },
   { name = "Robyn Marowitz", email = "robyn.marowitz@colorado.edu" },
 ]
-version = "0.2.2"
+version = "0.2.0"
 description = "Defines OGDC recipe API(s) and submits recipes to OGDC for execution"
 readme = "README.md"
 license.file = "LICENSE"
@@ -76,7 +76,7 @@ requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [tool.bumpversion]
-current_version = "0.2.2"
+current_version = "0.2.0"
 commit = false
 tag = false
 
@@ -85,6 +85,10 @@ filename = "pyproject.toml"
 search = '^version = "{current_version}"$'
 replace = 'version = "{new_version}"'
 
+[[tool.bumpversion.files]]
+filename = "CHANGELOG.md"
+search = "^## NEXT_VERSION"
+replace = "## v{new_version} ({now:%Y-%m-%d})"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
