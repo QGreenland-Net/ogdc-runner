@@ -191,6 +191,16 @@ This project uses [semantic versioning](https://semver.org/).
 Decide what the version will be for your release, and ensure that the CHANGELOG
 contains an entry for the planned release.
 
+**Bump the Version**
+
+Use bump-my-version to automatically update the version number in all configured
+files (e.g., pyproject.toml, CHANGELOG.md).
+
+Choose the appropriate part to bump:
+
+PATCH releasebump-my-version bump patch MINOR releasebump-my-version bump minor
+MAJOR releasebump-my-version bump major
+
 Once `main` is ready for a release (feature branches are merged and the
 CHANGELOG is up-to-date), tag the latest commit with the version to be released
 (e.g., `v0.1.0`) and push it to GitHub:
