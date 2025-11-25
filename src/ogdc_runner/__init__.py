@@ -6,6 +6,12 @@ execution.
 
 from __future__ import annotations
 
-from ._version import version as __version__
+from importlib.metadata import PackageNotFoundError, version
 
-__all__ = ["__version__"]
+try:
+    __version__ = version(
+        "ogdc-runner"
+    )  # Use your package's name as registered on PyPI
+except PackageNotFoundError:
+    # This block handles cases where the package is imported but not yet installed (e.g., development mode)
+    __version__ = "0.0.0+unknown"
