@@ -6,6 +6,5 @@
 !Dockerfile*
 !src/
 !pyproject.toml
-!.git/
 !LICENSE
 !README.md

@@ -4,7 +4,7 @@
 # https://github.com/QGreenland-Net/ogdc-helm/issues/31
 FROM ghcr.io/osgeo/gdal:ubuntu-small-latest
 # We use and wget to fetch data from remote sources.
-RUN apt update && apt install -y wget rsync git pip python3-venv
+RUN apt update && apt install -y wget rsync pip python3-venv
 
 WORKDIR /ogdc_runner/
 COPY . /ogdc_runner
