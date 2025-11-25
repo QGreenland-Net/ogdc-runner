@@ -6,6 +6,7 @@ authors = [
   { name = "Trey Stafford", email = "trey.stafford@colorado.edu" },
   { name = "Robyn Marowitz", email = "robyn.marowitz@colorado.edu" },
 ]
+version = "0.2.0"
 description = "Defines OGDC recipe API(s) and submits recipes to OGDC for execution"
 readme = "README.md"
 license.file = "LICENSE"
@@ -24,7 +25,6 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Typing :: Typed",
 ]
-dynamic = ["version"]
 dependencies = [
   "click >=8",
   "hera >=5.18.0",
@@ -72,18 +72,28 @@ ogdc-runner = "ogdc_runner.__main__:cli"
 
 
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.bumpversion]
+current_version = "0.2.0"
+commit = false
+tag = false
 
-[tool.hatch]
-version.source = "vcs"
-build.hooks.vcs.version-file = "src/ogdc_runner/_version.py"
+[[tool.bumpversion.files]]
+filename = "src/ogdc_runner/__init__.py"
+search = '__version__ = "{current_version}"'
+replace = '__version__ = "{new_version}"'
 
-[tool.hatch.envs.default]
-features = ["test"]
-scripts.test = "pytest {args}"
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
 
+[[tool.bumpversion.files]]
+filename = "CHANGELOG.md"
+search = "## NEXT_VERSION"
+replace = "## v{new_version} ({now:%Y-%m-%d})"
 
 [tool.pytest.ini_options]
 minversion = "6.0"

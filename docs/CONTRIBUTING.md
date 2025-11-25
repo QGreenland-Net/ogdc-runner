@@ -189,7 +189,18 @@ This project uses [semantic versioning](https://semver.org/).
 > 3. PATCH version when you make backward compatible bug fixes
 
 Decide what the version will be for your release, and ensure that the CHANGELOG
-contains an entry for the planned release.
+contains an entry for the `## NEXT_VERSION`.
+
+**Bump the Version**
+
+Use bump-my-version to automatically update the version number in all configured
+files (e.g., pyproject.toml, CHANGELOG.md).
+
+Choose the appropriate part to bump:
+
+- PATCH release: `bump-my-version bump patch`
+- MINOR release: `bump-my-version bump minor`
+- MAJOR release: `bump-my-version bump major`
 
 Once `main` is ready for a release (feature branches are merged and the
 CHANGELOG is up-to-date), tag the latest commit with the version to be released
