@@ -8,7 +8,7 @@ from ogdc_runner.service import app
 client = TestClient(app)
 
 
-def test_root():
+def test_version():
     response = client.get("/version")
     assert response.status_code == 200
     assert response.json() == {"ogdc_runner_version": __version__}
