@@ -25,7 +25,6 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Typing :: Typed",
 ]
-# CLI dependencies live here.
 # TODO: separate the packages more clearly? Does it make sense to have one
 # python project for the CLI and the service?
 dependencies = [
