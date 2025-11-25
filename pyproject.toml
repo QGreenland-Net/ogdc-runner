@@ -6,7 +6,7 @@ authors = [
   { name = "Trey Stafford", email = "trey.stafford@colorado.edu" },
   { name = "Robyn Marowitz", email = "robyn.marowitz@colorado.edu" },
 ]
-version = "0.2.0"
+version = "0.3.0"
 description = "Defines OGDC recipe API(s) and submits recipes to OGDC for execution"
 readme = "README.md"
 license.file = "LICENSE"
@@ -80,7 +80,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.bumpversion]
-current_version = "0.2.0"
+current_version = "0.3.0"
 commit = false
 tag = false
 
