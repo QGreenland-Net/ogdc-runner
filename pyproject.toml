@@ -87,7 +87,7 @@ replace = 'version = "{new_version}"'
 
 [[tool.bumpversion.files]]
 filename = "CHANGELOG.md"
-search = "^## NEXT_VERSION"
+search = "## NEXT_VERSION"
 replace = "## v{new_version} ({now:%Y-%m-%d})"
 
 [tool.pytest.ini_options]
