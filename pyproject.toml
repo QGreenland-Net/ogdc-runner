@@ -72,7 +72,7 @@ ogdc-runner = "ogdc_runner.__main__:cli"
 
 
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.bumpversion]
