@@ -26,6 +26,7 @@ from typing import Any
 from hera.workflows import (
     Artifact,
     Container,
+    Parameter,
     Task,
 )
 from loguru import logger
@@ -74,16 +75,32 @@ class ParallelExecutionOrchestrator:
         self.recipe_config = recipe_config
         self.execution_function = execution_function
 
+    def create_execution_template(self) -> Container | Any:
+        """Create execution template. Must be called BEFORE entering DAG context.
+
+        Returns:
+            Container template, or Hera @script decorated function
+        """
+        return self._create_execution_template()
+
     def create_parallel_tasks(
         self,
+        template: Container | Any,
+        source_task: Task,
+        source_artifact_name: str = "output-dir",
         input_artifact_name: str = "input-dir",
         artifact_path: str | None = None,
         file_patterns: list[str] | None = None,
     ) -> list[Task]:
         """Create Argo DAG tasks for parallel execution of a single function.
 
+        Must be called AFTER create_execution_template() and can be called within DAG context.
+
         Args:
-            input_artifact_name: Name of the input artifact containing fetched data
+            template: The execution template created by create_execution_template()
+            source_task: The task to get input artifacts from
+            source_artifact_name: Name of the artifact from the source task
+            input_artifact_name: Name to use for the input artifact in this task
             artifact_path: Optional path to artifact from previous step (for dynamic discovery)
             file_patterns: Optional file patterns for filtering discovered files
 
@@ -100,12 +117,9 @@ class ParallelExecutionOrchestrator:
             f"Created {len(partitions)} partitions for {self.execution_function.name}"
         )
 
-        # Step 2: Create execution template
-        template = self._create_execution_template()
-
-        # Step 3: Create parallel tasks from partitions
+        # Step 2: Create parallel tasks from partitions
         tasks = self._create_tasks_from_partitions(
-            partitions, template, input_artifact_name
+            partitions, template, source_task, source_artifact_name, input_artifact_name
         )
 
         return tasks
@@ -172,23 +186,33 @@ class ParallelExecutionOrchestrator:
             Container template
         """
         # Build command that processes files from partition manifest
+        # The manifest is passed as a parameter containing JSON array of file paths
         command_script = f"""
         set -e
         mkdir -p /output_dir/
 
-        # Read partition manifest (JSON with list of files)
-        PARTITION_FILES=$(cat /partition/manifest.json)
+        # Read partition manifest from parameter (JSON array of files)
+        PARTITION_FILES='{{{{inputs.parameters.partition-manifest}}}}'
         echo "Processing partition with files: $PARTITION_FILES"
 
-        # Parse JSON and process each file
-        echo "$PARTITION_FILES" | jq -r '.[]' | while read -r file; do
+        # Parse JSON array and process each file
+        FILES=$(echo "$PARTITION_FILES" | sed 's/\\[//g' | sed 's/\\]//g' | sed 's/"//g' | tr ',' '\\n')
+
+        # Process each file
+        echo "$FILES" | while IFS= read -r file; do
+            # Skip empty lines
+            [ -z "$file" ] && continue
+
+            # Trim whitespace
+            file=$(echo "$file" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
             echo "Processing file: $file"
             # Extract filename from path
             filename=$(basename "$file")
 
-            # Execute the command, replacing input/output placeholders
-            INPUT_FILE="/input_dir/$filename"
-            OUTPUT_FILE="/output_dir/$filename"
+            # Set environment variables for the command
+            export INPUT_FILE="/input_dir/$filename"
+            export OUTPUT_FILE="/output_dir/$filename"
 
             # Run the actual command
             {func.command}
@@ -201,7 +225,7 @@ class ParallelExecutionOrchestrator:
             args=[command_script],
             inputs=[
                 Artifact(name="input-dir", path="/input_dir/"),
-                Artifact(name="partition-manifest", path="/partition/manifest.json"),
+                Parameter(name="partition-manifest"),
             ],
             outputs=[Artifact(name="output-dir", path="/output_dir/")],
         )
@@ -218,14 +242,14 @@ class ParallelExecutionOrchestrator:
             Container template
         """
         # For script-based execution (visualization workflows)
-        # The script should handle reading the partition manifest
+        # The script should handle reading the partition manifest from parameter
         template = Container(
             name=func.name,
             command=["python", "-m", func.script_module],
-            args=["--partition-manifest", "/partition/manifest.json"],
+            args=["--partition-manifest", "{{inputs.parameters.partition-manifest}}"],
             inputs=[
                 Artifact(name="input-dir", path="/input_dir/"),
-                Artifact(name="partition-manifest", path="/partition/manifest.json"),
+                Parameter(name="partition-manifest"),
             ],
             outputs=[Artifact(name="output-dir", path="/output_dir/")],
         )
@@ -236,6 +260,8 @@ class ParallelExecutionOrchestrator:
         self,
         partitions: list[FilePartition],
         template: Container,
+        source_task: Task,
+        source_artifact_name: str,
         input_artifact_name: str,
     ) -> list[Task]:
         """Create Argo tasks that execute in parallel for a single function.
@@ -253,7 +279,9 @@ class ParallelExecutionOrchestrator:
         Args:
             partitions: List of file partitions
             template: Execution template
-            input_artifact_name: Name of the input artifact
+            source_task: The task to get input artifacts from
+            source_artifact_name: Name of the artifact from the source task
+            input_artifact_name: Name to use for the input artifact
 
         Returns:
             List of Task objects (parallelism controlled by workflow config)
@@ -264,18 +292,18 @@ class ParallelExecutionOrchestrator:
         # Create partition manifests (JSON with list of files)
         partition_manifests = [json.dumps(p.files) for p in partitions]
 
-        # Create tasks with with-items for parallel execution
-        # Each partition becomes a separate task instance
+        # Create tasks - each gets the artifact from the source task
+        # and the partition manifest as a parameter
         for partition, manifest in zip(partitions, partition_manifests, strict=True):
             task = Task(
                 name=f"{func_name}-partition-{partition.partition_id}",
                 template=template,
-                arguments={
-                    input_artifact_name: Artifact(
-                        from_=f"{{{{inputs.artifacts.{input_artifact_name}}}}}"
+                arguments=[
+                    source_task.get_artifact(source_artifact_name).with_name(
+                        input_artifact_name
                     ),
-                    "partition-manifest": manifest,
-                },
+                    Parameter(name="partition-manifest", value=manifest),
+                ],
             )
             tasks.append(task)
 

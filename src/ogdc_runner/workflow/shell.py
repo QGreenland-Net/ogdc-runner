@@ -57,23 +57,36 @@ def make_and_submit_shell_workflow(
         publish_template = make_publish_template(recipe_id=recipe_config.id)
 
         if parallel_config.enabled:
-            # PARALLEL MODE: Create orchestrators for each command
+            # PARALLEL MODE: Create orchestrators and templates OUTSIDE the DAG
+            orchestrators_with_templates = []
+            for idx, command in enumerate(commands):
+                exec_func = ExecutionFunction(
+                    name=f"cmd-{idx}",
+                    command=command,
+                )
+                orchestrator = ParallelExecutionOrchestrator(
+                    recipe_config=recipe_config,
+                    execution_function=exec_func,
+                )
+                # Create template outside DAG context
+                template = orchestrator.create_execution_template()
+                orchestrators_with_templates.append((orchestrator, template))
+
+            # Now create the DAG with tasks
             with DAG(name="main"):
                 fetch_task = Task(name="fetch", template=fetch_template)
 
                 previous_tasks = [fetch_task]
-                for idx, command in enumerate(commands):
-                    exec_func = ExecutionFunction(
-                        name=f"cmd-{idx}",
-                        command=command,
-                    )
-                    orchestrator = ParallelExecutionOrchestrator(
-                        recipe_config=recipe_config,
-                        execution_function=exec_func,
-                    )
+                for orchestrator, template in orchestrators_with_templates:
+                    # Get the output artifact from the previous task
+                    # For the first iteration, it's from fetch_task
+                    source_task = previous_tasks[0]
 
                     # Create parallel tasks for this command
                     parallel_tasks = orchestrator.create_parallel_tasks(
+                        template=template,
+                        source_task=source_task,
+                        source_artifact_name="output-dir",
                         input_artifact_name="input-dir",
                     )
 
@@ -84,19 +97,20 @@ def make_and_submit_shell_workflow(
 
                     previous_tasks = parallel_tasks
 
-                # Publish step
-                publish_task = Task(name="publish", template=publish_template)
-                for prev_task in previous_tasks:
-                    prev_task >> publish_task
         else:
-            # SEQUENTIAL MODE: Keep existing Steps-based approach
+            # SEQUENTIAL MODE: Create templates outside Steps context
+            cmd_templates = []
+            for idx, command in enumerate(commands):
+                cmd_template = make_cmd_template(
+                    name=f"run-cmd-{idx}",
+                    command=command,
+                )
+                cmd_templates.append(cmd_template)
+
+            # Now create Steps with the pre-created templates
             with Steps(name="main"):
                 step = fetch_template()
-                for idx, command in enumerate(commands):
-                    cmd_template = make_cmd_template(
-                        name=f"run-cmd-{idx}",
-                        command=command,
-                    )
+                for idx, cmd_template in enumerate(cmd_templates):
                     step = cmd_template(
                         name=f"step-{idx}",
                         arguments=step.get_artifact("output-dir").with_name(
