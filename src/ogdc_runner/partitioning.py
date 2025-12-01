@@ -33,31 +33,27 @@ def _discover_files_from_artifact(
 
     Args:
         artifact_path: Path to artifact directory (e.g., /input_dir/)
-        file_patterns: Optional list of glob patterns to filter files
+        file_patterns: Optional glob patterns to filter files
 
     Returns:
-        List of discovered file paths
+        List of discovered file paths (relative to artifact_path)
     """
-    discovered_files = []
     artifact_dir = Path(artifact_path)
 
     if not artifact_dir.exists():
         logger.warning(f"Artifact path does not exist: {artifact_path}")
-        return discovered_files
+        return []
 
-    # Walk the directory to find all files
+    discovered_files = []
     for root, _, files in os.walk(artifact_dir):
         for file in files:
             file_path = Path(root) / file
             relative_path = str(file_path.relative_to(artifact_dir))
 
             # Apply file patterns if specified
-            if file_patterns:
-                if any(
-                    fnmatch.fnmatch(relative_path, pattern) for pattern in file_patterns
-                ):
-                    discovered_files.append(relative_path)
-            else:
+            if not file_patterns or any(
+                fnmatch.fnmatch(relative_path, pattern) for pattern in file_patterns
+            ):
                 discovered_files.append(relative_path)
 
     logger.info(f"Discovered {len(discovered_files)} files from {artifact_path}")
@@ -67,7 +63,7 @@ def _discover_files_from_artifact(
 def _extract_files_from_inputs(
     inputs: list[InputParam],
 ) -> list[str]:
-    """Extract individual file paths/URLs from input parameters.
+    """Extract file paths/URLs from input parameters.
 
     Args:
         inputs: List of input parameters
@@ -75,11 +71,7 @@ def _extract_files_from_inputs(
     Returns:
         List of file paths or URLs
     """
-    files = []
-    for param in inputs:
-        # Treat each input as a single file
-        files.append(str(param.value))
-    return files
+    return [str(param.value) for param in inputs]
 
 
 def create_partitions(
@@ -92,14 +84,17 @@ def create_partitions(
     """Create partitions by grouping files based on partition_size.
 
     Args:
-        inputs: List of input parameters or list of file paths
-        execution_function: Single execution function to create partitions for
+        inputs: List of input parameters or file paths
+        execution_function: Execution function to create partitions for
         parallel_config: Parallel execution configuration
         artifact_path: Path to artifact directory from previous step
-        file_patterns: Optional list of glob patterns to filter discovered files
+        file_patterns: Optional glob patterns to filter discovered files
 
     Returns:
-        List of FilePartition objects with configured number of files per partition
+        List of FilePartition objects
+
+    Raises:
+        ValueError: If execution_function is None, no file source provided, or no files found
     """
     if not execution_function:
         msg = "execution_function must be provided"
@@ -107,20 +102,13 @@ def create_partitions(
 
     # Determine file source: static inputs or dynamic discovery
     if artifact_path:
-        # Dynamic: discover files from previous step's output
-        files = _discover_files_from_artifact(
-            artifact_path,
-            file_patterns,
-        )
+        files = _discover_files_from_artifact(artifact_path, file_patterns)
         logger.info(f"Using dynamic file discovery from {artifact_path}")
     elif inputs:
-        # Static: use files from recipe config or direct file paths
         if isinstance(inputs[0], Path):
-            # List of file paths provided directly
             files = [str(p) for p in inputs]
             logger.info("Using static file paths from inputs")
         else:
-            # List of InputParam objects
             files = _extract_files_from_inputs(inputs)
             logger.info("Using static files from recipe inputs")
     else:
@@ -129,35 +117,28 @@ def create_partitions(
 
     # Validate that we have files to partition
     if not files:
-        func_name = execution_function.name
-        msg = f"No files discovered/provided for execution function '{func_name}'"
+        msg = f"No files discovered/provided for execution function '{execution_function.name}'"
         raise ValueError(msg)
 
     # Determine number of files per partition
-    if parallel_config and parallel_config.partition_size is not None:
-        num_files = parallel_config.partition_size
-    else:
-        num_files = 1
+    num_files = (
+        parallel_config.partition_size
+        if parallel_config and parallel_config.partition_size
+        else 1
+    )
+    num_files = max(1, num_files)  # Ensure at least 1 file per partition
 
-    if num_files < 1:
-        logger.warning(f"Invalid partition_size {num_files}, using 1")
-        num_files = 1
-
-    # Create partitions for the single execution function
-    partitions = []
+    # Create partitions
     func_name = execution_function.name
-
-    for partition_id, i in enumerate(range(0, len(files), num_files)):
-        chunk = files[i : i + num_files]
-        partition = FilePartition(
+    partitions = [
+        FilePartition(
             partition_id=partition_id,
-            files=chunk,
+            files=files[i : i + num_files],
             execution_function=func_name,
-            metadata={
-                "num_files": len(chunk),
-            },
+            metadata={"num_files": len(files[i : i + num_files])},
         )
-        partitions.append(partition)
+        for partition_id, i in enumerate(range(0, len(files), num_files))
+    ]
 
     logger.info(
         f"Created {len(partitions)} partitions for {func_name} (partition_size={num_files})"

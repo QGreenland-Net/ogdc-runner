@@ -1,21 +1,14 @@
 """Orchestrator for parallel execution of workflows.
 
 This module manages parallel task execution with automatic scheduling.
-When multiple partitions are created, the MAX_PARALLEL_LIMIT controls
-how many tasks execute concurrently. The workflow engine automatically
-schedules remaining tasks as active tasks complete.
+The MAX_PARALLEL_LIMIT controls how many tasks execute concurrently,
+with the workflow engine automatically scheduling remaining tasks as
+active tasks complete.
 
-To use parallelism in a workflow, set the 'parallelism' parameter when
-creating the Workflow object:
-
-    with Workflow(
-        ...,
-        parallelism=get_max_parallelism(),
-    ) as w:
+Usage:
+    with Workflow(..., parallelism=get_max_parallelism()) as w:
+        # Create workflow tasks
         ...
-
-This ensures that no more than MAX_PARALLEL_LIMIT tasks run simultaneously,
-while remaining tasks are automatically queued and scheduled.
 """
 
 from __future__ import annotations
@@ -43,11 +36,8 @@ from ogdc_runner.partitioning import create_partitions
 def get_max_parallelism() -> int:
     """Get the maximum parallelism limit for workflow execution.
 
-    This value should be used when creating Workflow objects to control
-    the maximum number of tasks that can execute concurrently.
-
     Returns:
-        Maximum number of parallel tasks allowed
+        int: Maximum number of parallel tasks allowed
     """
     return MAX_PARALLEL_LIMIT
 
@@ -65,21 +55,21 @@ class ParallelExecutionOrchestrator:
         self,
         recipe_config: RecipeConfig,
         execution_function: ExecutionFunction,
-    ):
+    ) -> None:
         """Initialize the orchestrator.
 
         Args:
-            recipe_config: The recipe configuration
-            execution_function: Single execution function to run in parallel
+            recipe_config: Recipe configuration
+            execution_function: Execution function to run in parallel
         """
         self.recipe_config = recipe_config
         self.execution_function = execution_function
 
     def create_execution_template(self) -> Container | Any:
-        """Create execution template. Must be called BEFORE entering DAG context.
+        """Create execution template. Must be called before entering DAG context.
 
         Returns:
-            Container template, or Hera @script decorated function
+            Container template or Hera @script decorated function
         """
         return self._create_execution_template()
 
@@ -92,37 +82,33 @@ class ParallelExecutionOrchestrator:
         artifact_path: str | None = None,
         file_patterns: list[str] | None = None,
     ) -> list[Task]:
-        """Create Argo DAG tasks for parallel execution of a single function.
+        """Create Argo DAG tasks for parallel execution.
 
-        Must be called AFTER create_execution_template() and can be called within DAG context.
+        Must be called after create_execution_template() and can be called within DAG context.
 
         Args:
-            template: The execution template created by create_execution_template()
-            source_task: The task to get input artifacts from
-            source_artifact_name: Name of the artifact from the source task
-            input_artifact_name: Name to use for the input artifact in this task
-            artifact_path: Optional path to artifact from previous step (for dynamic discovery)
-            file_patterns: Optional file patterns for filtering discovered files
+            template: Execution template from create_execution_template()
+            source_task: Task providing input artifacts
+            source_artifact_name: Name of the source artifact (default: "output-dir")
+            input_artifact_name: Name for the input artifact (default: "input-dir")
+            artifact_path: Optional artifact path for dynamic file discovery
+            file_patterns: Optional glob patterns for filtering files
 
         Returns:
-            List of Argo Task objects that will execute in parallel
+            List of Argo Task objects for parallel execution
         """
         logger.info(
             f"Creating parallel execution tasks for {self.execution_function.name}"
         )
 
-        # Step 1: Create partitions for this execution function
         partitions = self._create_partitions(artifact_path, file_patterns)
         logger.info(
             f"Created {len(partitions)} partitions for {self.execution_function.name}"
         )
 
-        # Step 2: Create parallel tasks from partitions
-        tasks = self._create_tasks_from_partitions(
+        return self._create_tasks_from_partitions(
             partitions, template, source_task, source_artifact_name, input_artifact_name
         )
-
-        return tasks
 
     def _create_partitions(
         self,
@@ -132,16 +118,15 @@ class ParallelExecutionOrchestrator:
         """Create file partitions based on configuration.
 
         Args:
-            artifact_path: Optional path to artifact from previous step
-            file_patterns: Optional file patterns for filtering
+            artifact_path: Optional artifact path for dynamic discovery
+            file_patterns: Optional glob patterns for filtering
 
         Returns:
             List of FilePartition objects
         """
-        # Use artifact_path if provided (dynamic discovery), otherwise use recipe inputs
         inputs = None if artifact_path else self.recipe_config.input.params
 
-        partitions = create_partitions(
+        return create_partitions(
             inputs=inputs,
             execution_function=self.execution_function,
             parallel_config=self.recipe_config.workflow.parallel,
@@ -149,32 +134,26 @@ class ParallelExecutionOrchestrator:
             file_patterns=file_patterns,
         )
 
-        return partitions
-
     def _create_execution_template(self) -> Container | Any:
         """Create Argo Container template for the execution function.
 
         Returns:
-            Container template, or Hera @script decorated function
+            Container template or Hera @script decorated function
+
+        Raises:
+            ValueError: If execution function has no valid execution type
         """
         func = self.execution_function
 
         if func.command:
-            # Shell command execution
-            template = self._create_shell_template(func)
-        elif func.script_module:
-            # Python script execution (module-based)
-            template = self._create_script_template(func)
-        elif func.function:
-            # Python callable (Hera @script decorated function)
-            # The function is already a Hera template, return it directly
+            return self._create_shell_template(func)
+        if func.script_module:
+            return self._create_script_template(func)
+        if func.function:
             return func.function
-        else:
-            raise ValueError(
-                f"ExecutionFunction {func.name} must have either 'command', 'script_module', or 'function'"
-            )
 
-        return template
+        msg = f"ExecutionFunction '{func.name}' must have 'command', 'script_module', or 'function'"
+        raise ValueError(msg)
 
     def _create_shell_template(self, func: ExecutionFunction) -> Container:
         """Create a Container template for shell command execution.
@@ -185,8 +164,6 @@ class ParallelExecutionOrchestrator:
         Returns:
             Container template
         """
-        # Build command that processes files from partition manifest
-        # The manifest is passed as a parameter containing JSON array of file paths
         command_script = f"""
         set -e
         mkdir -p /output_dir/
@@ -219,7 +196,7 @@ class ParallelExecutionOrchestrator:
         done
         """
 
-        template = Container(
+        return Container(
             name=func.name,
             command=["sh", "-c"],
             args=[command_script],
@@ -230,8 +207,6 @@ class ParallelExecutionOrchestrator:
             outputs=[Artifact(name="output-dir", path="/output_dir/")],
         )
 
-        return template
-
     def _create_script_template(self, func: ExecutionFunction) -> Container:
         """Create a Container template for Python script execution.
 
@@ -241,9 +216,7 @@ class ParallelExecutionOrchestrator:
         Returns:
             Container template
         """
-        # For script-based execution (visualization workflows)
-        # The script should handle reading the partition manifest from parameter
-        template = Container(
+        return Container(
             name=func.name,
             command=["python", "-m", func.script_module],
             args=["--partition-manifest", "{{inputs.parameters.partition-manifest}}"],
@@ -253,8 +226,6 @@ class ParallelExecutionOrchestrator:
             ],
             outputs=[Artifact(name="output-dir", path="/output_dir/")],
         )
-
-        return template
 
     def _create_tasks_from_partitions(
         self,
@@ -326,12 +297,12 @@ class SequentialExecutionOrchestrator:
         self,
         recipe_config: RecipeConfig,
         execution_function: ExecutionFunction,
-    ):
+    ) -> None:
         """Initialize the orchestrator.
 
         Args:
-            recipe_config: The recipe configuration
-            execution_function: Single execution function to run
+            recipe_config: Recipe configuration
+            execution_function: Execution function to run
         """
         self.recipe_config = recipe_config
         self.execution_function = execution_function
@@ -343,25 +314,26 @@ class SequentialExecutionOrchestrator:
         """Create Argo DAG task for sequential execution.
 
         Args:
-            input_artifact_name: Name of the input artifact
+            input_artifact_name: Name of the input artifact (currently unused)
 
         Returns:
             Task object for this execution function
+
+        Raises:
+            ValueError: If execution function is not command-based
         """
         func = self.execution_function
 
-        if func.command:
-            template = Container(
-                name=func.name,
-                command=["sh", "-c"],
-                args=[f"mkdir -p /output_dir/ && {func.command}"],
-                inputs=[Artifact(name="input-dir", path="/input_dir/")],
-                outputs=[Artifact(name="output-dir", path="/output_dir/")],
-            )
-        else:
-            msg = f"Sequential execution currently only supports 'command' type for ExecutionFunction '{func.name}'"
+        if not func.command:
+            msg = f"Sequential execution only supports 'command' type for ExecutionFunction '{func.name}'"
             raise ValueError(msg)
 
-        task = Task(name=func.name, template=template)
+        template = Container(
+            name=func.name,
+            command=["sh", "-c"],
+            args=[f"mkdir -p /output_dir/ && {func.command}"],
+            inputs=[Artifact(name="input-dir", path="/input_dir/")],
+            outputs=[Artifact(name="output-dir", path="/output_dir/")],
+        )
 
-        return task
+        return Task(name=func.name, template=template)
