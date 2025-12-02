@@ -68,7 +68,7 @@ class StatusResponse(pydantic.BaseModel):
 
 
 @app.get("/status/{recipe_workflow_name}")
-def status(recipe_workflow_name: str):
+def status(recipe_workflow_name: str) -> StatusResponse:
     """Check an argo workflow's status."""
     status = get_workflow_status(recipe_workflow_name)
     return StatusResponse(

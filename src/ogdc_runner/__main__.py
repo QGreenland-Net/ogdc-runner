@@ -20,7 +20,7 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
-def _get_workflow_status(workflow_name) -> str:
+def _get_workflow_status(workflow_name: str) -> str:
     response = requests.get(
         url=f"{OGDC_API_URL}/status/{workflow_name}",
     )
@@ -28,7 +28,7 @@ def _get_workflow_status(workflow_name) -> str:
 
     status = response.json()["status"]
 
-    return status
+    return str(status)
 
 
 def _wait_for_workflow_completion(workflow_name: str) -> None:
