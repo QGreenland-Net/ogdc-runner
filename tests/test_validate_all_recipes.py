@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
-TEST_RECIPES_PATH = os.getenv("TEST_RECIPES_PATH", "tests")
-# TODO: decide if this should be shorter
-PER_RECIPE_TIMEOUT = int(os.getenv("PER_RECIPE_TIMEOUT", "600"))  # seconds
+# Per-recipe timeout in seconds
+PER_RECIPE_TIMEOUT = 600  # adjust if some recipes need more time
+
+
+def _tests_dir() -> Path:
+    """Return the directory containing this test file (the tests/ folder)."""
+    return Path(__file__).parent.resolve()
 
 
 def _immediate_child_dirs(root: Path):
@@ -17,24 +20,20 @@ def _immediate_child_dirs(root: Path):
     return [p for p in root.iterdir() if p.is_dir()]
 
 
-def discover_recipe_dirs_one_level_down(root: Path):
+def discover_recipe_dirs_one_level_down(root: Path) -> list:
     """
-    Discover recipe directories by looking for .meta.yml under each immediate child
-    directory of `root`. This avoids discovering .meta.yml files directly under `root`.
-    Returns a sorted list of unique parent directories that contain a .meta.yml.
+    Discover recipe directories by looking for .meta.yml OR meta.yml under each immediate child
+    directory of `root`.
     """
     parents: set[Path] = set()
     for child in _immediate_child_dirs(root):
-        for p in child.rglob(".meta.yml"):
-            parents.add(p.parent.resolve())
+        for name in (".meta.yml", "meta.yml"):
+            for p in child.rglob(name):
+                parents.add(p.parent.resolve())
     return sorted(parents)
 
 
 def _find_cli_executable() -> str:
-    """
-    Return the path to the 'ogdc-runner' CLI if available, otherwise raise.
-    The test uses the CLI exclusively.
-    """
     exe = shutil.which("ogdc-runner")
     if exe:
         return exe
@@ -44,10 +43,6 @@ def _find_cli_executable() -> str:
 def _call_validate_with_cli(
     recipe_dir: Path, timeout: int, exe_path: str
 ) -> tuple[int, str]:
-    """
-    Run the CLI command `ogdc-runner validate-recipe <dir>` and return (rc, combined output).
-    Expects the ogdc-runner executable to be present at exe_path.
-    """
     cmd = [exe_path, "validate-recipe", str(recipe_dir)]
     try:
         proc = subprocess.run(
@@ -63,11 +58,7 @@ def _call_validate_with_cli(
 
 @pytest.fixture(scope="session")
 def recipes_root():
-    """
-    Yield the root path to search for recipes.
-    Defaults to TEST_RECIPES_PATH. Skip the tests if the path doesn't exist.
-    """
-    p = Path(TEST_RECIPES_PATH).resolve()
+    p = _tests_dir()
     if not p.exists():
         pytest.skip(f"Test recipes root does not exist: {p}")
     return p
@@ -75,10 +66,9 @@ def recipes_root():
 
 def test_validate_all_recipes_iterative(recipes_root):
     """
-    Validate every recipe found under the configured test area (any directory with .meta.yml).
-    Uses the ogdc-runner CLI exclusively. Collects all failures and fail once at the end with a combined report.
+    Validate every recipe found under the immediate subdirectories of the tests/ folder.
+    Uses the ogdc-runner CLI exclusively. Collects all failures and fails once at the end.
     """
-    # Ensure CLI is available
     try:
         exe = _find_cli_executable()
     except FileNotFoundError:
@@ -87,9 +77,13 @@ def test_validate_all_recipes_iterative(recipes_root):
         )
 
     dirs = discover_recipe_dirs_one_level_down(Path(recipes_root))
+    # Print discovered dirs so pytest -s shows what will be validated
+    print("Discovered recipe directories:")
+    for p in dirs:
+        print(" -", p)
     if not dirs:
         pytest.skip(
-            f"No recipes (.meta.yml) discovered under the immediate children of {recipes_root}"
+            f"No recipes (meta.yml or .meta.yml) discovered under immediate children of {recipes_root}"
         )
 
     failures = []
