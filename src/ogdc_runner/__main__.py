@@ -3,11 +3,14 @@ from __future__ import annotations
 import sys
 
 import click
+import requests
 from pydantic import ValidationError
 
-from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
 from ogdc_runner.recipe import get_recipe_config, stage_ogdc_recipe
+
+# TODO: make this configurable/default to prod URL
+OGDC_API_URL = "http://localhost:8000"
 
 
 @click.group
@@ -41,12 +44,21 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     RECIPE-PATH: Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
     or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
     """
-    with stage_ogdc_recipe(recipe_path) as recipe_dir:
-        submit_ogdc_recipe(
-            recipe_dir=recipe_dir,
-            wait=wait,
-            overwrite=overwrite,
-        )
+    response = requests.post(
+        url=f"{OGDC_API_URL}/submit",
+        json={
+            "recipe_path": recipe_path,
+            "overwrite": overwrite,
+        },
+    )
+
+    response.raise_for_status()
+
+    if wait:
+        msg = "TODO: implement `--wait` for the CLI"
+        raise NotImplementedError(msg)
+
+    print(response.json()["message"])
 
 
 @cli.command

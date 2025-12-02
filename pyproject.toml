@@ -35,6 +35,7 @@ dependencies = [
   "fastapi[standard]",
   "hera >=5.18.0",
   "fsspec",
+  "requests",
 ]
 
 [project.optional-dependencies]
