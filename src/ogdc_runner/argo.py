@@ -79,8 +79,10 @@ class ArgoManager:
             service_account_name=os.environ.get(
                 "ARGO_SERVICE_ACCOUNT_NAME", "argo-workflow"
             ),
+            # TODO: pick up service URL from envvar via helm?
             workflows_service_url=os.environ.get(
-                "ARGO_WORKFLOWS_SERVICE_URL", "http://localhost:2746"
+                "ARGO_WORKFLOWS_SERVICE_URL",
+                "http://qgnet-ogdc-argo-workflows-server.qgnet.svc.cluster.local:2746",
             ),
             runner_image=runner_image,
             runner_image_tag=runner_image_tag,
