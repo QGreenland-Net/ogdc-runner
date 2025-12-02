@@ -6,7 +6,6 @@ import click
 import requests
 from pydantic import ValidationError
 
-from ogdc_runner.argo import get_workflow_status
 from ogdc_runner.recipe import get_recipe_config, stage_ogdc_recipe
 
 # TODO: make this configurable/default to prod URL
@@ -69,7 +68,12 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
 )
 def check_workflow_status(workflow_name: str) -> None:
     """Check an argo workflow's status."""
-    status = get_workflow_status(workflow_name)
+    response = requests.get(
+        url=f"{OGDC_API_URL}/status/{workflow_name}",
+    )
+    response.raise_for_status()
+
+    status = response.json()["status"]
     print(f"Workflow {workflow_name} has status {status}.")
 
 
