@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import sys
+import time
 
 import click
 import requests
+from loguru import logger
 from pydantic import ValidationError
 
+from ogdc_runner.exceptions import OgdcWorkflowExecutionError
 from ogdc_runner.recipe import get_recipe_config, stage_ogdc_recipe
 
 # TODO: make this configurable/default to prod URL
@@ -15,6 +18,32 @@ OGDC_API_URL = "http://localhost:8000"
 @click.group
 def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
+
+
+def _get_workflow_status(workflow_name) -> str:
+    response = requests.get(
+        url=f"{OGDC_API_URL}/status/{workflow_name}",
+    )
+    response.raise_for_status()
+
+    status = response.json()["status"]
+
+    return status
+
+
+def _wait_for_workflow_completion(workflow_name: str) -> None:
+    while True:
+        status = _get_workflow_status(workflow_name)
+        if status:
+            logger.info(f"Workflow status: {status}")
+            # Terminal states
+            if status == "Failed":
+                raise OgdcWorkflowExecutionError(
+                    f"Workflow with name {workflow_name} failed."
+                )
+            if status == "Succeeded":
+                return
+        time.sleep(5)
 
 
 @cli.command
@@ -54,8 +83,11 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     response.raise_for_status()
 
     if wait:
-        msg = "TODO: implement `--wait` for the CLI"
-        raise NotImplementedError(msg)
+        workflow_name = response.json()["recipe_workflow_name"]
+        logger.info(
+            f"Workflow with name {workflow_name} submitted. Waiting for completion..."
+        )
+        _wait_for_workflow_completion(workflow_name)
 
     print(response.json()["message"])
 
@@ -68,12 +100,7 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
 )
 def check_workflow_status(workflow_name: str) -> None:
     """Check an argo workflow's status."""
-    response = requests.get(
-        url=f"{OGDC_API_URL}/status/{workflow_name}",
-    )
-    response.raise_for_status()
-
-    status = response.json()["status"]
+    status = _get_workflow_status(workflow_name)
     print(f"Workflow {workflow_name} has status {status}.")
 
 
