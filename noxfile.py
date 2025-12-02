@@ -31,7 +31,13 @@ def typecheck(session: nox.Session) -> None:
 def tests(session: nox.Session) -> None:
     """Run the unit and regular tests."""
     session.install(".[test]")
-    session.run("pytest", *session.posargs)
+    session.run(
+        "pytest",
+        *session.posargs,
+        # Set ARGO_WORKFLOWS_SERVICE_URL to point directly to exposed localhost
+        # URL for local development.
+        env={"ARGO_WORKFLOWS_SERVICE_URL": "http://localhost:2746"},
+    )
 
 
 @nox.session(reuse_venv=True)
