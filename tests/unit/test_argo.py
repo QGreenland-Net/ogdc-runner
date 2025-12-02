@@ -102,7 +102,10 @@ def test_ARGO_MANAGER_config_access(monkeypatch):
 
     assert config.namespace == "qgnet"
     assert config.service_account_name == "argo-workflow"
-    assert config.workflows_service_url == "http://localhost:2746"
+    assert (
+        config.workflows_service_url
+        == "http://qgnet-ogdc-argo-workflows-server.qgnet.svc.cluster.local:2746"
+    )
     assert config.runner_image == "ogdc-runner"
     assert config.runner_image_tag == "latest"
     assert config.image_pull_policy == "Never"
