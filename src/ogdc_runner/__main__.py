@@ -75,6 +75,11 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     response = requests.post(
         url=f"{OGDC_API_URL}/submit",
         json={
+            # TODO: support _local_ paths? Or should we force a remote recipe
+            # path for this service-ification? Supporting a local path would
+            # maybe require zipping up the contents of a dir and POSTing it as
+            # data? Instead of `recipe_path`, it would be `recipe_data`?
+            # Update click docs/docstring above depending on decision.
             "recipe_path": recipe_path,
             "overwrite": overwrite,
         },
