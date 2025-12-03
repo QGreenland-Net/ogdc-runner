@@ -8,7 +8,7 @@ import requests
 from loguru import logger
 from pydantic import ValidationError
 
-from ogdc_runner.exceptions import OgdcWorkflowExecutionError
+from ogdc_runner.exceptions import OgdcServiceApiError, OgdcWorkflowExecutionError
 from ogdc_runner.recipe import get_recipe_config, stage_ogdc_recipe
 
 # TODO: make this configurable/default to prod URL
@@ -20,11 +20,25 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
+def _check_ogdc_api_error(response: requests.Response) -> None:
+    if not response.ok:
+        try:
+            detail = response.json()["detail"]
+        except Exception:
+            detail = "No error details."
+        err_msg = (
+            f"API Error with status code {response.status_code}: {response.reason}."
+            f"\nAPI Error details: {detail}"
+        )
+        raise OgdcServiceApiError(err_msg)
+
+
 def _get_workflow_status(workflow_name: str) -> str:
     response = requests.get(
         url=f"{OGDC_API_URL}/status/{workflow_name}",
     )
-    response.raise_for_status()
+
+    _check_ogdc_api_error(response)
 
     status = response.json()["status"]
 
@@ -85,7 +99,7 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
         },
     )
 
-    response.raise_for_status()
+    _check_ogdc_api_error(response)
 
     if wait:
         workflow_name = response.json()["recipe_workflow_name"]

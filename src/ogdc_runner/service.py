@@ -8,10 +8,9 @@ into one or more Argo workflows that are executed.
 from __future__ import annotations
 
 import datetime as dt
-from typing import Literal
 
 import pydantic
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 from ogdc_runner import __version__
 from ogdc_runner.api import submit_ogdc_recipe
@@ -37,29 +36,31 @@ class SubmitRecipeInput(pydantic.BaseModel):
 
 
 class SubmitRecipeResponse(pydantic.BaseModel):
-    status: Literal["success", "failed"]
     message: str
-    recipe_workflow_name: str
+    recipe_workflow_name: str | None
 
 
 @app.post("/submit")
 def submit(submit_recipe_input: SubmitRecipeInput) -> SubmitRecipeResponse:
     """Submit a recipe to OGDC for execution."""
-    with stage_ogdc_recipe(submit_recipe_input.recipe_path) as recipe_dir:
-        recipe_workflow_name = submit_ogdc_recipe(
-            recipe_dir=recipe_dir,
-            # Submitting a recipe should never wait - the api should be
-            # responsive and async.
-            wait=False,
-            overwrite=submit_recipe_input.overwrite,
-        )
-        return SubmitRecipeResponse(
-            status="success",
-            message=f"Successfully submitted recipe with {recipe_workflow_name=}",
-            recipe_workflow_name=recipe_workflow_name,
-        )
-
-    # TODO: handle failure case
+    try:
+        with stage_ogdc_recipe(submit_recipe_input.recipe_path) as recipe_dir:
+            recipe_workflow_name = submit_ogdc_recipe(
+                recipe_dir=recipe_dir,
+                # Submitting a recipe should never wait - the api should be
+                # responsive and async.
+                wait=False,
+                overwrite=submit_recipe_input.overwrite,
+            )
+            return SubmitRecipeResponse(
+                message=f"Successfully submitted recipe with {recipe_workflow_name=}",
+                recipe_workflow_name=recipe_workflow_name,
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to submit recipe with error: {e}.",
+        ) from e
 
 
 class StatusResponse(pydantic.BaseModel):

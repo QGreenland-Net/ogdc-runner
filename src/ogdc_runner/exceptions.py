@@ -29,3 +29,9 @@ class OgdcInvalidRecipeConfig(OgdcRunnerException):
     """Exception raised if invalid OGDC recipe configuration is encountered."""
 
     pass
+
+
+class OgdcServiceApiError(OgdcRunnerException):
+    """Exception raised when interacting with the OGDC Service API."""
+
+    pass
