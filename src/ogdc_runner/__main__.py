@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import os
 import sys
 import time
 
@@ -11,8 +12,16 @@ from pydantic import ValidationError
 from ogdc_runner.exceptions import OgdcServiceApiError, OgdcWorkflowExecutionError
 from ogdc_runner.recipe import get_recipe_config, stage_ogdc_recipe
 
-# TODO: make this configurable/default to prod URL
-OGDC_API_URL = "http://localhost:8000"
+# Default the OGDC API URL based on the environment, falling back to the prod
+# URL.
+env = os.environ.get("ENVIRONMENT")
+if env == "local":
+    default_url = "http://localhost:8000"
+elif env == "dev":
+    default_url = "http://api.test.dataone.org/ogdc"
+else:
+    default_url = "http://api.dataone.org/ogdc"
+OGDC_API_URL = os.environ.get("OGDC_API_URL", default_url)
 
 
 @click.group
