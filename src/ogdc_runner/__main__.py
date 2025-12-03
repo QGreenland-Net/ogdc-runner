@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import datetime as dt
 import sys
 import time
 
 import click
 import requests
-from loguru import logger
 from pydantic import ValidationError
 
 from ogdc_runner.exceptions import OgdcServiceApiError, OgdcWorkflowExecutionError
@@ -49,7 +49,7 @@ def _wait_for_workflow_completion(workflow_name: str) -> None:
     while True:
         status = _get_workflow_status(workflow_name)
         if status:
-            logger.info(f"Workflow status: {status}")
+            print(f"Workflow status ({dt.datetime.now():%Y-%m-%dT%H:%m:%S}): {status}")
             # Terminal states
             if status == "Failed":
                 raise OgdcWorkflowExecutionError(
@@ -103,7 +103,7 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
 
     if wait:
         workflow_name = response.json()["recipe_workflow_name"]
-        logger.info(
+        print(
             f"Workflow with name {workflow_name} submitted. Waiting for completion..."
         )
         _wait_for_workflow_completion(workflow_name)
