@@ -57,8 +57,10 @@ class ArgoManager:
 
     def _initialize_config(self) -> ArgoConfig:
         """Initialize Argo configuration from environment variables with defaults."""
-        is_dev_environment = os.environ.get("ENVIRONMENT") == "dev"
-        is_local_environment = os.environ.get("ENVIRONMENT") == "local"
+        env = os.environ.get("ENVIRONMENT")
+        is_dev_environment = env == "dev"
+        is_local_environment = env == "local"
+        logger.info(f"Using ENVIRONMENT={env}")
 
         # Default runner image configuration
         runner_image = (
