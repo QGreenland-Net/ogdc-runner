@@ -48,7 +48,8 @@ def submit(submit_recipe_input: SubmitRecipeInput) -> SubmitRecipeResponse:
     with stage_ogdc_recipe(submit_recipe_input.recipe_path) as recipe_dir:
         recipe_workflow_name = submit_ogdc_recipe(
             recipe_dir=recipe_dir,
-            # TODO: consider how to handle 'wait'.
+            # Submitting a recipe should never wait - the api should be
+            # responsive and async.
             wait=False,
             overwrite=submit_recipe_input.overwrite,
         )
