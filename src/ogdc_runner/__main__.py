@@ -109,15 +109,12 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     )
 
     _check_ogdc_api_error(response)
+    print(response.json()["message"])
 
     if wait:
         workflow_name = response.json()["recipe_workflow_name"]
-        print(
-            f"Workflow with name {workflow_name} submitted. Waiting for completion..."
-        )
+        print("Waiting for completion...")
         _wait_for_workflow_completion(workflow_name)
-
-    print(response.json()["message"])
 
 
 @cli.command
