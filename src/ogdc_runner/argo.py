@@ -76,15 +76,20 @@ class ArgoManager:
         elif is_local_environment:
             image_pull_policy = "Never"
 
+        # Argo workflows service URL
+        workflows_service_url = os.environ.get(
+            "ARGO_WORKFLOWS_SERVICE_URL",
+            # Default to locally-hosted argo workflows.
+            "http://localhost:2746",
+        )
+        logger.info(f"Using ARGO_WORKFLOWS_SERVICE_URL={workflows_service_url}")
+
         return ArgoConfig(
             namespace=os.environ.get("ARGO_NAMESPACE", "qgnet"),
             service_account_name=os.environ.get(
                 "ARGO_SERVICE_ACCOUNT_NAME", "argo-workflow"
             ),
-            workflows_service_url=os.environ.get(
-                "ARGO_WORKFLOWS_SERVICE_URL",
-                "http://qgnet-ogdc-argo-workflows-server.qgnet.svc.cluster.local:2746",
-            ),
+            workflows_service_url=workflows_service_url,
             runner_image=runner_image,
             runner_image_tag=runner_image_tag,
             image_pull_policy=image_pull_policy,

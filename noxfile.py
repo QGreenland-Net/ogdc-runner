@@ -34,9 +34,6 @@ def tests(session: nox.Session) -> None:
     session.run(
         "pytest",
         *session.posargs,
-        # Set ARGO_WORKFLOWS_SERVICE_URL to point directly to exposed localhost
-        # URL for local development.
-        env={"ARGO_WORKFLOWS_SERVICE_URL": "http://localhost:2746"},
     )
 
 
