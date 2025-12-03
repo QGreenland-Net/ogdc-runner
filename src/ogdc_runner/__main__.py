@@ -92,17 +92,13 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     """
     Submit a recipe to OGDC for execution.
 
-    RECIPE-PATH: Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
-    or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
+    RECIPE-PATH: Path to the recipe directory. Use an fsspec-compatible string
+    representing a remote and publicly accessible recipe directory (e.g., for
+    GitHub, 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
     """
     response = requests.post(
         url=f"{OGDC_API_URL}/submit",
         json={
-            # TODO: support _local_ paths? Or should we force a remote recipe
-            # path for this service-ification? Supporting a local path would
-            # maybe require zipping up the contents of a dir and POSTing it as
-            # data? Instead of `recipe_path`, it would be `recipe_data`?
-            # Update click docs/docstring above depending on decision.
             "recipe_path": recipe_path,
             "overwrite": overwrite,
         },
