@@ -66,6 +66,8 @@ def docs(session: nox.Session) -> None:
         return
 
     shared_args = (
+        "--port",  # Use port 8080
+        "8080",  # Use port 8080
         "-n",  # nitpicky mode
         "-T",  # full tracebacks
         f"-b={args.builder}",
