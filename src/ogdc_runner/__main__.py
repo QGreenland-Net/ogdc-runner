@@ -30,6 +30,7 @@ def cli() -> None:
 
 
 def _check_ogdc_api_error(response: requests.Response) -> None:
+    """Raise an `OgdcServiceApiError` if the response is not OK."""
     if not response.ok:
         try:
             detail = response.json()["detail"]
@@ -43,6 +44,7 @@ def _check_ogdc_api_error(response: requests.Response) -> None:
 
 
 def _get_workflow_status(workflow_name: str) -> str:
+    """Get the given workflow's status as a string."""
     response = requests.get(
         url=f"{OGDC_API_URL}/status/{workflow_name}",
     )
@@ -55,6 +57,7 @@ def _get_workflow_status(workflow_name: str) -> str:
 
 
 def _wait_for_workflow_completion(workflow_name: str) -> None:
+    """Wait for the given workflow to complete."""
     while True:
         status = _get_workflow_status(workflow_name)
         if status:
