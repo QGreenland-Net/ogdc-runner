@@ -1,4 +1,6 @@
-# Docker image for running gdal/ogr and fetch (wget) commands for ogdc recipes.
+# Docker image for:
+#  * Running gdal/ogr and fetch (wget) commands for ogdc recipes.
+#  * Provides the OGDC service interface (default CMD).
 # WARNING: this image *MUST NOT* be based on busybox/alpine linux due to a known
 # networking issue in non-local environments.  For context, see:
 # https://github.com/QGreenland-Net/ogdc-helm/issues/31
@@ -12,4 +14,5 @@ RUN python -m venv .venv && . ./.venv/bin/activate && pip install --editable .
 
 EXPOSE 8000
 
-CMD . ./.venv/bin/activate && fastapi dev --port 8000 --host 0.0.0.0 src/ogdc_runner/service.py
+# Default to running the production fastapi server
+CMD . ./.venv/bin/activate && fastapi run --port 8000 --host 0.0.0.0 src/ogdc_runner/service.py
