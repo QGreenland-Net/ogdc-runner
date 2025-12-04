@@ -151,7 +151,7 @@ def validate_all_recipes(recipes_location: str, ref: str) -> None:
                     print(f"  - {name}")
                 sys.exit(1)
     except subprocess.CalledProcessError as e:
-        print(f"Failed to clone repository: {e}")
+        print(f"Failed to clone repository: {e}\n{e.stderr}")
         sys.exit(1)
 
 
