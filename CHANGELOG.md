@@ -1,3 +1,7 @@
+# v0.3.0
+
+- Create service interface for ogdc-runner.
+
 # v0.2.0
 
 - Add support for both `local` (via rancher-desktop) and `dev` environments

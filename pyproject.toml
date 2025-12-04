@@ -6,7 +6,7 @@ authors = [
   { name = "Trey Stafford", email = "trey.stafford@colorado.edu" },
   { name = "Robyn Marowitz", email = "robyn.marowitz@colorado.edu" },
 ]
-version = "0.2.0"
+version = "0.3.0"
 description = "Defines OGDC recipe API(s) and submits recipes to OGDC for execution"
 readme = "README.md"
 license.file = "LICENSE"
@@ -25,16 +25,20 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Typing :: Typed",
 ]
+# TODO: separate the packages more clearly? Does it make sense to have one
+# python project for the CLI and the service?
 dependencies = [
   "click >=8",
-  "hera >=5.18.0",
   "pydantic >=2.7.1",
   "pyyaml",
-  "fsspec",
   "loguru",
+  "fastapi[standard]",
+  "hera >=5.18.0",
+  "fsspec",
 ]
 
 [project.optional-dependencies]
+
 # NOTE: "test" and "dev" are duplicated; why do we need both?
 test = [
   "mypy ~=1.10.0",
@@ -76,7 +80,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.bumpversion]
-current_version = "0.2.0"
+current_version = "0.3.0"
 commit = false
 tag = false
 
