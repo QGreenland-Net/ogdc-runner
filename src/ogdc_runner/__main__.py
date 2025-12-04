@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import click
 from pydantic import ValidationError
@@ -78,3 +79,75 @@ def validate_recipe(recipe_path: str) -> None:
             print(f"Recipe {recipe_path} is invalid.")
             print(err)
             sys.exit(1)
+
+
+@cli.command
+@click.argument(
+    "recipes_location",
+    required=True,
+    default="github://qgreenland-net:ogdc-recipes@main/recipes",
+    metavar="RECIPES-LOCATION",
+    type=str,
+)
+def validate_all_recipes(recipes_location: str) -> None:
+    """Validate all OGDC recipes in a directory or git repository.
+
+    # NOTE: may remove local due to conversations yesterday (12/03/2025)
+    RECIPES-LOCATION can be:
+    - A local directory path containing recipe subdirectories
+    - A github:// URL like github://qgreenland-net:ogdc-recipes@main/recipes
+
+    Looks for all directories containing meta.yml or .meta.yml files
+    that are exactly 2 levels deep from the base path.
+    """
+    with stage_ogdc_recipe(recipes_location) as base_dir:
+        # find recipes
+        recipe_dirs = _find_recipe_dirs(base_dir)
+
+        if not recipe_dirs:
+            print(f"No recipes found in {recipes_location}")
+            sys.exit(1)
+
+        print(f"Found {len(recipe_dirs)} recipes to validate\n")
+
+        invalid_recipes = []
+
+        for recipe_dir in recipe_dirs:
+            recipe_name = recipe_dir.relative_to(base_dir)
+            try:
+                get_recipe_config(recipe_dir)
+                print(f"✓ {recipe_name}")
+            except ValidationError as err:
+                print(f"✗ {recipe_name}")
+                print(f"  Error: {err}\n")
+                invalid_recipes.append((recipe_name, str(err)))
+
+        print("\nValidation Results:")
+        print(f"  Valid: {len(recipe_dirs) - len(invalid_recipes)}")
+        print(f"  Invalid: {len(invalid_recipes)}")
+
+        if invalid_recipes:
+            print("\nFailed recipes:")
+            for name, _ in invalid_recipes:
+                print(f"  - {name}")
+            sys.exit(1)
+
+
+def _find_recipe_dirs(base_path: Path) -> list[Path]:
+    """Find all directories containing meta.yml or .meta.yml exactly 2 levels deep."""
+    recipe_dirs = []
+
+    # Look for directories exactly 2 levels deep with meta.yml or .meta.yml
+    for child in base_path.iterdir():
+        if not child.is_dir():
+            continue
+        for grandchild in child.iterdir():
+            if not grandchild.is_dir():
+                continue
+            # Check if this directory has meta.yml or .meta.yml
+            if (grandchild / "meta.yml").exists() or (
+                grandchild / ".meta.yml"
+            ).exists():
+                recipe_dirs.append(grandchild)
+
+    return sorted(recipe_dirs)
