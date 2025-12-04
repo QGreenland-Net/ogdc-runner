@@ -96,7 +96,7 @@ def validate_recipe(recipe_path: str) -> None:
 @click.option(
     "--ref",
     default="main",
-    help="Git reference (branch, tag, or commit) to validate",
+    help="Git reference branch or tag to validate",
     type=str,
 )
 def validate_all_recipes(recipes_location: str, ref: str) -> None:
@@ -140,7 +140,7 @@ def validate_all_recipes(recipes_location: str, ref: str) -> None:
                     print(f"  Error: {err}\n")
                     invalid_recipes.append((recipe_name, str(err)))
 
-            # Summary
+            # output
             print("\nValidation Results:")
             print(f"  Valid: {len(recipe_dirs) - len(invalid_recipes)}")
             print(f"  Invalid: {len(invalid_recipes)}")
@@ -164,7 +164,7 @@ def clone_recipes_repo(repo_url: str, ref: str = "main") -> Generator[Path, None
         ref: Git ref like 'main' or 'develop'
     """
     # Validate repo_url format
-    if not repo_url.startswith("https://", "git://", "git@"):
+    if not repo_url.startswith(("https://", "git://", "git@")):
         raise ValueError(
             f"Invalid repo_url '{repo_url}'. Must start with 'https://', 'git://', or 'git@'."
         )
@@ -180,16 +180,13 @@ def clone_recipes_repo(repo_url: str, ref: str = "main") -> Generator[Path, None
 
 
 def _find_recipe_dirs(recipes_dir: Path) -> list[Path]:
-    """Find all directories containing meta.yml or .meta.yml in the recipes directory."""
+    """Find all directories containing meta.yml in the recipes directory."""
     recipe_dirs = set()
 
-    # Look for meta files at 1 or 2 levels deep under recipes/
+    # Look for meta files at 1 level under recipes/
     for meta_name in ["meta.yml"]:
         # recipes/seal-tags/meta.yml (1 level)
         for meta_file in recipes_dir.glob(f"*/{meta_name}"):
-            recipe_dirs.add(meta_file.parent)
-        # recipes/category/seal-tags/meta.yml (2 levels)
-        for meta_file in recipes_dir.glob(f"*/*/{meta_name}"):
             recipe_dirs.add(meta_file.parent)
 
     return sorted(recipe_dirs)
