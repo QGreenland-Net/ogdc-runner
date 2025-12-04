@@ -30,7 +30,7 @@ def version() -> VersionResponse:
     return VersionResponse()
 
 
-class SubmitRecipeInput(pydantic.BaseModel):
+class SubmitRecipeRequest(pydantic.BaseModel):
     recipe_path: str
     overwrite: bool = False
 
@@ -41,16 +41,16 @@ class SubmitRecipeResponse(pydantic.BaseModel):
 
 
 @app.post("/submit")
-def submit(submit_recipe_input: SubmitRecipeInput) -> SubmitRecipeResponse:
+def submit(submit_recipe_request: SubmitRecipeRequest) -> SubmitRecipeResponse:
     """Submit a recipe to OGDC for execution."""
     try:
-        with stage_ogdc_recipe(submit_recipe_input.recipe_path) as recipe_dir:
+        with stage_ogdc_recipe(submit_recipe_request.recipe_path) as recipe_dir:
             recipe_workflow_name = submit_ogdc_recipe(
                 recipe_dir=recipe_dir,
                 # Submitting a recipe should never wait - the api should be
                 # responsive and async.
                 wait=False,
-                overwrite=submit_recipe_input.overwrite,
+                overwrite=submit_recipe_request.overwrite,
             )
             return SubmitRecipeResponse(
                 message=f"Successfully submitted recipe with {recipe_workflow_name=}",
