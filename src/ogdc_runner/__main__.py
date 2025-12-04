@@ -93,9 +93,9 @@ def validate_all_recipes(recipes_location: str) -> None:
     """Validate all OGDC recipes in a directory or git repository.
 
     # NOTE: may remove local due to conversations yesterday (12/03/2025)
-    RECIPES-LOCATION can be:
-    - A local directory path containing recipe subdirectories
-    - A github:// URL like github://qgreenland-net:ogdc-recipes@main/recipes
+    RECIPE-PATH:
+     - Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
+     - fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes').
 
     Looks for all directories containing meta.yml or .meta.yml files
     that are exactly 2 levels deep from the base path.
@@ -135,19 +135,15 @@ def validate_all_recipes(recipes_location: str) -> None:
 
 def _find_recipe_dirs(base_path: Path) -> list[Path]:
     """Find all directories containing meta.yml or .meta.yml exactly 2 levels deep."""
-    recipe_dirs = []
+    recipe_dirs = set()
 
-    # Look for directories exactly 2 levels deep with meta.yml or .meta.yml
-    for child in base_path.iterdir():
-        if not child.is_dir():
-            continue
-        for grandchild in child.iterdir():
-            if not grandchild.is_dir():
-                continue
-            # Check if this directory has meta.yml or .meta.yml
-            if (grandchild / "meta.yml").exists() or (
-                grandchild / ".meta.yml"
-            ).exists():
-                recipe_dirs.append(grandchild)
+    # Look for meta files
+    for meta_name in ["meta.yml", ".meta.yml"]:
+        # Direct children (1 level)
+        for meta_file in base_path.glob(f"*/{meta_name}"):
+            recipe_dirs.add(meta_file.parent)
+        # Grandchildren (2 levels)
+        for meta_file in base_path.glob(f"*/*/{meta_name}"):
+            recipe_dirs.add(meta_file.parent)
 
     return sorted(recipe_dirs)
