@@ -163,6 +163,15 @@ def clone_recipes_repo(repo_url: str, ref: str = "main") -> Generator[Path, None
         repo_url: Git repository URL
         ref: Git ref like 'main' or 'develop'
     """
+    # Validate repo_url format
+    if not (
+        repo_url.startswith("https://")
+        or repo_url.startswith("git://")
+        or repo_url.startswith("git@")
+    ):
+        raise ValueError(
+            f"Invalid repo_url '{repo_url}'. Must start with 'https://', 'git://', or 'git@'."
+        )
     with tempfile.TemporaryDirectory() as tmpdir:
         subprocess.run(
             ["git", "clone", "--depth", "1", "--branch", ref, repo_url, tmpdir],
