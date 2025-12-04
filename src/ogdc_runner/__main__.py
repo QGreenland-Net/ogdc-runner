@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import tempfile
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -155,12 +156,12 @@ def validate_all_recipes(recipes_location: str, ref: str) -> None:
 
 
 @contextmanager
-def clone_recipes_repo(repo_url: str, ref: str = "main"):
+def clone_recipes_repo(repo_url: str, ref: str = "main") -> Generator[Path, None, None]:
     """Clone a git repository at a specific ref.
 
     Args:
         repo_url: Git repository URL
-        ref: Git ref like 'main', 'develop', or a commit SHA
+        ref: Git ref like 'main' or 'develop'
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         subprocess.run(

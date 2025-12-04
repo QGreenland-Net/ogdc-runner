@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 
@@ -20,10 +21,18 @@ def _find_cli_executable() -> str:
 
 
 def _call_validate_all_with_cli(
-    recipes_location: str, timeout: int, exe_path: str
+    ref: str, timeout: int, exe_path: str, repo_url: str | None = None
 ) -> tuple[int, str]:
     """Call the validate-all-recipes CLI command."""
-    cmd = [exe_path, "validate-all-recipes", recipes_location]
+    cmd = [exe_path, "validate-all-recipes"]
+
+    # Add repo URL if provided (otherwise uses default)
+    if repo_url:
+        cmd.append(repo_url)
+
+    # Add ref option
+    cmd.extend(["--ref", ref])
+
     try:
         proc = subprocess.run(
             cmd, check=False, capture_output=True, text=True, timeout=timeout
@@ -36,24 +45,18 @@ def _call_validate_all_with_cli(
         return 124, f"Timeout after {timeout}s"
 
 
-# NOTE: other branches could be added here
-@pytest.mark.parametrize("ref", ["main"])
-def test_validate_all_recipes_at_ref(ref):
-    """
-    Validate recipes at different git refs.
-    """
+def test_validate_all_recipes_at_main():
+    """Validate recipes at main (or OGDC_RECIPES_REF if set)."""
+    ref = os.environ.get("OGDC_RECIPES_REF", "main")
     exe = _find_cli_executable()
-
-    recipes_location = f"github://qgreenland-net:ogdc-recipes@{ref}/recipes"
 
     # Generous timeout since this validates multiple recipes and clones the repo
     timeout = PER_RECIPE_TIMEOUT * 10
 
-    rc, out = _call_validate_all_with_cli(
-        recipes_location, timeout=timeout, exe_path=exe
-    )
+    rc, out = _call_validate_all_with_cli(ref, timeout=timeout, exe_path=exe)
 
     # Print output for visibility
+    print(f"\nValidating recipes at ref: {ref}")
     print(f"\n{out}")
 
     if rc != 0:
