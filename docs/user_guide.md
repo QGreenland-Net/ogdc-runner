@@ -31,6 +31,7 @@ Options:
 Commands:
   check-workflow-status  Check an argo workflow's status.
   submit                 Submit a recipe to OGDC for execution.
+  validate-all-recipes   Validate all OGDC recipes in a git...
   validate-recipe        Validate an OGDC recipe directory.
 ```
 
