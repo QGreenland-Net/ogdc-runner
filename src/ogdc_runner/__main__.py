@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import subprocess
 import sys
+import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 import click
@@ -84,66 +87,103 @@ def validate_recipe(recipe_path: str) -> None:
 @cli.command
 @click.argument(
     "recipes_location",
-    required=True,
-    default="github://qgreenland-net:ogdc-recipes@main/recipes",
+    required=False,
+    default="https://github.com/qgreenland-net/ogdc-recipes.git",
     metavar="RECIPES-LOCATION",
     type=str,
 )
-def validate_all_recipes(recipes_location: str) -> None:
-    """Validate all OGDC recipes in a directory or git repository.
+@click.option(
+    "--ref",
+    default="main",
+    help="Git reference (branch, tag, or commit) to validate",
+    type=str,
+)
+def validate_all_recipes(recipes_location: str, ref: str) -> None:
+    """Validate all OGDC recipes in a git repository.
 
-    # NOTE: may remove local due to conversations yesterday (12/03/2025)
-    RECIPE-PATH:
-     - Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
-     - fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes').
+    RECIPES-LOCATION: Git repository URL (default: https://github.com/qgreenland-net/ogdc-recipes.git)
 
-    Looks for all directories containing meta.yml or .meta.yml files
-    that are exactly 2 levels deep from the base path.
+    Examples:
+      ogdc-runner validate-all-recipes
+      ogdc-runner validate-all-recipes --ref develop
+      ogdc-runner validate-all-recipes https://github.com/myorg/ogdc-recipes.git --ref feature-branch
     """
-    with stage_ogdc_recipe(recipes_location) as base_dir:
-        # find recipes
-        recipe_dirs = _find_recipe_dirs(base_dir)
+    print(f"Cloning {recipes_location}@{ref}...")
 
-        if not recipe_dirs:
-            print(f"No recipes found in {recipes_location}")
-            sys.exit(1)
+    try:
+        with clone_recipes_repo(recipes_location, ref) as repo_dir:
+            recipes_dir = repo_dir / "recipes"
 
-        print(f"Found {len(recipe_dirs)} recipes to validate\n")
+            if not recipes_dir.exists():
+                print("No 'recipes' directory found in repository")
+                sys.exit(1)
 
-        invalid_recipes = []
+            # Find all recipe directories
+            recipe_dirs = _find_recipe_dirs(recipes_dir)
 
-        for recipe_dir in recipe_dirs:
-            recipe_name = recipe_dir.relative_to(base_dir)
-            try:
-                get_recipe_config(recipe_dir)
-                print(f"✓ {recipe_name}")
-            except ValidationError as err:
-                print(f"✗ {recipe_name}")
-                print(f"  Error: {err}\n")
-                invalid_recipes.append((recipe_name, str(err)))
+            if not recipe_dirs:
+                print("No recipes found in recipes directory")
+                sys.exit(1)
 
-        print("\nValidation Results:")
-        print(f"  Valid: {len(recipe_dirs) - len(invalid_recipes)}")
-        print(f"  Invalid: {len(invalid_recipes)}")
+            print(f"Found {len(recipe_dirs)} recipes to validate\n")
 
-        if invalid_recipes:
-            print("\nFailed recipes:")
-            for name, _ in invalid_recipes:
-                print(f"  - {name}")
-            sys.exit(1)
+            invalid_recipes = []
+
+            for recipe_dir in recipe_dirs:
+                recipe_name = recipe_dir.relative_to(recipes_dir)
+                try:
+                    get_recipe_config(recipe_dir)
+                    print(f"✓ {recipe_name}")
+                except ValidationError as err:
+                    print(f"✗ {recipe_name}")
+                    print(f"  Error: {err}\n")
+                    invalid_recipes.append((recipe_name, str(err)))
+
+            # Summary
+            print("\nValidation Results:")
+            print(f"  Valid: {len(recipe_dirs) - len(invalid_recipes)}")
+            print(f"  Invalid: {len(invalid_recipes)}")
+
+            if invalid_recipes:
+                print("\nFailed recipes:")
+                for name, _ in invalid_recipes:
+                    print(f"  - {name}")
+                sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to clone repository: {e}")
+        sys.exit(1)
 
 
-def _find_recipe_dirs(base_path: Path) -> list[Path]:
-    """Find all directories containing meta.yml or .meta.yml exactly 2 levels deep."""
+@contextmanager
+def clone_recipes_repo(repo_url: str, ref: str = "main"):
+    """Clone a git repository at a specific ref.
+
+    Args:
+        repo_url: Git repository URL
+        ref: Git ref like 'main', 'develop', or a commit SHA
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        subprocess.run(
+            ["git", "clone", "--depth", "1", "--branch", ref, repo_url, tmpdir],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        yield Path(tmpdir)
+
+
+def _find_recipe_dirs(recipes_dir: Path) -> list[Path]:
+    """Find all directories containing meta.yml or .meta.yml in the recipes directory."""
     recipe_dirs = set()
 
-    # Look for meta files
+    # Look for meta files at 1 or 2 levels deep under recipes/
     for meta_name in ["meta.yml", ".meta.yml"]:
-        # Direct children (1 level)
-        for meta_file in base_path.glob(f"*/{meta_name}"):
+        # recipes/seal-tags/meta.yml (1 level)
+        for meta_file in recipes_dir.glob(f"*/{meta_name}"):
             recipe_dirs.add(meta_file.parent)
-        # Grandchildren (2 levels)
-        for meta_file in base_path.glob(f"*/*/{meta_name}"):
+        # recipes/category/seal-tags/meta.yml (2 levels)
+        for meta_file in recipes_dir.glob(f"*/*/{meta_name}"):
             recipe_dirs.add(meta_file.parent)
 
     return sorted(recipe_dirs)
