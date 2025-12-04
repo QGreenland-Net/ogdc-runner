@@ -164,11 +164,7 @@ def clone_recipes_repo(repo_url: str, ref: str = "main") -> Generator[Path, None
         ref: Git ref like 'main' or 'develop'
     """
     # Validate repo_url format
-    if not (
-        repo_url.startswith("https://")
-        or repo_url.startswith("git://")
-        or repo_url.startswith("git@")
-    ):
+    if not repo_url.startswith("https://", "git://", "git@"):
         raise ValueError(
             f"Invalid repo_url '{repo_url}'. Must start with 'https://', 'git://', or 'git@'."
         )
