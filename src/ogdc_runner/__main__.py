@@ -179,7 +179,7 @@ def _find_recipe_dirs(recipes_dir: Path) -> list[Path]:
     recipe_dirs = set()
 
     # Look for meta files at 1 or 2 levels deep under recipes/
-    for meta_name in ["meta.yml", ".meta.yml"]:
+    for meta_name in ["meta.yml"]:
         # recipes/seal-tags/meta.yml (1 level)
         for meta_file in recipes_dir.glob(f"*/{meta_name}"):
             recipe_dirs.add(meta_file.parent)
