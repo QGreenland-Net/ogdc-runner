@@ -7,7 +7,7 @@ import subprocess
 import pytest
 
 # Per-recipe timeout in seconds
-PER_RECIPE_TIMEOUT = 600
+PER_RECIPE_TIMEOUT = 120
 
 
 def _find_cli_executable() -> str:
