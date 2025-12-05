@@ -17,7 +17,11 @@ from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
 from ogdc_runner.recipe import stage_ogdc_recipe
 
-app = FastAPI(docs_url="/")
+app = FastAPI(
+    docs_url="/",
+    version=__version__,
+    title="Open Geospatial Data Cloud (OGDC) API",
+)
 
 
 class VersionResponse(pydantic.BaseModel):
