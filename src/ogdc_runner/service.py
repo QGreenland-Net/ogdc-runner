@@ -8,20 +8,35 @@ into one or more Argo workflows that are executed.
 from __future__ import annotations
 
 import datetime as dt
+from contextlib import asynccontextmanager
+from typing import Annotated
 
 import pydantic
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from sqlmodel import Session
 
 from ogdc_runner import __version__
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
+from ogdc_runner.db import create_db_and_tables, get_session
 from ogdc_runner.recipe import stage_ogdc_recipe
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):  # type: ignore[no-untyped-def]
+    create_db_and_tables()
+    yield
+
 
 app = FastAPI(
     docs_url="/",
     version=__version__,
     title="Open Geospatial Data Cloud (OGDC) API",
+    lifespan=lifespan,
 )
+
+
+SessionDep = Annotated[Session, Depends(get_session)]
 
 
 class VersionResponse(pydantic.BaseModel):
