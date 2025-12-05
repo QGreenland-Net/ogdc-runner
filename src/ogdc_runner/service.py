@@ -70,7 +70,7 @@ def submit(submit_recipe_request: SubmitRecipeRequest) -> SubmitRecipeResponse:
 class StatusResponse(pydantic.BaseModel):
     recipe_workflow_name: str
     status: str | None
-    timestamp: dt.datetime = dt.datetime.now()
+    timestamp: dt.datetime = pydantic.Field(default_factory=dt.datetime.now)
 
 
 @app.get("/status/{recipe_workflow_name}")
