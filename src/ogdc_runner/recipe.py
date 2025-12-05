@@ -107,8 +107,8 @@ def validate_all_recipes_in_repo(repo_url: str, ref: str = "main") -> None:
         recipe_dirs = find_recipe_dirs(recipes_dir)
 
         if not recipe_dirs:
-            print("No recipes found in recipes directory")
-            sys.exit(1)
+            msg = "No recipes found in recipes directory"
+            raise OgdcInvalidRecipeDir(msg)
 
         print(f"Found {len(recipe_dirs)} recipes to validate\n")
 
