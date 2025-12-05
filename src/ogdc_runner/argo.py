@@ -57,8 +57,10 @@ class ArgoManager:
 
     def _initialize_config(self) -> ArgoConfig:
         """Initialize Argo configuration from environment variables with defaults."""
-        is_dev_environment = os.environ.get("ENVIRONMENT") == "dev"
-        is_local_environment = os.environ.get("ENVIRONMENT") == "local"
+        env = os.environ.get("ENVIRONMENT")
+        is_dev_environment = env == "dev"
+        is_local_environment = env == "local"
+        logger.info(f"Using ENVIRONMENT={env}")
 
         # Default runner image configuration
         runner_image = (
@@ -74,14 +76,20 @@ class ArgoManager:
         elif is_local_environment:
             image_pull_policy = "Never"
 
+        # Argo workflows service URL
+        workflows_service_url = os.environ.get(
+            "ARGO_WORKFLOWS_SERVICE_URL",
+            # Default to locally-hosted argo workflows.
+            "http://localhost:2746",
+        )
+        logger.info(f"Using ARGO_WORKFLOWS_SERVICE_URL={workflows_service_url}")
+
         return ArgoConfig(
             namespace=os.environ.get("ARGO_NAMESPACE", "qgnet"),
             service_account_name=os.environ.get(
                 "ARGO_SERVICE_ACCOUNT_NAME", "argo-workflow"
             ),
-            workflows_service_url=os.environ.get(
-                "ARGO_WORKFLOWS_SERVICE_URL", "http://localhost:2746"
-            ),
+            workflows_service_url=workflows_service_url,
             runner_image=runner_image,
             runner_image_tag=runner_image_tag,
             image_pull_policy=image_pull_policy,

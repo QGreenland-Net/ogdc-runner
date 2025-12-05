@@ -43,8 +43,10 @@ To submit an OGDC recipe, use the `submit` subcommand.
 ogdc-runner submit --wait github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags
 ```
 
-`submit` takes the path to an OGDC-recipe directory (this can be a local path or
-an `fsspec`-compatible directory string).
+`submit` takes the path to an OGDC-recipe directory. This must be an an
+`fsspec`-compatible string representing a valid OGDC-recipe directory accessible
+by the OGDC service. The most common input is a public GitHub repository string
+like the one given above.
 
 ## OGDC Recipes
 

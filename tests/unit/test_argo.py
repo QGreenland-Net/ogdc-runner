@@ -94,6 +94,10 @@ def test__configure_argo_settings_prod(monkeypatch):
 def test_ARGO_MANAGER_config_access(monkeypatch):
     """Test that ArgoManager config can be accessed and has correct properties."""
     monkeypatch.setenv("ENVIRONMENT", "local")
+    monkeypatch.setenv(
+        "ARGO_WORKFLOWS_SERVICE_URL",
+        "http://qgnet-ogdc-argo-workflows-server.qgnet.svc.cluster.local:2746",
+    )
     argo = reload_argo_module(monkeypatch)
 
     # Test that we can access the manager and its config
@@ -102,7 +106,10 @@ def test_ARGO_MANAGER_config_access(monkeypatch):
 
     assert config.namespace == "qgnet"
     assert config.service_account_name == "argo-workflow"
-    assert config.workflows_service_url == "http://localhost:2746"
+    assert (
+        config.workflows_service_url
+        == "http://qgnet-ogdc-argo-workflows-server.qgnet.svc.cluster.local:2746"
+    )
     assert config.runner_image == "ogdc-runner"
     assert config.runner_image_tag == "latest"
     assert config.image_pull_policy == "Never"
