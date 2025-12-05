@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
+from ogdc_runner.constants import RECIPE_CONFIG_FILENAME
 from ogdc_runner.recipe import get_recipe_config, stage_ogdc_recipe
 
 
@@ -184,9 +185,7 @@ def _find_recipe_dirs(recipes_dir: Path) -> list[Path]:
     recipe_dirs = set()
 
     # Look for meta files at 1 level under recipes/
-    for meta_name in ["meta.yml"]:
-        # recipes/seal-tags/meta.yml (1 level)
-        for meta_file in recipes_dir.glob(f"*/{meta_name}"):
-            recipe_dirs.add(meta_file.parent)
+    for meta_file in recipes_dir.glob(f"*/{RECIPE_CONFIG_FILENAME}"):
+        recipe_dirs.add(meta_file.parent)
 
     return sorted(recipe_dirs)
