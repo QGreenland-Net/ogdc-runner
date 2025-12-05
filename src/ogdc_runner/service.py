@@ -24,6 +24,16 @@ from ogdc_runner.recipe import stage_ogdc_recipe
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):  # type: ignore[no-untyped-def]
+    """Lifespan context manager for the FastAPI app.
+
+    See: https://fastapi.tiangolo.com/advanced/events/#lifespan-function
+
+    Ensures database tables are created.
+
+
+    Code before the `yield` happens before the server is ready to take requests.
+    Code after the `yield` happens as a final step as the server is shutdown.
+    """
     create_db_and_tables()
     yield
 
