@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import subprocess
 import sys
 import time
 
@@ -10,7 +11,11 @@ import requests
 from pydantic import ValidationError
 
 from ogdc_runner.exceptions import OgdcServiceApiError, OgdcWorkflowExecutionError
-from ogdc_runner.recipe import get_recipe_config, stage_ogdc_recipe
+from ogdc_runner.recipe import (
+    get_recipe_config,
+    stage_ogdc_recipe,
+    validate_all_recipes_in_repo,
+)
 
 # Default the OGDC API URL based on the environment, falling back to the prod
 # URL.
@@ -145,3 +150,34 @@ def validate_recipe(recipe_path: str) -> None:
             print(f"Recipe {recipe_path} is invalid.")
             print(err)
             sys.exit(1)
+
+
+@cli.command
+@click.argument(
+    "recipes_location",
+    required=False,
+    default="https://github.com/qgreenland-net/ogdc-recipes.git",
+    metavar="RECIPES-LOCATION",
+    type=str,
+)
+@click.option(
+    "--ref",
+    default="main",
+    help="Git reference branch or tag to validate",
+    type=str,
+)
+def validate_all_recipes(recipes_location: str, ref: str) -> None:
+    """Validate all OGDC recipes in a git repository.
+
+    RECIPES-LOCATION: Git repository URL (default: https://github.com/qgreenland-net/ogdc-recipes.git)
+
+    Examples:
+      ogdc-runner validate-all-recipes
+      ogdc-runner validate-all-recipes --ref develop
+      ogdc-runner validate-all-recipes https://github.com/myorg/ogdc-recipes.git --ref feature-branch
+    """
+    try:
+        validate_all_recipes_in_repo(recipes_location, ref)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to clone repository: {e}\n{e.stderr}")
+        sys.exit(1)
