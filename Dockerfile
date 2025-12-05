@@ -6,7 +6,8 @@
 # https://github.com/QGreenland-Net/ogdc-helm/issues/31
 FROM ghcr.io/osgeo/gdal:ubuntu-small-3.12.0
 # We use and wget to fetch data from remote sources.
-RUN apt update && apt install -y wget rsync pip python3-venv
+# libpq-dev is required for connecting to postgresql db
+RUN apt update && apt install -y wget rsync pip python3-venv libpq-dev
 
 WORKDIR /ogdc_runner/
 COPY . /ogdc_runner

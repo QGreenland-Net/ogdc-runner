@@ -36,6 +36,9 @@ dependencies = [
   "hera >=5.18.0",
   "fsspec",
   "requests",
+  "sqlmodel",
+  # Required by sqlmodel to connect to postgresql
+  "psycopg2",
 ]
 
 [project.optional-dependencies]
