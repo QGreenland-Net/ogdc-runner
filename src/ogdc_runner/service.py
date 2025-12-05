@@ -18,7 +18,7 @@ from sqlmodel import Session
 from ogdc_runner import __version__
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
-from ogdc_runner.db import create_db_and_tables, get_session
+from ogdc_runner.db import get_session, init_db
 from ogdc_runner.recipe import stage_ogdc_recipe
 
 
@@ -34,7 +34,7 @@ async def lifespan(_app: FastAPI):  # type: ignore[no-untyped-def]
     Code before the `yield` happens before the server is ready to take requests.
     Code after the `yield` happens as a final step as the server is shutdown.
     """
-    create_db_and_tables()
+    init_db()
     yield
 
 
