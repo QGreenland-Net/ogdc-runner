@@ -9,7 +9,7 @@ workflow:
   config_file: "config.json"
 input:
   params:
-    - value: "https://raw.githubusercontent.com/QGreenland-Net/ogdc-runner/main/tests/test_viz_workflow_recipe_dir/test_ice_basins.gpkg"
+    - value: "https://demo.arcticdata.io/tiles/OGDC/QGnet/viz-workflow/ice_basins.gpkg"
       type: "url"
 output:
   dataone_id: "TODO"
