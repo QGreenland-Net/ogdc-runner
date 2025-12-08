@@ -31,7 +31,10 @@ def typecheck(session: nox.Session) -> None:
 def tests(session: nox.Session) -> None:
     """Run the unit and regular tests."""
     session.install(".[test]")
-    session.run("pytest", *session.posargs)
+    session.run(
+        "pytest",
+        *session.posargs,
+    )
 
 
 @nox.session(reuse_venv=True)
@@ -60,6 +63,8 @@ def docs(session: nox.Session) -> None:
         return
 
     shared_args = (
+        "--port",  # Use port 8080
+        "8080",  # Use port 8080
         "-n",  # nitpicky mode
         "-T",  # full tracebacks
         f"-b={args.builder}",

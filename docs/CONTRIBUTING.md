@@ -12,8 +12,7 @@ Add yourself as an author in `pyproject.toml`
 ## Setting up a local development environment
 
 First, ensure you have [ogdc-helm](https://github.com/QGreenland-Net/ogdc-helm)
-setup for local development with `rancher-desktop`. The argo server ports are
-expected to be forwarded for access via localhost.
+setup for local development with `rancher-desktop` using `skaffold`.
 
 Now you can set up a python development environment for `ogdc-runner` by
 running:
@@ -24,33 +23,10 @@ source ./.venv/bin/activate
 pip install -v --editable ".[dev]"
 ```
 
-### Using a local docker image for workflow execution
+### Required environment variables
 
-The `ogdc-runner` supports using a local `ogdc-runner` image for development
-purposes (e.g., you want to change and test something about the image without
-needing to release it to the GHCR).
-
-First, build a local image:
-
-```{note}
-The docker image must be built in the `rancher-desktop` context so
-that it is available to the Argo deployment on the developer's local machine.
-Check that you have the correct context selected with `docker context ls`.
-```
-
-```{warning}
-The `ogdc-runner` docker image (and any others intended to be run on the k8s
-cluster as part of the OGDC) **MUST NOT** be based on busybox/alpine Linux due
-to a known networking issue in non-local environments. For context, see:
-<https://github.com/QGreenland-Net/ogdc-helm/issues/31>
-```
-
-```
-docker build . -t ogdc-runner
-```
-
-Next, set the `ENVIRONMENT` envvar to `local`. This will tell `ogdc-runner` to
-use the locally built image instead of the one hosted on the GHCR:
+Set the `ENVIRONMENT` envvar to `local`. This will tell `ogdc-runner` to operate
+in "local" development mode:
 
 ```
 export ENVIRONMENT=local
@@ -133,18 +109,10 @@ only) or `pre-commit run --all-files` to check even without installing the hook.
 
 ## Testing
 
-Use pytest to run the unit checks:
+Use `nox` to run `pytest` to run tests:
 
 ```bash
-pytest
-```
-
-### Coverage
-
-Use pytest-cov to generate coverage reports:
-
-```bash
-pytest --cov=ogdc-runner
+nox
 ```
 
 ## Building docs
@@ -189,7 +157,18 @@ This project uses [semantic versioning](https://semver.org/).
 > 3. PATCH version when you make backward compatible bug fixes
 
 Decide what the version will be for your release, and ensure that the CHANGELOG
-contains an entry for the planned release.
+contains an entry for the `## NEXT_VERSION`.
+
+**Bump the Version**
+
+Use bump-my-version to automatically update the version number in all configured
+files (e.g., pyproject.toml, CHANGELOG.md).
+
+Choose the appropriate part to bump:
+
+- PATCH release: `bump-my-version bump patch`
+- MINOR release: `bump-my-version bump minor`
+- MAJOR release: `bump-my-version bump major`
 
 Once `main` is ready for a release (feature branches are merged and the
 CHANGELOG is up-to-date), tag the latest commit with the version to be released
