@@ -7,6 +7,18 @@ from ogdc_runner.argo import ARGO_WORKFLOW_SERVICE
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished
 
 
+def test_submit_ogdc_viz_recipe_fast(test_viz_workflow_fast_recipe_directory):
+    """Test visualization workflow with a small geopackage for faster feedback."""
+    workflow_name = submit_ogdc_recipe(
+        recipe_dir=test_viz_workflow_fast_recipe_directory,
+        overwrite=True,
+        wait=True,
+    )
+
+    # Cleanup test workflow.
+    ARGO_WORKFLOW_SERVICE.delete_workflow(workflow_name)
+
+
 @pytest.mark.slow
 def test_submit_ogdc_viz_recipe(test_viz_workflow_recipe_directory):
     """Test that an ogdc visualization recipe can be submitted and executed successfully."""
