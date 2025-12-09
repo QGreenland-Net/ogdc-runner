@@ -25,7 +25,7 @@ def reload_argo_module(_: object) -> Any:
 
 env_test_settings = [
     # when ENVIRONMENT=local, the `ogdc-runner` image should be used
-    ("local", "ogdc-runner:ogdc_runner_image_tag_test", "Never"),
+    ("local", "ogdc-runner:ogdc_runner_image_tag_test", "IfNotPresent"),
     # when ENVIRONMENT=production, the `ogdc-runner` image hosted on ghcr should be used
     (
         "production",
@@ -71,7 +71,7 @@ def test__configure_argo_settings_dev(monkeypatch):
 
     argo = reload_argo_module(monkeypatch)
     assert argo.global_config.image == "ogdc-runner:latest"
-    assert Container().image_pull_policy == "Never"
+    assert Container().image_pull_policy == "IfNotPresent"
     assert argo.global_config.namespace == "qgnet"
     assert argo.global_config.service_account_name == "argo-workflow"
 
@@ -112,7 +112,7 @@ def test_ARGO_MANAGER_config_access(monkeypatch):
     )
     assert config.runner_image == "ogdc-runner"
     assert config.runner_image_tag == "latest"
-    assert config.image_pull_policy == "Never"
+    assert config.image_pull_policy == "IfNotPresent"
 
 
 def test_ARGO_MANAGER_update_image(monkeypatch):

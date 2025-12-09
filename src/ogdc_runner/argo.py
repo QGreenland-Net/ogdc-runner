@@ -72,9 +72,9 @@ class ArgoManager:
 
         image_pull_policy = "IfNotPresent"
         if is_dev_environment:
+            # In dev, we expect the `latest` image to be used, so we always want
+            # the latest pulled and updated.
             image_pull_policy = "Always"
-        elif is_local_environment:
-            image_pull_policy = "Never"
 
         # Argo workflows service URL
         workflows_service_url = os.environ.get(
