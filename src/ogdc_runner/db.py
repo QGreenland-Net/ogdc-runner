@@ -14,9 +14,16 @@ class User(SQLModel, table=True):
     password_hash: str
 
 
-# TODO: inject user/pass and service URL via envvars
+db_user = os.environ.get("OGDC_DB_USERNAME")
+db_pass = os.environ.get("OGDC_DB_PASSWORD")
+if not db_user or not db_pass:
+    # TODO: more appropriate error than runtime
+    err_msg = "`OGDC_DB_USERNAME` and `OGDC_DB_PASSWORD` must be set."
+    raise RuntimeError(err_msg)
+
+
 ENGINE = create_engine(
-    "postgresql://admin:password@postgres-service/ogdc",
+    f"postgresql://{db_user}:{db_pass}@ogdc-db-cnpg-rw/ogdc",
 )
 
 
