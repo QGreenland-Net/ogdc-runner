@@ -34,10 +34,21 @@ def get_session() -> Generator[Session, None, None]:
         yield session
 
 
+def get_user(*, session: Session, name: str) -> User | None:
+    results = session.exec(select(User).where(User.name == name)).one_or_none()
+
+    return results
+
+
+def hash_password(password: str) -> str:
+    # TODO: actually hash the password!!
+    return password
+
+
 def create_admin_user() -> None:
     with Session(ENGINE) as session:
-        results = session.exec(select(User).where(User.name == "admin")).one_or_none()
-        if results:
+        user = get_user(session=session, name="admin")
+        if user:
             logger.info("Admin user already created.")
             return
 
@@ -51,8 +62,7 @@ def create_admin_user() -> None:
         session.add(
             User(
                 name="admin",
-                # TODO: actually hash the password!!
-                password_hash=admin_password,
+                password_hash=hash_password(admin_password),
             )
         )
         session.commit()
