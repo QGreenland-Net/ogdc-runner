@@ -16,12 +16,13 @@ import pydantic
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
+from loguru import logger
 from sqlmodel import Session
 
 from ogdc_runner import __version__
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
-from ogdc_runner.db import User, get_auth_user, get_session, get_user, init_db
+from ogdc_runner.db import User, close_db, get_auth_user, get_session, get_user, init_db
 from ogdc_runner.recipe import stage_ogdc_recipe
 
 # to get a string like this run:
@@ -65,8 +66,11 @@ async def lifespan(_app: FastAPI):  # type: ignore[no-untyped-def]
     Code before the `yield` happens before the server is ready to take requests.
     Code after the `yield` happens as a final step as the server is shutdown.
     """
+    logger.info("FastAPI Lifespan start")
     init_db()
     yield
+    close_db()
+    logger.info("FastAPI Lifespan end")
 
 
 app = FastAPI(
