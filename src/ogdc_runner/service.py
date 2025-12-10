@@ -11,9 +11,11 @@ import datetime as dt
 from contextlib import asynccontextmanager
 from typing import Annotated
 
+import jwt
 import pydantic
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jwt.exceptions import InvalidTokenError
 from sqlmodel import Session
 
 from ogdc_runner import __version__
@@ -21,6 +23,34 @@ from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
 from ogdc_runner.db import User, get_auth_user, get_session, get_user, init_db
 from ogdc_runner.recipe import stage_ogdc_recipe
+
+# to get a string like this run:
+# openssl rand -hex 32
+# TODO: get this from envvar.
+JWT_SECRET_KEY = "2ae25b5398824129235724f243811d7a335a98339abe4630e4e27d25e4f144a2"
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_TIMEDELTA = dt.timedelta(30)
+JWT_USERNAME_KEY = "sub"
+
+
+class Token(pydantic.BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+
+
+def create_access_token(user: User) -> str:
+    expire = dt.datetime.now() + ACCESS_TOKEN_EXPIRE_TIMEDELTA
+    to_encode = {
+        # "sub" is short for "subject", and is part of the JWT spec. We use it here
+        # to just store the username, which should be unique.
+        # See:
+        # https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/#technical-details-about-the-jwt-subject-sub
+        "sub": user.name,
+        "exp": expire,
+    }
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+    return encoded_jwt
 
 
 @asynccontextmanager
@@ -112,23 +142,36 @@ def status(recipe_workflow_name: str) -> StatusResponse:
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
-async def _get_current_user(
+async def _get_authenticated_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     session: SessionDep,
-):
-    user = get_user(session=session, name=token)
+) -> User:
+    auth_exception = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        # Get the subject AKA username
+        username = payload.get(JWT_USERNAME_KEY)
+        if username is None:
+            raise auth_exception
+
+    except InvalidTokenError as e:
+        raise auth_exception from e
+
+    user = get_user(session=session, name=username)
     if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Not authorized",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise auth_exception
 
     return user
 
 
 @app.get("/user")
-async def get_current_user(current_user: Annotated[User, Depends(_get_current_user)]):
+async def get_current_user(
+    current_user: Annotated[User, Depends(_get_authenticated_user)],
+) -> dict[str, str]:
     return {"current_user": current_user.name}
 
 
@@ -136,11 +179,15 @@ async def get_current_user(current_user: Annotated[User, Depends(_get_current_us
 def token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: SessionDep,
-):
+) -> Token:
     user = get_auth_user(
-        session=session, name=form_data.username, password=form_data.password
+        session=session,
+        name=form_data.username,
+        password=form_data.password,
     )
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect username or password.")
 
-    return {"access_token": user.name, "token_type": "bearer"}
+    access_token = create_access_token(user)
+
+    return Token(access_token=access_token)
