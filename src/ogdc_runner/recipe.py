@@ -8,12 +8,13 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import fsspec
+import requests
 import yaml
 from loguru import logger
 from pydantic import ValidationError
 
 from ogdc_runner.constants import RECIPE_CONFIG_FILENAME
-from ogdc_runner.exceptions import OgdcInvalidRecipeDir
+from ogdc_runner.exceptions import OgdcInvalidRecipeConfig, OgdcInvalidRecipeDir
 from ogdc_runner.models.recipe_config import RecipeConfig
 
 
@@ -86,12 +87,52 @@ def find_recipe_dirs(recipes_dir: Path) -> list[Path]:
     return sorted(recipe_dirs)
 
 
-def validate_all_recipes_in_repo(repo_url: str, ref: str = "main") -> None:
+def validate_input_urls(
+    config: RecipeConfig, timeout: int = 30
+) -> list[tuple[str, str]]:
+    """Validate that all URL-type input parameters are accessible.
+
+    Uses HEAD requests to check URL accessibility without downloading content.
+
+    Args:
+        config: The recipe configuration to validate
+        timeout: Request timeout in seconds
+
+    Returns:
+        List of (url, error_message) tuples for any URLs that failed validation.
+        Empty list means all URLs are accessible.
+    """
+    errors: list[tuple[str, str]] = []
+
+    for param in config.input.params:
+        if param.type != "url":
+            continue
+
+        url = str(param.value)
+        try:
+            response = requests.head(url, timeout=timeout, allow_redirects=True)
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            errors.append((url, f"HTTP {e.response.status_code}"))
+        except requests.exceptions.ConnectionError:
+            errors.append((url, "Connection failed"))
+        except requests.exceptions.Timeout:
+            errors.append((url, f"Timeout after {timeout}s"))
+        except requests.exceptions.RequestException as e:
+            errors.append((url, str(e)))
+
+    return errors
+
+
+def validate_all_recipes_in_repo(
+    repo_url: str, ref: str = "main", *, check_urls: bool = False
+) -> None:
     """Validate all recipes in a git repository.
 
     Args:
         repo_url: Git repository URL
         ref: Git reference (branch, tag, or commit)
+        check_urls: If True, validate that all URL-type input parameters are accessible
     """
 
     print(f"Cloning {repo_url}@{ref}...")
@@ -110,16 +151,31 @@ def validate_all_recipes_in_repo(repo_url: str, ref: str = "main") -> None:
             msg = "No recipes found in recipes directory"
             raise OgdcInvalidRecipeDir(msg)
 
-        print(f"Found {len(recipe_dirs)} recipes to validate\n")
+        print(f"Found {len(recipe_dirs)} recipes to validate")
+        if check_urls:
+            print("URL validation enabled")
+        print()
 
-        invalid_recipes = []
+        invalid_recipes: list[tuple[Path, str]] = []
 
         for recipe_dir in recipe_dirs:
             recipe_name = recipe_dir.relative_to(recipes_dir)
             try:
-                get_recipe_config(recipe_dir)
+                config = get_recipe_config(recipe_dir)
+
+                if check_urls:
+                    url_errors = validate_input_urls(config)
+                    if url_errors:
+                        error_details = "; ".join(
+                            f"{url}: {error}" for url, error in url_errors
+                        )
+                        raise OgdcInvalidRecipeConfig(
+                            f"URL validation failed: {error_details}"
+                        )
+
                 print(f"✓ {recipe_name}")
-            except ValidationError as err:
+
+            except (ValidationError, OgdcInvalidRecipeConfig) as err:
                 print(f"✗ {recipe_name}")
                 print(f"  Error: {err}\n")
                 invalid_recipes.append((recipe_name, str(err)))
