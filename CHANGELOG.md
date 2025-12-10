@@ -1,11 +1,8 @@
-## NEXT_VERSION
-
-- Refactor URL validation to use Pydantic model validators.
-- Add recipe ID truncation to avoid Kubernetes name length limits.
-
 # v0.3.0
 
 - Create service interface for ogdc-runner.
+- Refactor URL validation to use Pydantic model validators.
+- Add recipe ID truncation to avoid Kubernetes name length limits.
 
 # v0.2.0
 
