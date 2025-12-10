@@ -11,4 +11,4 @@ def test_validate_all_recipes_at_main():
     repo_url = "https://github.com/qgreenland-net/ogdc-recipes.git"
 
     print(f"\nValidating recipes at ref: {ref}")
-    validate_all_recipes_in_repo(repo_url, ref)
+    validate_all_recipes_in_repo(repo_url, ref, check_urls=True)

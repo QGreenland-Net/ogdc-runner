@@ -13,7 +13,7 @@ from loguru import logger
 from pydantic import ValidationError
 
 from ogdc_runner.constants import RECIPE_CONFIG_FILENAME
-from ogdc_runner.exceptions import OgdcInvalidRecipeDir
+from ogdc_runner.exceptions import OgdcInvalidRecipeConfig, OgdcInvalidRecipeDir
 from ogdc_runner.models.recipe_config import RecipeConfig
 
 
@@ -56,8 +56,15 @@ def clone_recipes_repo(repo_url: str, ref: str = "main") -> Generator[Path, None
         yield Path(tmpdir)
 
 
-def get_recipe_config(recipe_directory: Path) -> RecipeConfig:
-    """Extract config from a recipe configuration file (meta.yml)."""
+def get_recipe_config(
+    recipe_directory: Path, *, check_urls: bool = False
+) -> RecipeConfig:
+    """Extract config from a recipe configuration file (meta.yml).
+
+    Args:
+        recipe_directory: Path to the recipe directory containing meta.yml
+        check_urls: If True, validate that all URL-type input parameters are accessible
+    """
     recipe_path = recipe_directory / RECIPE_CONFIG_FILENAME
     try:
         with recipe_path.open("r") as config_file:
@@ -69,7 +76,7 @@ def get_recipe_config(recipe_directory: Path) -> RecipeConfig:
 
     config = RecipeConfig.model_validate(
         dict(**config_dict, recipe_directory=recipe_directory),
-        context={"recipe_directory": recipe_directory},
+        context={"recipe_directory": recipe_directory, "check_urls": check_urls},
     )
 
     return config
@@ -86,12 +93,15 @@ def find_recipe_dirs(recipes_dir: Path) -> list[Path]:
     return sorted(recipe_dirs)
 
 
-def validate_all_recipes_in_repo(repo_url: str, ref: str = "main") -> None:
+def validate_all_recipes_in_repo(
+    repo_url: str, ref: str = "main", *, check_urls: bool = False
+) -> None:
     """Validate all recipes in a git repository.
 
     Args:
         repo_url: Git repository URL
         ref: Git reference (branch, tag, or commit)
+        check_urls: If True, validate that all URL-type input parameters are accessible
     """
 
     print(f"Cloning {repo_url}@{ref}...")
@@ -110,16 +120,20 @@ def validate_all_recipes_in_repo(repo_url: str, ref: str = "main") -> None:
             msg = "No recipes found in recipes directory"
             raise OgdcInvalidRecipeDir(msg)
 
-        print(f"Found {len(recipe_dirs)} recipes to validate\n")
+        print(f"Found {len(recipe_dirs)} recipes to validate")
+        if check_urls:
+            print("URL validation enabled")
+        print()
 
-        invalid_recipes = []
+        invalid_recipes: list[tuple[Path, str]] = []
 
         for recipe_dir in recipe_dirs:
             recipe_name = recipe_dir.relative_to(recipes_dir)
             try:
-                get_recipe_config(recipe_dir)
+                get_recipe_config(recipe_dir, check_urls=check_urls)
                 print(f"✓ {recipe_name}")
-            except ValidationError as err:
+
+            except (ValidationError, OgdcInvalidRecipeConfig) as err:
                 print(f"✗ {recipe_name}")
                 print(f"  Error: {err}\n")
                 invalid_recipes.append((recipe_name, str(err)))

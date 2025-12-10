@@ -9,6 +9,7 @@ from hera.workflows import (
 
 from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
+    make_generate_name,
     submit_workflow,
 )
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
@@ -55,7 +56,7 @@ def make_and_submit_shell_workflow(
     commands = recipe_config.workflow.get_commands_from_sh_file()
 
     with Workflow(
-        generate_name=f"{recipe_config.id}-",
+        generate_name=make_generate_name(recipe_config.id),
         entrypoint="steps",
         workflows_service=ARGO_WORKFLOW_SERVICE,
     ) as w:

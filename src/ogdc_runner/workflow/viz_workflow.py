@@ -20,6 +20,7 @@ from ogdc_runner.argo import (
     ARGO_MANAGER,
     ARGO_WORKFLOW_SERVICE,
     OGDC_WORKFLOW_PVC,
+    make_generate_name,
     submit_workflow,
 )
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
@@ -152,7 +153,7 @@ def make_and_submit_viz_workflow(
         )
 
     with Workflow(
-        generate_name=f"{recipe_config.id}-",
+        generate_name=make_generate_name(recipe_config.id),
         entrypoint="main",
         namespace=ARGO_MANAGER.config.namespace,
         service_account_name="argo-workflow",
