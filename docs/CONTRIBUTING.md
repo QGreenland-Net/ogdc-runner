@@ -115,13 +115,8 @@ Use `nox` to run `pytest` to run tests:
 nox
 ```
 
-### Running tests without slow integration tests
-
-Some integration tests (like the full visualization workflow test) are marked as
-`slow`. To run tests without these slow tests:
-
 ```bash
-pytest -m "not slow"
+pytest
 ```
 
 ## Building docs
