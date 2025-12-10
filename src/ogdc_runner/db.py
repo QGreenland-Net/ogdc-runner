@@ -4,6 +4,7 @@ import os
 from collections.abc import Generator
 
 from loguru import logger
+from pwdlib import PasswordHash
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 
@@ -40,9 +41,27 @@ def get_user(*, session: Session, name: str) -> User | None:
     return results
 
 
+def get_auth_user(session: Session, name: str, password: str) -> None | User:
+    user = get_user(session=session, name=name)
+    if user is None or not verify_password(
+        password=password, hashed_password=user.password_hash
+    ):
+        return None
+
+    return user
+
+
+# to get a string like this run:
+# openssl rand -hex 32
+password_hash = PasswordHash.recommended()
+
+
 def hash_password(password: str) -> str:
-    # TODO: actually hash the password!!
-    return password
+    return password_hash.hash(password)
+
+
+def verify_password(*, password: str, hashed_password: str) -> bool:
+    return password_hash.verify(password, hashed_password)
 
 
 def create_admin_user() -> None:

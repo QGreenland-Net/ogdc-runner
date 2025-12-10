@@ -19,7 +19,7 @@ from sqlmodel import Session
 from ogdc_runner import __version__
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
-from ogdc_runner.db import User, get_session, get_user, hash_password, init_db
+from ogdc_runner.db import User, get_auth_user, get_session, get_user, init_db
 from ogdc_runner.recipe import stage_ogdc_recipe
 
 
@@ -134,13 +134,13 @@ async def get_current_user(current_user: Annotated[User, Depends(_get_current_us
 
 @app.post("/token")
 def token(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()], session: SessionDep
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    session: SessionDep,
 ):
-    user = get_user(session=session, name=form_data.username)
+    user = get_auth_user(
+        session=session, name=form_data.username, password=form_data.password
+    )
     if not user:
-        raise HTTPException(status_code=400, detail="Incorrect username or password.")
-    hashed_password = hash_password(form_data.password)
-    if not hashed_password == user.password_hash:
-        raise HTTPException(status_code=400, detail="Incorrect username or password.")
+        raise HTTPException(status_code=401, detail="Incorrect username or password.")
 
     return {"access_token": user.name, "token_type": "bearer"}

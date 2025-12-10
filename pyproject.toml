@@ -39,6 +39,9 @@ dependencies = [
   "sqlmodel",
   # Required by sqlmodel to connect to postgresql
   "psycopg2",
+  # required for auth
+  "pyjwt",
+  "pwdlib[argon2]",
 ]
 
 [project.optional-dependencies]
