@@ -16,17 +16,10 @@ def test_get_recipe_config(test_shell_workflow_recipe_directory):
     assert config.id == "test-ogdc-workflow"
 
 
-def _http_error(status_code):
-    """Create an HTTPError with the given status code."""
-    response = Mock()
-    response.status_code = status_code
-    return requests.exceptions.HTTPError(response=response)
-
-
 @pytest.mark.parametrize(
     ("side_effect", "expected_error"),
     [
-        (_http_error(404), "HTTP 404"),
+        (requests.exceptions.HTTPError(response=Mock(status_code=404)), "HTTP 404"),
         (requests.exceptions.ConnectionError(), "Connection failed"),
         (requests.exceptions.Timeout(), "Timeout"),
     ],
