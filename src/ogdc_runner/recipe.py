@@ -8,7 +8,6 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import fsspec
-import requests
 import yaml
 from loguru import logger
 from pydantic import ValidationError
@@ -57,8 +56,15 @@ def clone_recipes_repo(repo_url: str, ref: str = "main") -> Generator[Path, None
         yield Path(tmpdir)
 
 
-def get_recipe_config(recipe_directory: Path) -> RecipeConfig:
-    """Extract config from a recipe configuration file (meta.yml)."""
+def get_recipe_config(
+    recipe_directory: Path, *, check_urls: bool = False
+) -> RecipeConfig:
+    """Extract config from a recipe configuration file (meta.yml).
+
+    Args:
+        recipe_directory: Path to the recipe directory containing meta.yml
+        check_urls: If True, validate that all URL-type input parameters are accessible
+    """
     recipe_path = recipe_directory / RECIPE_CONFIG_FILENAME
     try:
         with recipe_path.open("r") as config_file:
@@ -70,7 +76,7 @@ def get_recipe_config(recipe_directory: Path) -> RecipeConfig:
 
     config = RecipeConfig.model_validate(
         dict(**config_dict, recipe_directory=recipe_directory),
-        context={"recipe_directory": recipe_directory},
+        context={"recipe_directory": recipe_directory, "check_urls": check_urls},
     )
 
     return config
@@ -85,43 +91,6 @@ def find_recipe_dirs(recipes_dir: Path) -> list[Path]:
         recipe_dirs.add(meta_file.parent)
 
     return sorted(recipe_dirs)
-
-
-def validate_input_urls(
-    config: RecipeConfig, timeout: int = 30
-) -> list[tuple[str, str]]:
-    """Validate that all URL-type input parameters are accessible.
-
-    Uses HEAD requests to check URL accessibility without downloading content.
-
-    Args:
-        config: The recipe configuration to validate
-        timeout: Request timeout in seconds
-
-    Returns:
-        List of (url, error_message) tuples for any URLs that failed validation.
-        Empty list means all URLs are accessible.
-    """
-    errors: list[tuple[str, str]] = []
-
-    for param in config.input.params:
-        if param.type != "url":
-            continue
-
-        url = str(param.value)
-        try:
-            response = requests.head(url, timeout=timeout, allow_redirects=True)
-            response.raise_for_status()
-        except requests.exceptions.HTTPError as e:
-            errors.append((url, f"HTTP {e.response.status_code}"))
-        except requests.exceptions.ConnectionError:
-            errors.append((url, "Connection failed"))
-        except requests.exceptions.Timeout:
-            errors.append((url, f"Timeout after {timeout}s"))
-        except requests.exceptions.RequestException as e:
-            errors.append((url, str(e)))
-
-    return errors
 
 
 def validate_all_recipes_in_repo(
@@ -161,18 +130,7 @@ def validate_all_recipes_in_repo(
         for recipe_dir in recipe_dirs:
             recipe_name = recipe_dir.relative_to(recipes_dir)
             try:
-                config = get_recipe_config(recipe_dir)
-
-                if check_urls:
-                    url_errors = validate_input_urls(config)
-                    if url_errors:
-                        error_details = "; ".join(
-                            f"{url}: {error}" for url, error in url_errors
-                        )
-                        raise OgdcInvalidRecipeConfig(
-                            f"URL validation failed: {error_details}"
-                        )
-
+                get_recipe_config(recipe_dir, check_urls=check_urls)
                 print(f"✓ {recipe_name}")
 
             except (ValidationError, OgdcInvalidRecipeConfig) as err:

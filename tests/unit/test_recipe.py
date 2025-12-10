@@ -4,8 +4,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 import requests
+from pydantic import ValidationError
 
-from ogdc_runner.recipe import get_recipe_config, validate_input_urls
+from ogdc_runner.recipe import get_recipe_config
 
 
 def test_get_recipe_config(test_shell_workflow_recipe_directory):
@@ -24,26 +25,24 @@ def test_get_recipe_config(test_shell_workflow_recipe_directory):
         (requests.exceptions.Timeout(), "Timeout"),
     ],
 )
-def test_validate_input_urls_errors(
+def test_get_recipe_config_url_validation_errors(
     test_shell_workflow_recipe_directory, side_effect, expected_error
 ):
     """URL validation returns appropriate errors for various failure modes."""
-    config = get_recipe_config(test_shell_workflow_recipe_directory)
-
-    with patch("ogdc_runner.recipe.requests.head") as mock_head:
+    with patch("ogdc_runner.models.recipe_config.requests.head") as mock_head:
         mock_head.side_effect = side_effect
-        errors = validate_input_urls(config)
+        with pytest.raises(ValidationError) as exc_info:
+            get_recipe_config(test_shell_workflow_recipe_directory, check_urls=True)
 
-    assert len(errors) == 1
-    assert expected_error in errors[0][1]
+    assert expected_error in str(exc_info.value)
 
 
-def test_validate_input_urls_success(test_shell_workflow_recipe_directory):
+def test_get_recipe_config_url_validation_success(test_shell_workflow_recipe_directory):
     """Accessible URLs return no errors."""
-    config = get_recipe_config(test_shell_workflow_recipe_directory)
-
-    with patch("ogdc_runner.recipe.requests.head") as mock_head:
+    with patch("ogdc_runner.models.recipe_config.requests.head") as mock_head:
         mock_head.return_value = Mock()
-        errors = validate_input_urls(config)
+        config = get_recipe_config(
+            test_shell_workflow_recipe_directory, check_urls=True
+        )
 
-    assert errors == []
+    assert config.id == "test-ogdc-workflow"
