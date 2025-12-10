@@ -4,8 +4,7 @@ workflow:
   config_file: "config.json"
 input:
   params:
-    # TODO: change to main before merging
-    - value: "https://raw.githubusercontent.com/QGreenland-Net/ogdc-runner/add-integration-test-viz/tests/test_viz_workflow_recipe_dir/test_ice_basins.gpkg"
+    - value: "https://raw.githubusercontent.com/QGreenland-Net/ogdc-runner/main/tests/test_viz_workflow_recipe_dir/test_ice_basins.gpkg"
       type: "url"
 output:
   dataone_id: "TODO"
