@@ -15,6 +15,15 @@ Use `pip` to install the `ogdc-runner`:
 pip install ogdc-runner
 ```
 
+```{note}
+If the installation fails with a message about `psycopg2` failing to build, you
+may need to install the postgresql dev kit/client on your machine first.
+
+E.g., on Ubuntu: `apt install libpq-dev`.
+
+On MacOS: `brew install postgresql`
+```
+
 ## Using the CLI
 
 Use the `--help` flag for the most up-to-date usage information:
