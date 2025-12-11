@@ -4,7 +4,7 @@ from functools import cache
 from pathlib import Path
 
 import pytest
-from sqlmodel import create_engine
+from sqlmodel import StaticPool, create_engine
 
 from ogdc_runner import db
 
@@ -26,7 +26,14 @@ def test_viz_workflow_recipe_directory() -> Path:
 def mock_db(monkeypatch):
     @cache
     def mock_get_engine():
-        return create_engine("sqlite:///:memory:")
+        return create_engine(
+            "sqlite:///:memory:",
+            # Needed for pytest running tests in different threads.
+            connect_args={"check_same_thread": False},
+            # Use one connection for all requests during tests.
+            # https://docs.sqlalchemy.org/en/13/core/pooling.html#sqlalchemy.pool.StaticPool
+            poolclass=StaticPool,
+        )
 
     monkeypatch.setattr(db, "_get_engine", mock_get_engine)
     monkeypatch.setenv("OGDC_ADMIN_PASSWORD", "password")

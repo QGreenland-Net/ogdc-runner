@@ -11,3 +11,16 @@ def test_version(mock_db):  # noqa: ARG001
         response = client.get("/version")
         assert response.status_code == 200
         assert response.json() == {"ogdc_runner_version": __version__}
+
+
+def test_token(mock_db):  # noqa: ARG001
+    with TestClient(app) as client:
+        response = client.post(
+            "/token",
+            data={
+                "username": "admin",
+                "password": "password",
+            },
+        )
+        assert response.status_code == 200
+        assert "access_token" in response.json()
