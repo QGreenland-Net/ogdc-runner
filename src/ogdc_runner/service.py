@@ -8,19 +8,125 @@ into one or more Argo workflows that are executed.
 from __future__ import annotations
 
 import datetime as dt
+import os
+from collections.abc import Generator
+from contextlib import asynccontextmanager
+from functools import cache
+from typing import Annotated
 
+import jwt
 import pydantic
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jwt.exceptions import InvalidTokenError
+from loguru import logger
+from sqlmodel import Session
 
 from ogdc_runner import __version__
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
+from ogdc_runner.db import User, close_db, get_auth_user, get_engine, get_user, init_db
+from ogdc_runner.exceptions import OgdcMissingEnvvar
 from ogdc_runner.recipe import stage_ogdc_recipe
+
+# JWT token constants
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_TIMEDELTA = dt.timedelta(30)
+JWT_USERNAME_KEY = "sub"
+
+# Create OAuth2 scheme for the application. The tokenUrl points to the `token/`
+# route below.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+
+# Create a FastAPI dependency on the database session.
+def _get_session() -> Generator[Session, None, None]:
+    """Yield a database session for FastAPI routes."""
+    with Session(get_engine()) as session:
+        yield session
+
+
+SessionDep = Annotated[Session, Depends(_get_session)]
+
+
+async def get_authenticated_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    session: SessionDep,
+) -> User:
+    """Given a valid token, return the matching user."""
+    auth_exception = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, _get_jwt_secret_key(), algorithms=[JWT_ALGORITHM])
+        # Get the subject AKA username
+        username = payload.get(JWT_USERNAME_KEY)
+        if username is None:
+            raise auth_exception
+
+    except InvalidTokenError as e:
+        raise auth_exception from e
+
+    user = get_user(session=session, name=username)
+    if not user:
+        raise auth_exception
+
+    return user
+
+
+# Authenticated user depednency for FastAPI routes. Using this as a type
+# annotation in an argument to a route results in that route needing to be
+# passed a valid token.
+authenticated_user = Annotated[User, Depends(get_authenticated_user)]
+
+
+@cache
+def _get_jwt_secret_key() -> str:
+    """Get the JWT secret key used to encode and decode JWT tokens used by the app for auth.
+
+    Requires the `OGDC_JWT_SECRET_KEY` be set.
+    """
+    jwt_secret_key = os.environ.get("OGDC_JWT_SECRET_KEY")
+    if not jwt_secret_key:
+        err_msg = "OGDC_JWT_SECRET_KEY envvar must be set."
+        raise OgdcMissingEnvvar(err_msg)
+
+    return jwt_secret_key
+
+
+class Token(pydantic.BaseModel):
+    """Model representing token data returned by the app when auth is successful."""
+
+    access_token: str
+    token_type: str = "Bearer"
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):  # type: ignore[no-untyped-def]
+    """Lifespan context manager for the FastAPI app.
+
+    See: https://fastapi.tiangolo.com/advanced/events/#lifespan-function
+
+    Ensures database tables are created.
+
+
+    Code before the `yield` happens before the server is ready to take requests.
+    Code after the `yield` happens as a final step as the server is shutdown.
+    """
+    logger.info("FastAPI Lifespan start")
+    init_db()
+    yield
+    close_db()
+    logger.info("FastAPI Lifespan end")
+
 
 app = FastAPI(
     docs_url="/",
     version=__version__,
     title="Open Geospatial Data Cloud (OGDC) API",
+    lifespan=lifespan,
 )
 
 
@@ -45,8 +151,15 @@ class SubmitRecipeResponse(pydantic.BaseModel):
 
 
 @app.post("/submit")
-def submit(submit_recipe_request: SubmitRecipeRequest) -> SubmitRecipeResponse:
-    """Submit a recipe to OGDC for execution."""
+def submit(
+    submit_recipe_request: SubmitRecipeRequest,
+    # Ensure submissions require an authenticated user.
+    _current_user: authenticated_user,
+) -> SubmitRecipeResponse:
+    """Submit a recipe to OGDC for execution.
+
+    Requires a valid auth token.
+    """
     try:
         with stage_ogdc_recipe(submit_recipe_request.recipe_path) as recipe_dir:
             recipe_workflow_name = submit_ogdc_recipe(
@@ -81,3 +194,48 @@ def status(recipe_workflow_name: str) -> StatusResponse:
         recipe_workflow_name=recipe_workflow_name,
         status=status,
     )
+
+
+@app.get("/user")
+async def get_current_user(
+    current_user: authenticated_user,
+) -> dict[str, str]:
+    """Return the current authenticated user.
+
+    Useful for testing that authentication is working as expected.
+    """
+    return {"current_user": current_user.name}
+
+
+def create_access_token(user: User) -> str:
+    """Create a JWT access token for authentication."""
+    expire = dt.datetime.now() + ACCESS_TOKEN_EXPIRE_TIMEDELTA
+    to_encode = {
+        # "sub" is short for "subject", and is part of the JWT spec. We use it here
+        # to just store the username, which should be unique.
+        # See:
+        # https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/#technical-details-about-the-jwt-subject-sub
+        "sub": user.name,
+        "exp": expire,
+    }
+    encoded_jwt = jwt.encode(to_encode, _get_jwt_secret_key(), algorithm=JWT_ALGORITHM)
+
+    return encoded_jwt
+
+
+@app.post("/token")
+def token(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    session: SessionDep,
+) -> Token:
+    user = get_auth_user(
+        session=session,
+        name=form_data.username,
+        password=form_data.password,
+    )
+    if not user:
+        raise HTTPException(status_code=401, detail="Incorrect username or password.")
+
+    access_token = create_access_token(user)
+
+    return Token(access_token=access_token)
