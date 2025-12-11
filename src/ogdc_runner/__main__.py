@@ -66,7 +66,9 @@ def _wait_for_workflow_completion(workflow_name: str) -> None:
     while True:
         status = _get_workflow_status(workflow_name)
         if status:
-            print(f"Workflow status ({dt.datetime.now():%Y-%m-%dT%H:%m:%S}): {status}")
+            print(
+                f"Workflow status for {workflow_name} ({dt.datetime.now():%Y-%m-%d@%H:%M:%S}): {status}"
+            )
             # Terminal states
             if status == "Failed":
                 raise OgdcWorkflowExecutionError(
