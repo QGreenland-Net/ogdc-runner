@@ -10,7 +10,11 @@ import click
 import requests
 from pydantic import ValidationError
 
-from ogdc_runner.exceptions import OgdcServiceApiError, OgdcWorkflowExecutionError
+from ogdc_runner.exceptions import (
+    OgdcMissingEnvvar,
+    OgdcServiceApiError,
+    OgdcWorkflowExecutionError,
+)
 from ogdc_runner.recipe import (
     get_recipe_config,
     stage_ogdc_recipe,
@@ -32,6 +36,33 @@ OGDC_API_URL = os.environ.get("OGDC_API_URL", default_url)
 @click.group
 def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
+
+
+def get_api_token() -> str:
+    username = os.environ.get("OGDC_API_USERNAME")
+    password = os.environ.get("OGDC_API_PASSWORD")
+    if not username or not password:
+        err = "OGDC_API_USERNAME and OGDC_API_PASSWORD must be set."
+        raise OgdcMissingEnvvar(err)
+
+    response = requests.post(
+        f"{OGDC_API_URL}/token",
+        data={
+            "username": username,
+            "password": password,
+        },
+    )
+
+    response.raise_for_status()
+
+    token_data = response.json()
+    access_token = token_data["access_token"]
+
+    if not isinstance(access_token, str):
+        err_msg = "Failed to get valid access token from OGDC API."
+        raise OgdcServiceApiError(err_msg)
+
+    return access_token
 
 
 def _check_ogdc_api_error(response: requests.Response) -> None:
@@ -112,6 +143,7 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
             "recipe_path": recipe_path,
             "overwrite": overwrite,
         },
+        headers={"Authorization": f"Bearer {get_api_token()}"},
     )
 
     _check_ogdc_api_error(response)

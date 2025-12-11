@@ -28,6 +28,34 @@ from ogdc_runner.db import User, close_db, get_auth_user, get_session, get_user,
 from ogdc_runner.exceptions import OgdcMissingEnvvar
 from ogdc_runner.recipe import stage_ogdc_recipe
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+
+async def authenticated_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    session: SessionDep,
+) -> User:
+    auth_exception = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, _get_jwt_secret_key(), algorithms=[JWT_ALGORITHM])
+        # Get the subject AKA username
+        username = payload.get(JWT_USERNAME_KEY)
+        if username is None:
+            raise auth_exception
+
+    except InvalidTokenError as e:
+        raise auth_exception from e
+
+    user = get_user(session=session, name=username)
+    if not user:
+        raise auth_exception
+
+    return user
+
 
 @cache
 def _get_jwt_secret_key() -> str:
@@ -115,7 +143,11 @@ class SubmitRecipeResponse(pydantic.BaseModel):
 
 
 @app.post("/submit")
-def submit(submit_recipe_request: SubmitRecipeRequest) -> SubmitRecipeResponse:
+def submit(
+    submit_recipe_request: SubmitRecipeRequest,
+    # Ensure submissions require an authenticated user.
+    _current_user: Annotated[str, Depends(authenticated_user)],
+) -> SubmitRecipeResponse:
     """Submit a recipe to OGDC for execution."""
     try:
         with stage_ogdc_recipe(submit_recipe_request.recipe_path) as recipe_dir:
@@ -153,38 +185,9 @@ def status(recipe_workflow_name: str) -> StatusResponse:
     )
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-
-async def _get_authenticated_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    session: SessionDep,
-) -> User:
-    auth_exception = HTTPException(
-        status_code=401,
-        detail="Could not validate credentials.",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, _get_jwt_secret_key(), algorithms=[JWT_ALGORITHM])
-        # Get the subject AKA username
-        username = payload.get(JWT_USERNAME_KEY)
-        if username is None:
-            raise auth_exception
-
-    except InvalidTokenError as e:
-        raise auth_exception from e
-
-    user = get_user(session=session, name=username)
-    if not user:
-        raise auth_exception
-
-    return user
-
-
 @app.get("/user")
 async def get_current_user(
-    current_user: Annotated[User, Depends(_get_authenticated_user)],
+    current_user: Annotated[User, Depends(authenticated_user)],
 ) -> dict[str, str]:
     return {"current_user": current_user.name}
 
