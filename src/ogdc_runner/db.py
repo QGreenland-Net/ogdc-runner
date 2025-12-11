@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Generator
 from functools import cache
 
 import sqlalchemy
@@ -20,7 +19,7 @@ class User(SQLModel, table=True):
 
 
 @cache
-def _get_engine() -> sqlalchemy.engine.base.Engine:
+def get_engine() -> sqlalchemy.engine.base.Engine:
     db_user = os.environ.get("OGDC_DB_USERNAME")
     db_pass = os.environ.get("OGDC_DB_PASSWORD")
     if not db_user or not db_pass:
@@ -34,16 +33,9 @@ def _get_engine() -> sqlalchemy.engine.base.Engine:
     return engine
 
 
-# TODO: this is specifically for use with fastapi dependency injection, so maybe
-# it belongs in `service.py`?
-def get_session() -> Generator[Session, None, None]:
-    with Session(_get_engine()) as session:
-        yield session
-
-
 def close_db() -> None:
     logger.info("Disposing of Database engine.")
-    _get_engine().dispose()
+    get_engine().dispose()
 
 
 def get_user(*, session: Session, name: str) -> User | None:
@@ -76,7 +68,7 @@ def verify_password(*, password: str, hashed_password: str) -> bool:
 
 
 def create_admin_user() -> None:
-    with Session(_get_engine()) as session:
+    with Session(get_engine()) as session:
         user = get_user(session=session, name="admin")
         if user:
             logger.info("Admin user already created.")
@@ -101,7 +93,7 @@ def create_admin_user() -> None:
 
 def init_db() -> None:
     logger.info("Ensuring database is ready on app startup...")
-    SQLModel.metadata.create_all(_get_engine())
+    SQLModel.metadata.create_all(get_engine())
     logger.info("Database tables are ready.")
     create_admin_user()
     logger.info("Admin user is created.")
