@@ -46,7 +46,15 @@ Commands:
 
 ### Submitting a recipe
 
-To submit an OGDC recipe, use the `submit` subcommand.
+In order to submit recipes to the OGDC service backend, the `OGDC_API_USERNAME`
+and `OGDC_API_PASSWORD` must be set:
+
+```
+export OGDC_API_USERNAME=my-username
+export OGDC_API_PASSWORD=my-password
+```
+
+Then, to submit an OGDC recipe, use the `submit` subcommand.
 
 ```
 ogdc-runner submit --wait github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags
