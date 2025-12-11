@@ -35,3 +35,9 @@ class OgdcServiceApiError(OgdcRunnerException):
     """Exception raised when interacting with the OGDC Service API."""
 
     pass
+
+
+class OgdcMissingEnvvar(OgdcRunnerException):
+    """Exception raised when an expected environment variable is unset."""
+
+    pass

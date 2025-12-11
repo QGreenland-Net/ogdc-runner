@@ -9,6 +9,8 @@ from loguru import logger
 from pwdlib import PasswordHash
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
+from ogdc_runner.exceptions import OgdcMissingEnvvar
+
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
@@ -22,9 +24,8 @@ def _get_engine() -> sqlalchemy.engine.base.Engine:
     db_user = os.environ.get("OGDC_DB_USERNAME")
     db_pass = os.environ.get("OGDC_DB_PASSWORD")
     if not db_user or not db_pass:
-        # TODO: more appropriate error than runtime
         err_msg = "`OGDC_DB_USERNAME` and `OGDC_DB_PASSWORD` must be set."
-        raise RuntimeError(err_msg)
+        raise OgdcMissingEnvvar(err_msg)
 
     engine = create_engine(
         f"postgresql://{db_user}:{db_pass}@ogdc-db-cnpg-rw/ogdc",
@@ -85,8 +86,7 @@ def create_admin_user() -> None:
         admin_password = os.environ.get("OGDC_ADMIN_PASSWORD")
         if not admin_password:
             err_msg = "`OGDC_ADMIN_PASSWORD` envvar must be set."
-            # TODO: more appropriate error than runtime
-            raise RuntimeError(err_msg)
+            raise OgdcMissingEnvvar(err_msg)
 
         session.add(
             User(

@@ -25,6 +25,7 @@ from ogdc_runner import __version__
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
 from ogdc_runner.db import User, close_db, get_auth_user, get_session, get_user, init_db
+from ogdc_runner.exceptions import OgdcMissingEnvvar
 from ogdc_runner.recipe import stage_ogdc_recipe
 
 
@@ -33,8 +34,7 @@ def _get_jwt_secret_key() -> str:
     jwt_secret_key = os.environ.get("OGDC_JWT_SECRET_KEY")
     if not jwt_secret_key:
         err_msg = "OGDC_JWT_SECRET_KEY envvar must be set."
-        # TODO: more appropriate error than runtime
-        raise RuntimeError(err_msg)
+        raise OgdcMissingEnvvar(err_msg)
 
     return jwt_secret_key
 
