@@ -24,3 +24,11 @@ def test_token(mock_db):  # noqa: ARG001
         )
         assert response.status_code == 200
         assert "access_token" in response.json()
+
+        token = response.json()["access_token"]
+        response = client.get(
+            "/user",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        response.raise_for_status()
