@@ -8,7 +8,9 @@ into one or more Argo workflows that are executed.
 from __future__ import annotations
 
 import datetime as dt
+import os
 from contextlib import asynccontextmanager
+from functools import cache
 from typing import Annotated
 
 import jwt
@@ -25,10 +27,18 @@ from ogdc_runner.argo import get_workflow_status
 from ogdc_runner.db import User, close_db, get_auth_user, get_session, get_user, init_db
 from ogdc_runner.recipe import stage_ogdc_recipe
 
-# to get a string like this run:
-# openssl rand -hex 32
-# TODO: get this from envvar.
-JWT_SECRET_KEY = "2ae25b5398824129235724f243811d7a335a98339abe4630e4e27d25e4f144a2"
+
+@cache
+def _get_jwt_secret_key() -> str:
+    jwt_secret_key = os.environ.get("OGDC_JWT_SECRET_KEY")
+    if not jwt_secret_key:
+        err_msg = "OGDC_JWT_SECRET_KEY envvar must be set."
+        # TODO: more appropriate error than runtime
+        raise RuntimeError(err_msg)
+
+    return jwt_secret_key
+
+
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_TIMEDELTA = dt.timedelta(30)
 JWT_USERNAME_KEY = "sub"
@@ -49,7 +59,7 @@ def create_access_token(user: User) -> str:
         "sub": user.name,
         "exp": expire,
     }
-    encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, _get_jwt_secret_key(), algorithm=JWT_ALGORITHM)
 
     return encoded_jwt
 
@@ -156,7 +166,7 @@ async def _get_authenticated_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, _get_jwt_secret_key(), algorithms=[JWT_ALGORITHM])
         # Get the subject AKA username
         username = payload.get(JWT_USERNAME_KEY)
         if username is None:
