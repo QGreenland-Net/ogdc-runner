@@ -6,16 +6,20 @@ from functools import cache
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
+import pydantic
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 
 from ogdc_runner.exceptions import OgdcMissingEnvvar
 from ogdc_runner.service.db import (
     SessionDependency,
     User,
+    get_auth_user,
     get_user,
 )
+
+router = APIRouter()
 
 # JWT token constants
 JWT_ALGORITHM = "HS256"
@@ -93,3 +97,28 @@ def create_access_token(user: User) -> str:
     encoded_jwt = jwt.encode(to_encode, _get_jwt_secret_key(), algorithm=JWT_ALGORITHM)
 
     return encoded_jwt
+
+
+class TokenResponse(pydantic.BaseModel):
+    """Model representing token data returned by the app when auth is successful."""
+
+    access_token: str
+    token_type: str = "Bearer"
+
+
+@router.post(AUTH_TOKEN_URL)
+def token(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    session: SessionDependency,
+) -> TokenResponse:
+    user = get_auth_user(
+        session=session,
+        name=form_data.username,
+        password=form_data.password,
+    )
+    if not user:
+        raise HTTPException(status_code=401, detail="Incorrect username or password.")
+
+    access_token = create_access_token(user)
+
+    return TokenResponse(access_token=access_token)

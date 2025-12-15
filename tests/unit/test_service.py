@@ -5,7 +5,8 @@ from fastapi.testclient import TestClient
 from httpx import HTTPError
 
 from ogdc_runner import __version__
-from ogdc_runner.service.routes import app
+from ogdc_runner.service.auth import AUTH_TOKEN_URL
+from ogdc_runner.service.main import app
 
 
 def test_version(mock_db):  # noqa: ARG001
@@ -18,7 +19,7 @@ def test_version(mock_db):  # noqa: ARG001
 def test_token(mock_db):  # noqa: ARG001
     with TestClient(app) as client:
         response = client.post(
-            "/token",
+            AUTH_TOKEN_URL,
             data={
                 "username": "admin",
                 "password": "password",

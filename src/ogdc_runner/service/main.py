@@ -9,11 +9,9 @@ from __future__ import annotations
 
 import datetime as dt
 from contextlib import asynccontextmanager
-from typing import Annotated
 
 import pydantic
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import FastAPI, HTTPException
 from loguru import logger
 
 from ogdc_runner import __version__
@@ -22,9 +20,7 @@ from ogdc_runner.argo import get_workflow_status
 from ogdc_runner.recipe import stage_ogdc_recipe
 from ogdc_runner.service import auth
 from ogdc_runner.service.db import (
-    SessionDependency,
     close_db,
-    get_auth_user,
     init_db,
 )
 
@@ -54,6 +50,8 @@ app = FastAPI(
     title="Open Geospatial Data Cloud (OGDC) API",
     lifespan=lifespan,
 )
+
+app.include_router(auth.router)
 
 
 class VersionResponse(pydantic.BaseModel):
@@ -131,28 +129,3 @@ async def get_current_user(
     Useful for testing that authentication is working as expected.
     """
     return {"current_user": current_user.name}
-
-
-class TokenResponse(pydantic.BaseModel):
-    """Model representing token data returned by the app when auth is successful."""
-
-    access_token: str
-    token_type: str = "Bearer"
-
-
-@app.post(auth.AUTH_TOKEN_URL)
-def token(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    session: SessionDependency,
-) -> TokenResponse:
-    user = get_auth_user(
-        session=session,
-        name=form_data.username,
-        password=form_data.password,
-    )
-    if not user:
-        raise HTTPException(status_code=401, detail="Incorrect username or password.")
-
-    access_token = auth.create_access_token(user)
-
-    return TokenResponse(access_token=access_token)
