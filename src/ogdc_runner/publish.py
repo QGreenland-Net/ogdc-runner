@@ -11,7 +11,12 @@ from hera.workflows import (
     models,
 )
 
-from ogdc_runner.argo import ARGO_WORKFLOW_SERVICE, OGDC_WORKFLOW_PVC, submit_workflow
+from ogdc_runner.argo import (
+    ARGO_WORKFLOW_SERVICE,
+    OGDC_WORKFLOW_PVC,
+    make_generate_name,
+    submit_workflow,
+)
 from ogdc_runner.exceptions import OgdcWorkflowExecutionError
 from ogdc_runner.models.recipe_config import RecipeConfig
 
@@ -47,7 +52,7 @@ def remove_existing_published_data(
     """Executes an argo workflow that removes published data for a recipe if it
     exists."""
     with Workflow(
-        generate_name=f"{recipe_config.id}-remove-existing-data-",
+        generate_name=make_generate_name(recipe_config.id, "-remove-existing-data-"),
         entrypoint="steps",
         workflows_service=ARGO_WORKFLOW_SERVICE,
     ) as w:
@@ -84,7 +89,7 @@ def check_for_existing_published_data(
     otherwise `False`.
     """
     with Workflow(
-        generate_name=f"{recipe_config.id}-check-published-",
+        generate_name=make_generate_name(recipe_config.id, "-check-published-"),
         entrypoint="steps",
         workflows_service=ARGO_WORKFLOW_SERVICE,
     ) as w:

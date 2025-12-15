@@ -115,6 +115,10 @@ Use `nox` to run `pytest` to run tests:
 nox
 ```
 
+```bash
+pytest
+```
+
 ## Building docs
 
 You can build the docs using:

@@ -14,6 +14,33 @@ from loguru import logger
 
 from ogdc_runner.exceptions import OgdcWorkflowExecutionError
 
+# Kubernetes names must be no more than 63 characters.
+# Argo appends a 5-character random suffix to generate_name, so we reserve space for it.
+KUBERNETES_NAME_MAX_LENGTH = 63
+ARGO_GENERATED_SUFFIX_LENGTH = 5
+
+
+def make_generate_name(recipe_id: str, suffix: str = "-") -> str:
+    """Create a workflow generate_name, truncating recipe_id if necessary.
+
+    Kubernetes names must be no more than 63 characters. Argo appends a 5-character
+    random suffix to generate_name to create the final workflow name. This function
+    truncates the recipe_id as needed to ensure the final name stays within the limit.
+
+    Args:
+        recipe_id: The recipe identifier to use as the base name
+        suffix: The suffix to append (e.g., "-", "-remove-existing-data-")
+
+    Returns:
+        A generate_name string that will produce a valid Kubernetes name
+    """
+    # Reserve space for Argo's generated suffix
+    max_generate_name_length = KUBERNETES_NAME_MAX_LENGTH - ARGO_GENERATED_SUFFIX_LENGTH
+    max_id_length = max_generate_name_length - len(suffix)
+    truncated_id = recipe_id[:max_id_length]
+    return f"{truncated_id}{suffix}"
+
+
 OGDC_WORKFLOW_PVC = models.Volume(
     name="workflow-volume",
     persistent_volume_claim=models.PersistentVolumeClaimVolumeSource(
@@ -72,9 +99,9 @@ class ArgoManager:
 
         image_pull_policy = "IfNotPresent"
         if is_dev_environment:
+            # In dev, we expect the `latest` image to be used, so we always want
+            # the latest pulled and updated.
             image_pull_policy = "Always"
-        elif is_local_environment:
-            image_pull_policy = "Never"
 
         # Argo workflows service URL
         workflows_service_url = os.environ.get(

@@ -5,6 +5,7 @@ from functools import cache, cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Self
 
+import requests
 from pydantic import (
     AnyUrl,
     Field,
@@ -49,8 +50,47 @@ class ParallelConfig(OgdcBaseModel):
 
 # Input parameter with type and value
 class InputParam(OgdcBaseModel):
+    """Input parameter for a recipe.
+
+    When instantiated with `context={"check_urls": True}`, URL-type parameters
+    will be validated to ensure they are accessible via HTTP HEAD request.
+    """
+
     value: AnyUrl | str
     type: Literal["url", "pvc_mount", "file_system"]
+
+    @model_validator(mode="after")
+    def validate_url_accessible(self, info: ValidationInfo) -> Self:
+        """Validate that URL-type parameters are accessible."""
+        if self.type != "url":
+            return self
+
+        context = info.context or {}
+        if not context.get("check_urls", False):
+            return self
+
+        url = str(self.value)
+        timeout = context.get("url_timeout", 30)
+
+        try:
+            response = requests.head(url, timeout=timeout, allow_redirects=True)
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            raise ValueError(
+                f"URL validation failed for {url}: HTTP {e.response.status_code}"
+            ) from e
+        except requests.exceptions.ConnectionError as e:
+            raise ValueError(
+                f"URL validation failed for {url}: Connection failed"
+            ) from e
+        except requests.exceptions.Timeout as e:
+            raise ValueError(
+                f"URL validation failed for {url}: Timeout after {timeout}s"
+            ) from e
+        except Exception as e:
+            raise ValueError(f"URL validation failed for {url}: {e}") from e
+
+        return self
 
 
 # Create a model for the recipe input
