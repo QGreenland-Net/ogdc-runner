@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Generator
 from functools import cache
+from typing import Annotated
 
 import sqlalchemy
+from fastapi import Depends
 from loguru import logger
 from pwdlib import PasswordHash
 from sqlmodel import Field, Session, SQLModel, create_engine, select
@@ -31,6 +34,16 @@ def get_engine() -> sqlalchemy.engine.base.Engine:
     )
 
     return engine
+
+
+# Create a FastAPI dependency on the database session.
+def _get_session() -> Generator[Session, None, None]:
+    """Yield a database session for FastAPI routes."""
+    with Session(get_engine()) as session:
+        yield session
+
+
+SessionDependency = Annotated[Session, Depends(_get_session)]
 
 
 def close_db() -> None:

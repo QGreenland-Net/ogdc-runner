@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from httpx import HTTPError
 
 from ogdc_runner import __version__
-from ogdc_runner.service import app
+from ogdc_runner.service.routes import app
 
 
 def test_version(mock_db):  # noqa: ARG001

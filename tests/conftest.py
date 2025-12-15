@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from sqlmodel import StaticPool, create_engine
 
-from ogdc_runner import db, service
+from ogdc_runner.service import db
 
 SHELL_RECIPE_TEST_PATH = Path(__file__).parent / "test_shell_workflow_recipe_dir"
 VIZ_RECIPE_TEST_PATH = Path(__file__).parent / "test_viz_workflow_recipe_dir"
@@ -36,7 +36,6 @@ def mock_db(monkeypatch):
         )
 
     monkeypatch.setattr(db, "get_engine", mock_get_engine)
-    monkeypatch.setattr(service, "get_engine", mock_get_engine)
     monkeypatch.setenv("OGDC_ADMIN_PASSWORD", "password")
     monkeypatch.setenv(
         "OGDC_JWT_SECRET_KEY",

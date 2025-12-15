@@ -16,4 +16,4 @@ RUN python -m venv .venv && . ./.venv/bin/activate && pip install --editable .
 EXPOSE 8000
 
 # Default to running the production fastapi server
-CMD . ./.venv/bin/activate && fastapi run --port 8000 --host 0.0.0.0 src/ogdc_runner/service.py
+CMD . ./.venv/bin/activate && fastapi run --port 8000 --host 0.0.0.0 src/ogdc_runner/service/routes.py

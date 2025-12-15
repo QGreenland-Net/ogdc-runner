@@ -8,99 +8,25 @@ into one or more Argo workflows that are executed.
 from __future__ import annotations
 
 import datetime as dt
-import os
-from collections.abc import Generator
 from contextlib import asynccontextmanager
-from functools import cache
 from typing import Annotated
 
-import jwt
 import pydantic
 from fastapi import Depends, FastAPI, HTTPException
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jwt.exceptions import InvalidTokenError
+from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
-from sqlmodel import Session
 
 from ogdc_runner import __version__
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
-from ogdc_runner.db import User, close_db, get_auth_user, get_engine, get_user, init_db
-from ogdc_runner.exceptions import OgdcMissingEnvvar
 from ogdc_runner.recipe import stage_ogdc_recipe
-
-# JWT token constants
-JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_TIMEDELTA = dt.timedelta(30)
-JWT_USERNAME_KEY = "sub"
-
-# Create OAuth2 scheme for the application. The tokenUrl points to the `token/`
-# route below.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-
-# Create a FastAPI dependency on the database session.
-def _get_session() -> Generator[Session, None, None]:
-    """Yield a database session for FastAPI routes."""
-    with Session(get_engine()) as session:
-        yield session
-
-
-SessionDep = Annotated[Session, Depends(_get_session)]
-
-
-async def get_authenticated_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    session: SessionDep,
-) -> User:
-    """Given a valid token, return the matching user."""
-    auth_exception = HTTPException(
-        status_code=401,
-        detail="Could not validate credentials.",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, _get_jwt_secret_key(), algorithms=[JWT_ALGORITHM])
-        # Get the subject AKA username
-        username = payload.get(JWT_USERNAME_KEY)
-        if username is None:
-            raise auth_exception
-
-    except InvalidTokenError as e:
-        raise auth_exception from e
-
-    user = get_user(session=session, name=username)
-    if not user:
-        raise auth_exception
-
-    return user
-
-
-# Authenticated user depednency for FastAPI routes. Using this as a type
-# annotation in an argument to a route results in that route needing to be
-# passed a valid token.
-authenticated_user = Annotated[User, Depends(get_authenticated_user)]
-
-
-@cache
-def _get_jwt_secret_key() -> str:
-    """Get the JWT secret key used to encode and decode JWT tokens used by the app for auth.
-
-    Requires the `OGDC_JWT_SECRET_KEY` be set.
-    """
-    jwt_secret_key = os.environ.get("OGDC_JWT_SECRET_KEY")
-    if not jwt_secret_key:
-        err_msg = "OGDC_JWT_SECRET_KEY envvar must be set."
-        raise OgdcMissingEnvvar(err_msg)
-
-    return jwt_secret_key
-
-
-class Token(pydantic.BaseModel):
-    """Model representing token data returned by the app when auth is successful."""
-
-    access_token: str
-    token_type: str = "Bearer"
+from ogdc_runner.service import auth
+from ogdc_runner.service.db import (
+    SessionDependency,
+    close_db,
+    get_auth_user,
+    init_db,
+)
 
 
 @asynccontextmanager
@@ -154,7 +80,7 @@ class SubmitRecipeResponse(pydantic.BaseModel):
 def submit(
     submit_recipe_request: SubmitRecipeRequest,
     # Ensure submissions require an authenticated user.
-    _current_user: authenticated_user,
+    _current_user: auth.AuthenticatedUserDependency,
 ) -> SubmitRecipeResponse:
     """Submit a recipe to OGDC for execution.
 
@@ -198,7 +124,7 @@ def status(recipe_workflow_name: str) -> StatusResponse:
 
 @app.get("/user")
 async def get_current_user(
-    current_user: authenticated_user,
+    current_user: auth.AuthenticatedUserDependency,
 ) -> dict[str, str]:
     """Return the current authenticated user.
 
@@ -207,27 +133,18 @@ async def get_current_user(
     return {"current_user": current_user.name}
 
 
-def create_access_token(user: User) -> str:
-    """Create a JWT access token for authentication."""
-    expire = dt.datetime.now() + ACCESS_TOKEN_EXPIRE_TIMEDELTA
-    to_encode = {
-        # "sub" is short for "subject", and is part of the JWT spec. We use it here
-        # to just store the username, which should be unique.
-        # See:
-        # https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/#technical-details-about-the-jwt-subject-sub
-        "sub": user.name,
-        "exp": expire,
-    }
-    encoded_jwt = jwt.encode(to_encode, _get_jwt_secret_key(), algorithm=JWT_ALGORITHM)
+class TokenResponse(pydantic.BaseModel):
+    """Model representing token data returned by the app when auth is successful."""
 
-    return encoded_jwt
+    access_token: str
+    token_type: str = "Bearer"
 
 
 @app.post("/token")
 def token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    session: SessionDep,
-) -> Token:
+    session: SessionDependency,
+) -> TokenResponse:
     user = get_auth_user(
         session=session,
         name=form_data.username,
@@ -236,6 +153,6 @@ def token(
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect username or password.")
 
-    access_token = create_access_token(user)
+    access_token = auth.create_access_token(user)
 
-    return Token(access_token=access_token)
+    return TokenResponse(access_token=access_token)
