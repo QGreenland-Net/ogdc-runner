@@ -1,3 +1,9 @@
+"""Module containing code for interacting with the OGDC database.
+
+Defines database tables, configures a connection to the database, and includes
+user creation code.
+"""
+
 from __future__ import annotations
 
 import os
@@ -15,7 +21,10 @@ from ogdc_runner.exceptions import OgdcMissingEnvvar
 
 
 class User(SQLModel, table=True):
+    """Model representing the `users` table in the OGDC database."""
+
     __tablename__ = "users"
+    # `id` field is auto-created
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     password_hash: str

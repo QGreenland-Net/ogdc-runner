@@ -1,3 +1,11 @@
+"""Module containing code related to authenticating an OGDC user.
+
+Users authenticate by submitting a username and password to the `token/`
+endpoint. If the username/password pair are valid, the response will contain a
+JSON Web Token (JWT) that can be used to authenticate other endpoints via a
+`Authorization: Bearer token` header.
+"""
+
 from __future__ import annotations
 
 import datetime as dt
