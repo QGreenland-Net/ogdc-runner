@@ -57,7 +57,13 @@ def get_user(*, session: Session, name: str) -> User | None:
     return results
 
 
-def get_auth_user(session: Session, name: str, password: str) -> None | User:
+def get_user_with_password(
+    *,
+    session: Session,
+    name: str,
+    password: str,
+) -> None | User:
+    """Get the user record by name and password."""
     user = get_user(session=session, name=name)
     if user is None or not verify_password(
         password=password, hashed_password=user.password_hash

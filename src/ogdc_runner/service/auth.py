@@ -15,8 +15,8 @@ from ogdc_runner.exceptions import OgdcMissingEnvvar
 from ogdc_runner.service.db import (
     SessionDependency,
     User,
-    get_auth_user,
     get_user,
+    get_user_with_password,
 )
 
 router = APIRouter()
@@ -111,7 +111,7 @@ def token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: SessionDependency,
 ) -> TokenResponse:
-    user = get_auth_user(
+    user = get_user_with_password(
         session=session,
         name=form_data.username,
         password=form_data.password,
