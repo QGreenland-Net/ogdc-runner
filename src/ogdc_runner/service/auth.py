@@ -34,7 +34,7 @@ AUTH_TOKEN_URL = "/token"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=AUTH_TOKEN_URL)
 
 
-async def get_authenticated_user(
+async def get_user_by_auth_token(
     token: Annotated[str, Depends(oauth2_scheme)],
     session: SessionDependency,
 ) -> User:
@@ -64,12 +64,13 @@ async def get_authenticated_user(
 # Authenticated user depednency for FastAPI routes. Using this as a type
 # annotation in an argument to a route results in that route needing to be
 # passed a valid token.
-AuthenticatedUserDependency = Annotated[User, Depends(get_authenticated_user)]
+AuthenticatedUserDependency = Annotated[User, Depends(get_user_by_auth_token)]
 
 
 @cache
 def _get_jwt_secret_key() -> str:
-    """Get the JWT secret key used to encode and decode JWT tokens used by the app for auth.
+    """Get the JWT secret key used to encode and decode JWT tokens used by the
+    app for auth.
 
     Requires the `OGDC_JWT_SECRET_KEY` be set.
     """
@@ -111,6 +112,11 @@ def token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: SessionDependency,
 ) -> TokenResponse:
+    """Given a username and password matching an existing user, return an access token.
+
+    Token can be used to authenticate with other endpoints that use the
+    `AuthenticatedUserDependency`.
+    """
     user = get_user_with_password(
         session=session,
         name=form_data.username,
