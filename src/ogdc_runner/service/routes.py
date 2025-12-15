@@ -140,7 +140,7 @@ class TokenResponse(pydantic.BaseModel):
     token_type: str = "Bearer"
 
 
-@app.post("/token")
+@app.post(auth.AUTH_TOKEN_URL)
 def token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: SessionDependency,

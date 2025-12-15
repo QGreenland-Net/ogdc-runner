@@ -23,9 +23,11 @@ ACCESS_TOKEN_EXPIRE_TIMEDELTA = dt.timedelta(30)
 JWT_USERNAME_KEY = "sub"
 
 
+AUTH_TOKEN_URL = "/token"
+
 # Create OAuth2 scheme for the application. The tokenUrl points to the `token/`
 # route below.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=AUTH_TOKEN_URL)
 
 
 async def get_authenticated_user(
