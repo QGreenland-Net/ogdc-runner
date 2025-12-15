@@ -221,6 +221,8 @@ class VizWorkflow(Workflow):
     # configuration.
     config_file: str | Path | None = None
 
+    batch_size: int = 250
+
     # Optional parallel execution configuration
     parallel: ParallelConfig = Field(
         default_factory=lambda: _get_parallel_config_default(),

@@ -4,6 +4,7 @@ import json
 
 from hera.workflows import (
     DAG,
+    Artifact,
     Container,
     HTTPArtifact,
     Parameter,
@@ -29,32 +30,80 @@ from ogdc_runner.models.recipe_config import RecipeConfig
 
 
 @script(
-    name="staging",
+    name="batching",
     inputs=[
         Parameter(name="input_url"),
         Parameter(name="recipe_id"),
         HTTPArtifact(
-            name="staging-input",
+            name="batch-input",
             path="/mnt/workflow/{{inputs.parameters.recipe_id}}/input/input.gpkg",
             url="{{inputs.parameters.input_url}}",
         ),
     ],
-    image="ghcr.io/permafrostdiscoverygateway/pdgworkflow:latest",
+    outputs=[
+        Artifact(
+            name="batch-output",
+            path="/mnt/workflow/{{inputs.parameters.recipe_id}}/batch",
+        ),
+    ],
+    image="ghcr.io/rushirajnenuji/viz-staging:latest",
     command=["python"],
     volume_mounts=[
         VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
     ],
 )
-def staging_process() -> None:
-    """Stages the input file directly for visualization."""
+def batch_process(num_features) -> None:  # type: ignore[no-untyped-def]
+    """Processes data in batches."""
     import sys
     from pathlib import Path
 
-    from pdgworkflow import (  # type: ignore[import-not-found]
-        WorkflowManager,
-    )
+    import geopandas as gpd  # type: ignore[import-not-found]
 
-    # Log to stderr
+    # Redirect print statements to stderr instead of stdout
+    # This way they won't interfere with the JSON output
+    def print_log(message: str) -> None:
+        print(message, file=sys.stderr)
+
+    gdf = gpd.read_file("{{inputs.artifacts.batch-input.path}}")
+    results = []
+    for idx, start in enumerate(range(0, len(gdf), num_features)):
+        output_fp = Path(
+            "{{outputs.artifacts.batch-output.path}}/" + f"chunk-{idx}.gpkg"
+        )
+        print_log(f"Writing chunk {idx} to {output_fp}")
+        output_fp.parent.mkdir(parents=True, exist_ok=True)
+        gdf[start : start + num_features].to_file(
+            filename=output_fp,
+            driver="GPKG",
+        )
+        results.append(str(output_fp))
+
+    # Output only the JSON to stdout
+    print(json.dumps(results))
+
+
+@script(
+    name="tiling",
+    inputs=[
+        Parameter(name="chunk-filepath"),
+        Parameter(name="recipe_id"),
+    ],
+    image="ghcr.io/rushirajnenuji/viz-staging:latest",
+    command=["python"],
+    volume_mounts=[
+        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
+    ],
+)
+def tiling_process() -> None:
+    """Creates tiles from a geospatial data chunk."""
+    import json
+    import sys
+    from pathlib import Path
+
+    from pdgstaging import (  # type: ignore[import-not-found]
+        TileStager,
+    )  # Log to stderr
+
     def print_log(message: str) -> None:
         print(message, file=sys.stderr)
 
@@ -66,107 +115,11 @@ def staging_process() -> None:
         Path("/mnt/workflow/{{inputs.parameters.recipe_id}}/config.json").read_text()
     )
 
-    workflow_manager = WorkflowManager(workflow_config)
-    print_log("Staging input file")
-    print_log("{{inputs.artifacts.staging-input.path}}")
-    workflow_manager.stage("{{inputs.artifacts.staging-input.path}}")
+    tiler = TileStager(workflow_config, check_footprints=False)
+    print_log("Staging chunk file")
+    print_log("{{inputs.parameters.chunk-filepath}}")
+    tiler.stage("{{inputs.parameters.chunk-filepath}}")
     print_log("Staging done")
-
-    # Get list of staged files and return as JSON to stdout
-    staged_files = workflow_manager.list_staged_files()
-    print_log(f"Staged {len(staged_files)} files")
-
-    # Print to stdout (NOT stderr) so Hera can capture it
-    print(json.dumps(staged_files))
-
-
-@script(
-    name="rasterization",
-    inputs=[
-        Parameter(name="recipe_id"),
-        Parameter(name="staged_files"),  # Receive the list of staged files
-    ],
-    image="ghcr.io/permafrostdiscoverygateway/pdgworkflow:latest",
-    command=["python"],
-    volume_mounts=[
-        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
-    ],
-)
-def rasterization_process() -> None:
-    """
-    Creates geotiff and summary web tiles (png) from a geospatial vector data tile.
-    """
-    import json
-    import sys
-    from pathlib import Path
-
-    from pdgworkflow import (  # type: ignore[import-not-found]
-        WorkflowManager,
-    )
-
-    # Log to stderr
-    def print_log(message: str) -> None:
-        print(message, file=sys.stderr)
-
-    # Read the viz-config.json from the PVC
-    # This configuration controls how VizWorkflow processes the visualization data.
-    # For available configuration options, see:
-    # https://github.com/PermafrostDiscoveryGateway/viz-workflow/blob/feature-wf-k8s/pdgworkflow/ConfigManager.py
-    workflow_config = json.loads(
-        Path("/mnt/workflow/{{inputs.parameters.recipe_id}}/config.json").read_text()
-    )
-
-    # Parse the staged files list
-    staged_files = json.loads("{{inputs.parameters.staged_files}}")
-    print_log(f"Received {len(staged_files)} staged files: {staged_files}")
-
-    workflow_manager = WorkflowManager(workflow_config)
-    print_log("Rasterizing files..")
-    workflow_manager.rasterize_all()
-    print_log("Rasterizing done")
-
-
-@script(
-    name="b3dm-tiling",
-    inputs=[
-        Parameter(name="recipe_id"),
-        Parameter(name="staged_files"),  # Receive the list of staged files
-    ],
-    image="ghcr.io/permafrostdiscoverygateway/pdgworkflow:latest",
-    command=["python"],
-    volume_mounts=[
-        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
-    ],
-)
-def b3dm_tiling_process() -> None:
-    """Creates B3DM tiles (3D Tiles) from a geospatial vector data tile."""
-    import json
-    import sys
-    from pathlib import Path
-
-    from pdgworkflow import (  # type: ignore[import-not-found]
-        WorkflowManager,
-    )
-
-    def print_log(message: str) -> None:
-        print(message, file=sys.stderr)
-
-    # Read the viz-config.json from the PVC
-    # This configuration controls how VizWorkflow processes the visualization data.
-    # For available configuration options, see:
-    # https://github.com/PermafrostDiscoveryGateway/viz-workflow/blob/feature-wf-k8s/pdgworkflow/ConfigManager.py
-    workflow_config = json.loads(
-        Path("/mnt/workflow/{{inputs.parameters.recipe_id}}/config.json").read_text()
-    )
-
-    # Parse the staged files list
-    staged_files = json.loads("{{inputs.parameters.staged_files}}")
-    print_log(f"Received {len(staged_files)} staged files: {staged_files}")
-
-    workflow_manager = WorkflowManager(workflow_config)
-    print_log("Generating b3dm 3D tiles..")
-    workflow_manager.run_3d_tiling()
-    print_log("b3dm 3D tiles generation completed.")
 
 
 def make_and_submit_viz_workflow(
@@ -217,9 +170,11 @@ def make_and_submit_viz_workflow(
 
         stage_config_file_template = Container(
             name="stage-viz-config",
+            image="alpine:latest",
             command=["sh", "-c"],
             args=[
                 f"""mkdir -p /mnt/workflow/{recipe_config.id}/input && \\
+mkdir -p /mnt/workflow/{recipe_config.id}/batch && \\
 mkdir -p /mnt/workflow/{recipe_config.id}/output/staged && \\
 mkdir -p /mnt/workflow/{recipe_config.id}/output/geotiff && \\
 mkdir -p /mnt/workflow/{recipe_config.id}/output/3dtiles && \\
@@ -237,7 +192,7 @@ EOF"""
 
         # Set up the DAG
         with DAG(name="main"):
-            # Step 1: Stage the viz-config.json file
+            # Step1: Stage the viz-config.json file
             # This is the configuration file for the visualization workflow
             # It also creates necessary directories required for the workflow
             # to run successfully
@@ -246,45 +201,32 @@ EOF"""
                 template=stage_config_file_template,
             )
 
-            # Step 2: Staging/Tiling step
-            # Directly stage the input file for visualization
-            stage_task = staging_process(
+            # Step 2: Batching step
+            batch_task = batch_process(
                 arguments={
                     "input_url": input_url,
                     "recipe_id": recipe_config.id,
+                    "num_features": recipe_config.workflow.batch_size,
                 },
             )
 
-            # Step 3: Rasterization step
-            # This step creates geotiff and summary web tiles (png)
-            # from the staged geospatial vector data
-            rasterization_task = rasterization_process(
+            # Step 3: Tiling step
+            # This step processes each chunk of vector data in parallel
+            # using the tiling_process script defined above
+            stage_task = tiling_process(
                 arguments={
+                    "chunk-filepath": "{{item}}",
                     "recipe_id": recipe_config.id,
-                    "staged_files": stage_task.get_result_as("result"),
-                }
-            )
-
-            # Step 4: B3DM Tiling step
-            # This step generates 3D tiles from the staged vector data
-            b3dm_tiling_task = b3dm_tiling_process(
-                arguments={
-                    "recipe_id": recipe_config.id,
-                    "staged_files": stage_task.get_result_as("result"),
-                }
+                },
+                with_param=batch_task.get_result_as("result"),
             )
 
             # Define the workflow structure
-            # Staging depends on config staging
-            # Rasterization and b3dm_tiling execute in parallel after staging
-            (
-                stage_config_task
-                >> stage_task
-                >> [
-                    rasterization_task,
-                    b3dm_tiling_task,
-                ]
-            )
+            # tiling depends on both download and batch tasks
+            [  # type: ignore[operator]
+                stage_config_task,
+                batch_task,
+            ] >> stage_task
 
     # Submit the workflow
     workflow_name = submit_workflow(w, wait=wait)
