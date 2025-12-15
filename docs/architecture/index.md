@@ -1,5 +1,12 @@
 # Architecture
 
+```{toctree}
+:maxdepth: 1
+:hidden:
+
+service.md
+```
+
 ```{mermaid}
 graph LR
 
@@ -8,6 +15,7 @@ subgraph ADC_K8S[ADC k8s]
   subgraph OGDC[OGDC]
     OGDC_RUNNER_SERVICE[ogdc-runner service]
     ARGO[Argo Workflows]
+    DB[(PostgreSQL Database)]
   end
 end
 
@@ -18,6 +26,7 @@ end
 OGDC_RUNNER_CLI -->|"submit|status"| OGDC_RUNNER_SERVICE
 
 OGDC_RUNNER_SERVICE -->|"create/query Argo workflow(s) required to execute recipe instructions"|ARGO
+OGDC_RUNNER_SERVICE -->|"create/query Users"|DB
 
 %% Style
 style OGDC_RUNNER_SERVICE stroke:#ff6666,stroke-width:2px;
@@ -28,12 +37,12 @@ style OGDC_RUNNER_CLI stroke:#ff6666,stroke-width:2px;
 
 This component:
 
-- Defines and documents the recipe API(s). See [OGDC Recipes](./recipes.md).
+- Defines and documents the recipe API(s). See [OGDC Recipes](../recipes.md).
 - Defines a CLI published as the `ogdc-runner` pypi Python package that accepts
   a recipe as input and submits it to the service layer.
 - Defines a service layer published as the `ghcr.io/qgreenland-net/ogdc-runner`
   docker image that translates submitted OGDC recipes into Argo Workflows for
-  execution.
+  execution. See [OGDC Service API](./service.md) for more details.
 
 ## Aspirational
 
