@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 
 import click
 import requests
@@ -38,39 +39,65 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
-def get_api_token() -> str:
-    """Get an OGDC API token using envvar-provided username/password.
+def _get_api_token_factory() -> Callable:
+    """Helper function that creates a callable that returns an OGDC API token.
 
-    `OGDC_API_USERNAME` and `OGDC_API_PASSWORD` must be set or an
-    `OgdcMissingEnvvar` exception will be raised.
-
-    The resulting access token can be used to authenticate with OGDC API
-    endpoitns.
+    This is a closure (see e.g., https://realpython.com/python-closure/) - it
+    allows caching a requested access token based on its expiration datetime.
     """
-    username = os.environ.get("OGDC_API_USERNAME")
-    password = os.environ.get("OGDC_API_PASSWORD")
-    if not username or not password:
-        err = "OGDC_API_USERNAME and OGDC_API_PASSWORD must be set."
-        raise OgdcMissingEnvvar(err)
+    token_data = None
 
-    response = requests.post(
-        f"{OGDC_API_URL}/token",
-        data={
-            "username": username,
-            "password": password,
-        },
-    )
+    def _get_api_token() -> str:
+        """Get an OGDC API token using envvar-provided username/password.
 
-    response.raise_for_status()
+        `OGDC_API_USERNAME` and `OGDC_API_PASSWORD` must be set or an
+        `OgdcMissingEnvvar` exception will be raised.
 
-    token_data = response.json()
-    access_token = token_data["access_token"]
+        The resulting access token can be used to authenticate with OGDC API
+        endpoitns.
+        """
+        nonlocal token_data
 
-    if not isinstance(access_token, str):
-        err_msg = "Failed to get valid access token from OGDC API."
-        raise OgdcServiceApiError(err_msg)
+        # Check if the token is valid.
+        if token_data:
+            token_expiration_utc = dt.datetime.fromisoformat(
+                token_data["utc_expiration"]
+            )
+            # Use a 1 minute buffer to account for time between check and the
+            # next request.
+            current_utc = dt.datetime.utcnow() + dt.timedelta(minutes=1)
+            if token_expiration_utc > current_utc:
+                # Return the existing token - it is still valid.
+                return token_data["access_token"]
 
-    return access_token
+        username = os.environ.get("OGDC_API_USERNAME")
+        password = os.environ.get("OGDC_API_PASSWORD")
+        if not username or not password:
+            err = "OGDC_API_USERNAME and OGDC_API_PASSWORD must be set."
+            raise OgdcMissingEnvvar(err)
+
+        response = requests.post(
+            f"{OGDC_API_URL}/token",
+            data={
+                "username": username,
+                "password": password,
+            },
+        )
+
+        response.raise_for_status()
+
+        token_data = response.json()
+        access_token = token_data["access_token"]
+        if not isinstance(access_token, str):
+            err_msg = "Failed to get valid access token from OGDC API."
+            raise OgdcServiceApiError(err_msg)
+
+        return access_token
+
+    return _get_api_token
+
+
+get_api_token = _get_api_token_factory()
 
 
 def _check_ogdc_api_error(response: requests.Response) -> None:

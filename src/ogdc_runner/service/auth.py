@@ -31,7 +31,7 @@ router = APIRouter()
 
 # JWT token constants
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_TIMEDELTA = dt.timedelta(30)
+ACCESS_TOKEN_EXPIRE_TIMEDELTA = dt.timedelta(minutes=30)
 JWT_USERNAME_KEY = "sub"
 
 
@@ -92,9 +92,13 @@ def _get_jwt_secret_key() -> str:
     return jwt_secret_key
 
 
-def create_access_token(user: User) -> str:
-    """Create a JWT access token for authentication."""
-    expire = dt.datetime.now() + ACCESS_TOKEN_EXPIRE_TIMEDELTA
+def create_access_token(user: User) -> tuple[str, dt.datetime]:
+    """Create a JWT access token for authentication.
+
+    Returns a tuple with the first element being the JWT access token and the
+    second the expiration datetime in UTC.
+    """
+    expire = dt.datetime.utcnow() + ACCESS_TOKEN_EXPIRE_TIMEDELTA
     to_encode = {
         # "sub" is short for "subject", and is part of the JWT spec. We use it here
         # to just store the username, which should be unique.
@@ -105,7 +109,7 @@ def create_access_token(user: User) -> str:
     }
     encoded_jwt = jwt.encode(to_encode, _get_jwt_secret_key(), algorithm=JWT_ALGORITHM)
 
-    return encoded_jwt
+    return encoded_jwt, expire
 
 
 class TokenResponse(pydantic.BaseModel):
@@ -113,6 +117,7 @@ class TokenResponse(pydantic.BaseModel):
 
     access_token: str
     token_type: str = "Bearer"
+    utc_expiration: dt.datetime
 
 
 @router.post(AUTH_TOKEN_URL)
@@ -133,6 +138,9 @@ def token(
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect username or password.")
 
-    access_token = create_access_token(user)
+    access_token, utc_expiration_datetime = create_access_token(user)
 
-    return TokenResponse(access_token=access_token)
+    return TokenResponse(
+        access_token=access_token,
+        utc_expiration=utc_expiration_datetime,
+    )
