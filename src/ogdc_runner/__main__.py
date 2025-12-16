@@ -39,13 +39,13 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
-def _get_api_token_factory() -> Callable:
+def _get_api_token_factory() -> Callable[[], str]:
     """Helper function that creates a callable that returns an OGDC API token.
 
     This is a closure (see e.g., https://realpython.com/python-closure/) - it
     allows caching a requested access token based on its expiration datetime.
     """
-    token_data = None
+    token_data: None | dict[str, str] = None
 
     def _get_api_token() -> str:
         """Get an OGDC API token using envvar-provided username/password.
@@ -59,7 +59,7 @@ def _get_api_token_factory() -> Callable:
         nonlocal token_data
 
         # Check if the token is valid.
-        if token_data:
+        if token_data is not None:
             token_expiration_utc = dt.datetime.fromisoformat(
                 token_data["utc_expiration"]
             )
@@ -87,12 +87,13 @@ def _get_api_token_factory() -> Callable:
         response.raise_for_status()
 
         token_data = response.json()
-        access_token = token_data["access_token"]
-        if not isinstance(access_token, str):
+        if not isinstance(token_data, dict) or not isinstance(
+            token_data.get("access_token"), str
+        ):
             err_msg = "Failed to get valid access token from OGDC API."
             raise OgdcServiceApiError(err_msg)
 
-        return access_token
+        return token_data["access_token"]
 
     return _get_api_token
 
