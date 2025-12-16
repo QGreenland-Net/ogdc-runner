@@ -61,6 +61,10 @@ authentication via a token obtained via the
 {class}`ogdc_runner.service.auth.token` route (which requires
 username/password).
 
+By default, all routes in {mod}`ogdc_runner.service.auth_routes` require a valid
+auth token and do not need to explicitly use `auth.AuthenticatedUserDependency`
+in the function signature.
+
 ### Adding new users
 
 TODO.
