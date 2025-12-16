@@ -39,6 +39,14 @@ def cli() -> None:
 
 
 def get_api_token() -> str:
+    """Get an OGDC API token using envvar-provided username/password.
+
+    `OGDC_API_USERNAME` and `OGDC_API_PASSWORD` must be set or an
+    `OgdcMissingEnvvar` exception will be raised.
+
+    The resulting access token can be used to authenticate with OGDC API
+    endpoitns.
+    """
     username = os.environ.get("OGDC_API_USERNAME")
     password = os.environ.get("OGDC_API_PASSWORD")
     if not username or not password:
