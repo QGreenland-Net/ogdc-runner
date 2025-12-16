@@ -10,7 +10,7 @@ import nox
 DIR = Path(__file__).parent.resolve()
 
 nox.needs_version = ">=2024.3.2"
-nox.options.sessions = ["typecheck", "tests"]
+nox.options.sessions = ["tests"]
 nox.options.default_venv_backend = "uv|virtualenv"
 if os.environ.get("ENVIRONMENT") == "dev":
     # Use existing venvs where possible in dev
@@ -22,13 +22,14 @@ else:
 
 @nox.session
 def typecheck(session: nox.Session) -> None:
-    """Run typechecker."""
+    """Run typechecker (mypy)."""
     session.install(".[test]")
     session.run("mypy", *session.posargs)
 
 
 @nox.session
 def test_unit(session: nox.Session) -> None:
+    """Run unit tests."""
     session.install(".[test]")
     session.run(
         "pytest",
@@ -39,6 +40,11 @@ def test_unit(session: nox.Session) -> None:
 
 @nox.session
 def test_integration(session: nox.Session) -> None:
+    """Run integration tests.
+
+    These tests require that the `ogdc-helm` stack be deployed locally via
+    rancher-desktop.
+    """
     session.install(".[test]")
     session.run(
         "pytest",
@@ -49,12 +55,16 @@ def test_integration(session: nox.Session) -> None:
 
 @nox.session(requires=["typecheck", "test_unit"])
 def test_ci(session: nox.Session) -> None:
+    """Run tests required for CI (GitHub actions).
+
+    Runs typechecker and unit tests.
+    """
     pass
 
 
 @nox.session(requires=["test_ci", "test_integration"])
 def tests(session: nox.Session) -> None:
-    """Run the unit and regular tests."""
+    """Run all the tests."""
     session.install(".[test]")
     session.run(
         "pytest",
