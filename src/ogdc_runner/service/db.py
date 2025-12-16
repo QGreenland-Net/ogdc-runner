@@ -94,6 +94,10 @@ def verify_password(*, password: str, hashed_password: str) -> bool:
 
 
 def create_admin_user() -> None:
+    """Create the admin user if it does not already exist.
+
+    Requires that the `OGDC_ADMIN_PASSWORD` envvar be set.
+    """
     with Session(get_engine()) as session:
         user = get_user(session=session, name="admin")
         if user:
@@ -118,6 +122,7 @@ def create_admin_user() -> None:
 
 
 def init_db() -> None:
+    """Initialize the database with tables and an admin user."""
     logger.info("Ensuring database is ready on app startup...")
     SQLModel.metadata.create_all(get_engine())
     logger.info("Database tables are ready.")

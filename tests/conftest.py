@@ -24,6 +24,15 @@ def test_viz_workflow_recipe_directory() -> Path:
 
 @pytest.fixture
 def mock_db(monkeypatch):
+    """Fixture to mock out the OGDC API database.
+
+    Uses an in-memory sqlite database instead of the live postgresql database.
+
+    Ensures required envvars are set:
+        * `OGDC_JWT_SECRET_KEY`
+        * `OGDC_ADMIN_PASSWORD` (set to `password`)
+    """
+
     @cache
     def mock_get_engine():
         return create_engine(
