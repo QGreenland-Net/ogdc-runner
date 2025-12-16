@@ -98,7 +98,7 @@ def create_access_token(user: User) -> tuple[str, dt.datetime]:
     Returns a tuple with the first element being the JWT access token and the
     second the expiration datetime in UTC.
     """
-    expire = dt.datetime.utcnow() + ACCESS_TOKEN_EXPIRE_TIMEDELTA
+    expire = dt.datetime.now(dt.UTC) + ACCESS_TOKEN_EXPIRE_TIMEDELTA
     to_encode = {
         # "sub" is short for "subject", and is part of the JWT spec. We use it here
         # to just store the username, which should be unique.

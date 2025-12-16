@@ -65,7 +65,7 @@ def _get_api_token_factory() -> Callable[[], str]:
             )
             # Use a 1 minute buffer to account for time between check and the
             # next request.
-            current_utc = dt.datetime.utcnow() + dt.timedelta(minutes=1)
+            current_utc = dt.datetime.now(dt.UTC) + dt.timedelta(minutes=1)
             if token_expiration_utc > current_utc:
                 # Return the existing token - it is still valid.
                 return token_data["access_token"]
