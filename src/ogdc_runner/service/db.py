@@ -82,8 +82,6 @@ def get_user_with_password(
     return user
 
 
-# to get a string like this run:
-# openssl rand -hex 32
 password_hash = PasswordHash.recommended()
 
 
