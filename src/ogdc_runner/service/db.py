@@ -17,7 +17,7 @@ from loguru import logger
 from pwdlib import PasswordHash
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
-from ogdc_runner.exceptions import OgdcMissingEnvvar
+from ogdc_runner.exceptions import OgdcMissingEnvvar, OgdcUserAlreadyExists
 
 
 class User(SQLModel, table=True):
@@ -93,32 +93,43 @@ def verify_password(*, password: str, hashed_password: str) -> bool:
     return password_hash.verify(password, hashed_password)
 
 
+def create_user(*, username: str, password: str) -> User:
+    """Create a user with the given username and password.
+
+    Raises `OgdcUserAlreadyExists` if the given username is already in use.
+    """
+    with Session(get_engine()) as session:
+        user = get_user(session=session, name=username)
+        if user:
+            err_msg = f"User with {username=} already created."
+            raise OgdcUserAlreadyExists(err_msg)
+
+        new_user = User(
+            name="admin",
+            password_hash=hash_password(password),
+        )
+        session.add(new_user)
+        session.commit()
+
+    logger.info(f"User {username} created.")
+
+    return new_user
+
+
 def create_admin_user() -> None:
     """Create the admin user if it does not already exist.
 
     Requires that the `OGDC_ADMIN_PASSWORD` envvar be set.
     """
-    with Session(get_engine()) as session:
-        user = get_user(session=session, name="admin")
-        if user:
-            logger.info("Admin user already created.")
-            return
+    admin_password = os.environ.get("OGDC_ADMIN_PASSWORD")
+    if not admin_password:
+        err_msg = "`OGDC_ADMIN_PASSWORD` envvar must be set."
+        raise OgdcMissingEnvvar(err_msg)
 
-        logger.info("OGDC admin user is being created.")
-        admin_password = os.environ.get("OGDC_ADMIN_PASSWORD")
-        if not admin_password:
-            err_msg = "`OGDC_ADMIN_PASSWORD` envvar must be set."
-            raise OgdcMissingEnvvar(err_msg)
-
-        session.add(
-            User(
-                name="admin",
-                password_hash=hash_password(admin_password),
-            )
-        )
-        session.commit()
-
-    logger.info("OGDC admin user created.")
+    try:
+        create_user(username="admin", password=admin_password)
+    except OgdcUserAlreadyExists:
+        logger.info("Admin user already created.")
 
 
 def init_db() -> None:
