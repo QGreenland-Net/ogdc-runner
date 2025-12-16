@@ -91,6 +91,7 @@ def _get_workflow_status(workflow_name: str) -> str:
     """Get the given workflow's status as a string."""
     response = requests.get(
         url=f"{OGDC_API_URL}/status/{workflow_name}",
+        headers={"Authorization": f"Bearer {get_api_token()}"},
     )
 
     _check_ogdc_api_error(response)
