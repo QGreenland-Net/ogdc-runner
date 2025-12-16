@@ -61,6 +61,13 @@ authentication via a token obtained via the
 {class}`ogdc_runner.service.auth.token` route (which requires
 username/password).
 
+### Adding new users
+
+TODO.
+
+This is currently done manually, and will be addressed in
+[#133](https://github.com/QGreenland-Net/ogdc-runner/issues/133).
+
 ## Required envvars
 
 - `OGDC_DB_USERNAME`: database username that the service will use to interact
