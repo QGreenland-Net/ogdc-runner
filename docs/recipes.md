@@ -119,3 +119,55 @@ For an example of a recipe using the `visualization` workflow, we recommend
 taking a look at the
 [ogdc-recipes viz-workflow recipe](https://github.com/QGreenland-Net/ogdc-recipes/tree/main/recipes/viz-workflow)
 example.
+
+## Parallel Execution
+
+Currently only `shell` workflows support parallel execution for processing
+multiple input files concurrently. Parallel execution distributes work across
+multiple Argo workflow tasks, enabling efficient processing of large datasets.
+
+### Configuration
+
+Parallel execution is configured via the `parallel` field within the workflow
+configuration. See {class}`ogdc_runner.models.recipe_config.ParallelConfig` for
+complete configuration options.
+
+```yaml
+workflow:
+  type: "shell"
+  parallel:
+    enabled: true
+    partition_strategy: "files"
+    partition_size: 2
+```
+
+#### `enabled`
+
+Boolean flag to enable parallel execution. When `false` (default), workflow
+executes sequentially.
+
+#### `partition_strategy`
+
+Currently supports `"files"` strategy, which groups input files into partitions
+for parallel processing.
+
+#### `partition_size`
+
+Number of files per partition. The orchestrator divides input files into chunks
+of this size, creating one parallel task per partition. For example, with 5
+input files and `partition_size: 2`, three partitions are created: two with 2
+files and one with 1 file.
+
+### Execution Model
+
+Parallel execution uses Argo's DAG (Directed Acyclic Graph) to create
+independent tasks that can run concurrently. The maximum parallelism is
+controlled at the workflow level, allowing Argo to automatically schedule tasks
+as cluster resources become available.
+
+Each parallel task:
+
+- Receives a partition of input files via workflow parameters
+- Executes the same command/function independently
+- Writes outputs to isolated directories
+- Runs in a separate container with its own resource allocation
