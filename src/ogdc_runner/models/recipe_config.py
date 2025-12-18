@@ -57,7 +57,7 @@ class InputParam(OgdcBaseModel):
     """
 
     value: AnyUrl | str
-    type: Literal["url", "pvc_mount", "file_system"]
+    type: Literal["url", "pvc_mount"]
 
     @model_validator(mode="after")
     def validate_url_accessible(self, info: ValidationInfo) -> Self:

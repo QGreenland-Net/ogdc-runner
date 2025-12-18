@@ -30,9 +30,6 @@ def make_fetch_input_template(
             fetch_commands.append(
                 f"wget --content-disposition -P /output_dir/ {param.value}"
             )
-        elif param.type == "file_system":
-            filename = str(param.value).split("/")[-1]
-            fetch_commands.append(f"cp {param.value} /output_dir/{filename}")
         elif param.type == "pvc_mount":
             # TODO: support PVC paths as input.
             # Because it is a PVC, we expect it to be mounted to the first
