@@ -9,6 +9,7 @@ from pwdlib import PasswordHash
 from sqlmodel import Field, Session, SQLModel, select
 
 from ogdc_runner.exceptions import OgdcMissingEnvvar, OgdcUserAlreadyExists
+from ogdc_runner.service import db
 
 password_hash = PasswordHash.recommended()
 
@@ -46,7 +47,11 @@ def get_user_with_password(
     name: str,
     password: str,
 ) -> None | User:
-    """Get the user record by name and password."""
+    """Get the user record by name and password.
+
+
+    Returns `None` if no matching user is found.
+    """
     user = get_user(session=session, name=name)
     if user is None or not verify_password(
         password=password, hashed_password=user.password_hash
@@ -78,7 +83,7 @@ def create_user(*, session: Session, username: str, password: str) -> User:
     return new_user
 
 
-def create_admin_user(*, session: Session) -> None:
+def create_admin_user() -> None:
     """Create the admin user if it does not already exist.
 
     Requires that the `OGDC_ADMIN_PASSWORD` envvar be set.
@@ -89,6 +94,9 @@ def create_admin_user(*, session: Session) -> None:
         raise OgdcMissingEnvvar(err_msg)
 
     try:
-        create_user(session=session, username=ADMIN_USERNAME, password=admin_password)
+        with Session(db.get_engine()) as session:
+            create_user(
+                session=session, username=ADMIN_USERNAME, password=admin_password
+            )
     except OgdcUserAlreadyExists:
         logger.info("Admin user already created.")

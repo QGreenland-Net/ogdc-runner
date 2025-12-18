@@ -13,7 +13,6 @@ from loguru import logger
 from sqlmodel import Session, SQLModel, create_engine
 
 from ogdc_runner.exceptions import OgdcMissingEnvvar
-from ogdc_runner.service.user import create_admin_user
 
 
 @cache
@@ -47,10 +46,7 @@ def close_db() -> None:
 
 
 def init_db() -> None:
-    """Initialize the database with tables and an admin user."""
+    """Initialize the database with tables."""
     logger.info("Ensuring database is ready on app startup...")
     SQLModel.metadata.create_all(get_engine())
     logger.info("Database tables are ready.")
-    with Session(get_engine()) as session:
-        create_admin_user(session=session)
-    logger.info("Admin user is created.")
