@@ -1,0 +1,19 @@
+name: "Test parallel shell workflow"
+input:
+  params:
+    - value: "https://demo.arcticdata.io/tiles/3dtt/QGnet/runner/tests/parallel/file1.txt"
+      type: "url"
+    - value: "https://demo.arcticdata.io/tiles/3dtt/QGnet/runner/tests/parallel/file2.txt"
+      type: "url"
+    - value: "https://demo.arcticdata.io/tiles/3dtt/QGnet/runner/tests/parallel/file3.txt"
+      type: "url"
+    - value: "https://demo.arcticdata.io/tiles/3dtt/QGnet/runner/tests/parallel/file4.txt"
+      type: "url"
+    - value: "https://demo.arcticdata.io/tiles/3dtt/QGnet/runner/tests/parallel/file5.txt"
+      type: "url"
+workflow:
+  type: "shell"
+  parallel:
+    enabled: true
+    partition_strategy: "files"
+    partition_size: 2
