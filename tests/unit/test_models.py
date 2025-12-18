@@ -135,6 +135,7 @@ def test_recipe_config_with_parallel_workflow(tmpdir):
     )
     recipe_output = RecipeOutput(dataone_id="12345")
 
+    recipe_directory = Path(tmpdir)
     recipe_config = RecipeConfig(
         name="Parallel Test Recipe",
         input=recipe_input,
@@ -148,9 +149,9 @@ def test_recipe_config_with_parallel_workflow(tmpdir):
                     "partition_size": 2,
                 },
             },
-            context={"recipe_directory": tmpdir},
+            context={"recipe_directory": recipe_directory},
         ),
-        recipe_directory=tmpdir,
+        recipe_directory=recipe_directory,
     )
 
     assert recipe_config.workflow.parallel.enabled is True
