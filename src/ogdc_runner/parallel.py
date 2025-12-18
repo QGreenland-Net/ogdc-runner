@@ -1,14 +1,22 @@
-"""Orchestrator for parallel execution of workflows.
+"""Orchestration for parallel execution of workflow tasks.
 
-This module manages parallel task execution with automatic scheduling.
-The MAX_PARALLEL_LIMIT controls how many tasks execute concurrently,
-with the workflow engine automatically scheduling remaining tasks as
-active tasks complete.
+This module provides the ParallelExecutionOrchestrator class which manages
+the creation of parallel Argo workflow tasks. It handles:
 
-Usage:
-    with Workflow(..., parallelism=get_max_parallelism()) as w:
-        # Create workflow tasks
-        ...
+1. Creating execution templates (Container templates or Hera @script functions)
+2. Partitioning input data into parallel chunks
+3. Creating DAG tasks with proper dependencies and parameters
+
+The maximum parallelism is controlled at the workflow level, allowing the
+Argo workflow engine to automatically schedule tasks as resources become available.
+
+Example:
+    orchestrator = ParallelExecutionOrchestrator(
+        recipe_config=recipe_config,
+        execution_function=ExecutionFunction(name="cmd-0", command="process.sh"),
+    )
+    template = orchestrator.create_execution_template()
+    tasks = orchestrator.create_parallel_tasks(template)
 """
 
 from __future__ import annotations
@@ -144,59 +152,9 @@ class ParallelExecutionOrchestrator:
             func: ExecutionFunction with shell command
 
         Returns:
-            Container template
+            Container template configured for parallel partition processing
         """
-        command_script = f"""
-        set -e
-
-        # Get parameters
-        RECIPE_ID="{{{{inputs.parameters.recipe-id}}}}"
-        PARTITION_ID="{{{{inputs.parameters.partition-id}}}}"
-        CMD_INDEX="{{{{inputs.parameters.cmd-index}}}}"
-
-        # Setup PVC paths
-        # Use the initial input directory for the first command
-        # and the previous command's output for subsequent commands
-        if [ "$CMD_INDEX" -eq 0 ]; then
-            INPUT_DIR="/mnt/workflow/$RECIPE_ID/inputs"
-        else
-            PREV_CMD_INDEX=$((CMD_INDEX - 1))
-            INPUT_DIR="/mnt/workflow/$RECIPE_ID/cmd-$PREV_CMD_INDEX-partition-$PARTITION_ID"
-        fi
-
-        OUTPUT_DIR="/mnt/workflow/$RECIPE_ID/cmd-$CMD_INDEX-partition-$PARTITION_ID"
-
-        mkdir -p "$OUTPUT_DIR"
-
-        # Read partition manifest from parameter (JSON array of files)
-        PARTITION_FILES='{{{{inputs.parameters.partition-manifest}}}}'
-        echo "Processing partition with files: $PARTITION_FILES"
-        echo "Input directory: $INPUT_DIR"
-        echo "Output directory: $OUTPUT_DIR"
-
-        # Parse JSON array and process each file
-        FILES=$(echo "$PARTITION_FILES" | sed 's/\\[//g' | sed 's/\\]//g' | sed 's/"//g' | tr ',' '\\n')
-
-        # Process each file
-        echo "$FILES" | while IFS= read -r file; do
-            # Skip empty lines
-            [ -z "$file" ] && continue
-
-            # Trim whitespace
-            file=$(echo "$file" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-
-            echo "Processing file: $file"
-            # Extract filename from path
-            filename=$(basename "$file")
-
-            # Set environment variables for the command
-            export INPUT_FILE="$INPUT_DIR/$filename"
-            export OUTPUT_FILE="$OUTPUT_DIR/$filename"
-
-            # Run the actual command
-            {func.command}
-        done
-        """
+        command_script = self._build_partition_processing_script(func.command)
 
         return Container(
             name=func.name,
@@ -213,6 +171,65 @@ class ParallelExecutionOrchestrator:
             ],
         )
 
+    def _build_partition_processing_script(self, user_command: str) -> str:
+        """Build shell script for processing a partition of files.
+
+        The script:
+        1. Determines input/output directories based on command index
+        2. Parses the partition manifest (JSON array of files)
+        3. Processes each file by setting INPUT_FILE and OUTPUT_FILE env vars
+        4. Executes the user command for each file
+
+        Args:
+            user_command: The shell command to execute for each file
+
+        Returns:
+            Complete shell script as a string
+        """
+        return f"""
+set -e
+
+# Get parameters
+RECIPE_ID="{{{{inputs.parameters.recipe-id}}}}"
+PARTITION_ID="{{{{inputs.parameters.partition-id}}}}"
+CMD_INDEX="{{{{inputs.parameters.cmd-index}}}}"
+
+# Determine input directory based on command index
+if [ "$CMD_INDEX" -eq 0 ]; then
+    INPUT_DIR="/mnt/workflow/$RECIPE_ID/inputs"
+else
+    PREV_CMD_INDEX=$((CMD_INDEX - 1))
+    INPUT_DIR="/mnt/workflow/$RECIPE_ID/cmd-$PREV_CMD_INDEX-partition-$PARTITION_ID"
+fi
+
+OUTPUT_DIR="/mnt/workflow/$RECIPE_ID/cmd-$CMD_INDEX-partition-$PARTITION_ID"
+mkdir -p "$OUTPUT_DIR"
+
+# Read and parse partition manifest (JSON array of files)
+PARTITION_FILES='{{{{inputs.parameters.partition-manifest}}}}'
+echo "Processing partition with files: $PARTITION_FILES"
+echo "Input directory: $INPUT_DIR"
+echo "Output directory: $OUTPUT_DIR"
+
+# Parse JSON array into individual file paths
+FILES=$(echo "$PARTITION_FILES" | sed 's/\\\\[//g' | sed 's/\\\\]//g' | sed 's/"//g' | tr ',' '\\\\n')
+
+# Process each file in the partition
+echo "$FILES" | while IFS= read -r file; do
+    [ -z "$file" ] && continue
+
+    file=$(echo "$file" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    filename=$(basename "$file")
+
+    echo "Processing file: $file"
+    export INPUT_FILE="$INPUT_DIR/$filename"
+    export OUTPUT_FILE="$OUTPUT_DIR/$filename"
+
+    # Execute user command
+    {user_command}
+done
+"""
+
     def _create_tasks_from_partitions(
         self,
         partitions: list[FilePartition],
@@ -220,49 +237,58 @@ class ParallelExecutionOrchestrator:
     ) -> list[Task]:
         """Create Argo tasks that execute in parallel for a single function.
 
-        All partitions are created as individual tasks. The maximum parallel
-        execution limit is controlled by the workflow's parallelism setting,
-        which is set at the workflow level. This allows the workflow engine
-        to automatically schedule tasks as resources become available.
-
-        For example, with 20 partitions and a parallelism limit of 5:
-        - Tasks 1-5 execute immediately
-        - Tasks 6-20 are queued
-        - As each task completes, the next queued task starts automatically
+        Each partition becomes a separate task. The workflow's parallelism setting
+        controls how many tasks execute concurrently, with remaining tasks queued
+        and automatically scheduled as resources become available.
 
         Args:
-            partitions: List of file partitions
-            template: Execution template
+            partitions: List of file partitions to process
+            template: Execution template to use for all tasks
 
         Returns:
-            List of Task objects (parallelism controlled by workflow config)
+            List of Task objects ready for DAG execution
         """
-        tasks = []
         func_name = self.execution_function.name
-
-        # Extract cmd index from function name (e.g., "cmd-0" -> "0")
         cmd_index = func_name.split("-")[-1]
 
-        # Create partition manifests (JSON with list of files)
-        partition_manifests = [json.dumps(p.files) for p in partitions]
-
-        # Create tasks - each gets the partition manifest, recipe-id, partition-id, and cmd-index as parameters
-        # Data is accessed directly from PVC instead of artifacts
-        for partition, manifest in zip(partitions, partition_manifests, strict=True):
-            task = Task(
-                name=f"{func_name}-partition-{partition.partition_id}",
-                template=template,
-                arguments=[
-                    Parameter(name="partition-manifest", value=manifest),
-                    Parameter(name="recipe-id", value=self.recipe_config.id),
-                    Parameter(name="partition-id", value=str(partition.partition_id)),
-                    Parameter(name="cmd-index", value=cmd_index),
-                ],
-            )
-            tasks.append(task)
+        tasks = [
+            self._create_partition_task(partition, template, func_name, cmd_index)
+            for partition in partitions
+        ]
 
         logger.info(
-            f"Created {len(tasks)} parallel execution tasks for {func_name} "
-            f"(parallelism controlled by workflow configuration)"
+            f"Created {len(tasks)} parallel tasks for {func_name} "
+            f"(parallelism controlled by workflow config)"
         )
         return tasks
+
+    def _create_partition_task(
+        self,
+        partition: FilePartition,
+        template: Container,
+        func_name: str,
+        cmd_index: str,
+    ) -> Task:
+        """Create a single task for processing a file partition.
+
+        Args:
+            partition: File partition to process
+            template: Container template to use
+            func_name: Name of the execution function
+            cmd_index: Index of the command in the workflow
+
+        Returns:
+            Task configured with partition-specific parameters
+        """
+        partition_manifest = json.dumps(partition.files)
+
+        return Task(
+            name=f"{func_name}-partition-{partition.partition_id}",
+            template=template,
+            arguments=[
+                Parameter(name="partition-manifest", value=partition_manifest),
+                Parameter(name="recipe-id", value=self.recipe_config.id),
+                Parameter(name="partition-id", value=str(partition.partition_id)),
+                Parameter(name="cmd-index", value=cmd_index),
+            ],
+        )
