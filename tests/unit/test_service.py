@@ -7,6 +7,7 @@ from httpx import HTTPError
 from ogdc_runner import __version__
 from ogdc_runner.service.auth import AUTH_TOKEN_URL
 from ogdc_runner.service.main import app
+from ogdc_runner.service.user import ADMIN_USERNAME
 
 
 def test_version(mock_db):  # noqa: ARG001
@@ -21,7 +22,7 @@ def test_token(mock_db):  # noqa: ARG001
         response = client.post(
             AUTH_TOKEN_URL,
             data={
-                "username": "admin",
+                "username": ADMIN_USERNAME,
                 "password": "password",
             },
         )

@@ -13,6 +13,9 @@ from ogdc_runner.exceptions import OgdcMissingEnvvar, OgdcUserAlreadyExists
 password_hash = PasswordHash.recommended()
 
 
+ADMIN_USERNAME = "admin"
+
+
 class User(SQLModel, table=True):
     """Model representing the `users` table in the OGDC database."""
 
@@ -64,7 +67,7 @@ def create_user(*, session: Session, username: str, password: str) -> User:
         raise OgdcUserAlreadyExists(err_msg)
 
     new_user = User(
-        name="admin",
+        name=username,
         password_hash=hash_password(password),
     )
     session.add(new_user)
@@ -86,6 +89,6 @@ def create_admin_user(*, session: Session) -> None:
         raise OgdcMissingEnvvar(err_msg)
 
     try:
-        create_user(session=session, username="admin", password=admin_password)
+        create_user(session=session, username=ADMIN_USERNAME, password=admin_password)
     except OgdcUserAlreadyExists:
         logger.info("Admin user already created.")
