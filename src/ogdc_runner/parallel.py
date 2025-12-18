@@ -212,10 +212,10 @@ echo "Input directory: $INPUT_DIR"
 echo "Output directory: $OUTPUT_DIR"
 
 # Parse JSON array into individual file paths
-FILES=$(echo "$PARTITION_FILES" | sed 's/\\\\[//g' | sed 's/\\\\]//g' | sed 's/"//g' | tr ',' '\\\\n')
+FILES=$(echo "$PARTITION_FILES" | tr -d '[]"' | tr ',' '\\n')
 
 # Process each file in the partition
-echo "$FILES" | while IFS= read -r file; do
+for file in $FILES; do
     [ -z "$file" ] && continue
 
     file=$(echo "$file" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')

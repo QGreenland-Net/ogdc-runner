@@ -44,7 +44,9 @@ def make_fetch_input_template(
         outputs=[Artifact(name="output-dir", path="/output_dir/")]
         if not use_pvc
         else None,
-        volume_mounts=[VolumeMount(name=OGDC_WORKFLOW_PVC, mount_path="/mnt/workflow/")]
+        volume_mounts=[
+            VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow/")
+        ]
         if use_pvc
         else None,
     )
