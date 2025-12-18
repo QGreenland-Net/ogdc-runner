@@ -8,9 +8,11 @@ from hera.workflows import (
     Task,
     Workflow,
 )
+from hera.workflows.models import VolumeMount
 
 from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
+    OGDC_WORKFLOW_PVC,
     submit_workflow,
 )
 from ogdc_runner.inputs import make_fetch_input_template
@@ -23,8 +25,19 @@ from ogdc_runner.publish import make_publish_template
 def make_cmd_template(
     name: str,
     command: str,
+    use_pvc: bool = False,
 ) -> Container:
-    """Creates a command template with an optional custom image."""
+    """
+    Creates a command template with an optional custom image.
+
+    Args:
+        name: Name of the template
+        command: Shell command to execute
+        use_pvc: Whether to use PVC for input/output
+
+    Returns:
+        Container template
+    """
     template = Container(
         name=name,
         command=["sh", "-c"],
@@ -33,6 +46,14 @@ def make_cmd_template(
         ],
         inputs=[Artifact(name="input-dir", path="/input_dir/")],
         outputs=[Artifact(name="output-dir", path="/output_dir/")],
+        volume_mounts=[
+            VolumeMount(
+                name=OGDC_WORKFLOW_PVC,
+                mount_path="/mnt/workflow/",
+            )
+        ]
+        if use_pvc
+        else None,
     )
 
     return template
@@ -47,14 +68,16 @@ def make_and_submit_shell_workflow(
     commands = recipe_config.workflow.get_commands_from_sh_file()
     parallel_config = recipe_config.workflow.parallel
 
+    # Use PVC for parallel shell workflows
+    use_pvc = parallel_config.enabled
+
     with Workflow(
         generate_name=f"{recipe_config.id}-",
         entrypoint="main",
         workflows_service=ARGO_WORKFLOW_SERVICE,
         parallelism=get_max_parallelism() if parallel_config.enabled else None,
     ) as w:
-        fetch_template = make_fetch_input_template(recipe_config)
-        publish_template = make_publish_template(recipe_id=recipe_config.id)
+        fetch_template = make_fetch_input_template(recipe_config, use_pvc=use_pvc)
 
         if parallel_config.enabled:
             # PARALLEL MODE: Create orchestrators and templates OUTSIDE the DAG
@@ -92,6 +115,10 @@ def make_and_submit_shell_workflow(
 
         else:
             cmd_templates = []
+
+            if not use_pvc:
+                publish_template = make_publish_template(recipe_id=recipe_config.id)
+
             for idx, command in enumerate(commands):
                 cmd_template = make_cmd_template(
                     name=f"run-cmd-{idx}",
@@ -109,9 +136,12 @@ def make_and_submit_shell_workflow(
                             "input-dir"
                         ),
                     )
-                publish_template(
-                    name="publish-data",
-                    arguments=step.get_artifact("output-dir").with_name("input-dir"),
-                )
+                if not use_pvc:
+                    publish_template(
+                        name="publish-data",
+                        arguments=step.get_artifact("output-dir").with_name(
+                            "input-dir"
+                        ),
+                    )
 
     return submit_workflow(w, wait=wait)

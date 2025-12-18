@@ -148,11 +148,31 @@ class ParallelExecutionOrchestrator:
         """
         command_script = f"""
         set -e
-        mkdir -p /output_dir/
+
+        # Get parameters
+        RECIPE_ID="{{{{inputs.parameters.recipe-id}}}}"
+        PARTITION_ID="{{{{inputs.parameters.partition-id}}}}"
+        CMD_INDEX="{{{{inputs.parameters.cmd-index}}}}"
+
+        # Setup PVC paths
+        # Use the initial input directory for the first command
+        # and the previous command's output for subsequent commands
+        if [ "$CMD_INDEX" -eq 0 ]; then
+            INPUT_DIR="/mnt/workflow/$RECIPE_ID/inputs"
+        else
+            PREV_CMD_INDEX=$((CMD_INDEX - 1))
+            INPUT_DIR="/mnt/workflow/$RECIPE_ID/cmd-$PREV_CMD_INDEX-partition-$PARTITION_ID"
+        fi
+
+        OUTPUT_DIR="/mnt/workflow/$RECIPE_ID/cmd-$CMD_INDEX-partition-$PARTITION_ID"
+
+        mkdir -p "$OUTPUT_DIR"
 
         # Read partition manifest from parameter (JSON array of files)
         PARTITION_FILES='{{{{inputs.parameters.partition-manifest}}}}'
         echo "Processing partition with files: $PARTITION_FILES"
+        echo "Input directory: $INPUT_DIR"
+        echo "Output directory: $OUTPUT_DIR"
 
         # Parse JSON array and process each file
         FILES=$(echo "$PARTITION_FILES" | sed 's/\\[//g' | sed 's/\\]//g' | sed 's/"//g' | tr ',' '\\n')
@@ -170,8 +190,8 @@ class ParallelExecutionOrchestrator:
             filename=$(basename "$file")
 
             # Set environment variables for the command
-            export INPUT_FILE="/input_dir/$filename"
-            export OUTPUT_FILE="/output_dir/$filename"
+            export INPUT_FILE="$INPUT_DIR/$filename"
+            export OUTPUT_FILE="$OUTPUT_DIR/$filename"
 
             # Run the actual command
             {func.command}
@@ -185,6 +205,8 @@ class ParallelExecutionOrchestrator:
             inputs=[
                 Parameter(name="partition-manifest"),
                 Parameter(name="recipe-id"),
+                Parameter(name="partition-id"),
+                Parameter(name="cmd-index"),
             ],
             volume_mounts=[
                 VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
@@ -218,10 +240,13 @@ class ParallelExecutionOrchestrator:
         tasks = []
         func_name = self.execution_function.name
 
+        # Extract cmd index from function name (e.g., "cmd-0" -> "0")
+        cmd_index = func_name.split("-")[-1]
+
         # Create partition manifests (JSON with list of files)
         partition_manifests = [json.dumps(p.files) for p in partitions]
 
-        # Create tasks - each gets the partition manifest and recipe-id as parameters
+        # Create tasks - each gets the partition manifest, recipe-id, partition-id, and cmd-index as parameters
         # Data is accessed directly from PVC instead of artifacts
         for partition, manifest in zip(partitions, partition_manifests, strict=True):
             task = Task(
@@ -230,6 +255,8 @@ class ParallelExecutionOrchestrator:
                 arguments=[
                     Parameter(name="partition-manifest", value=manifest),
                     Parameter(name="recipe-id", value=self.recipe_config.id),
+                    Parameter(name="partition-id", value=str(partition.partition_id)),
+                    Parameter(name="cmd-index", value=cmd_index),
                 ],
             )
             tasks.append(task)
