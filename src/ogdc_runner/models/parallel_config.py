@@ -17,12 +17,11 @@ from ogdc_runner.models.base import OgdcBaseModel
 class ExecutionFunction(OgdcBaseModel):
     """Represents a function or command to execute in parallel.
 
-    Exactly one of command, script_module, or function must be specified.
+    Exactly one of command or function must be specified.
 
     Attributes:
         name: Unique identifier for this execution function
         command: Shell command to execute (for shell workflows)
-        script_module: Python module name to execute (for visualization workflows)
         function: Python callable (for Hera @script decorated functions)
     """
 
@@ -32,10 +31,6 @@ class ExecutionFunction(OgdcBaseModel):
     command: str | None = Field(
         default=None,
         description="Shell command to execute",
-    )
-    script_module: str | None = Field(
-        default=None,
-        description="Python module name to execute",
     )
     function: Callable[..., Any] | None = Field(
         default=None,
@@ -68,14 +63,14 @@ class ExecutionFunction(OgdcBaseModel):
         Raises:
             ValueError: If zero or multiple execution types are specified
         """
-        execution_types = [self.command, self.script_module, self.function]
+        execution_types = [self.command, self.function]
         specified_count = sum(1 for t in execution_types if t is not None)
 
         if specified_count == 0:
-            msg = "Must specify exactly one of: command, script_module, or function"
+            msg = "Must specify exactly one of: command or function"
             raise ValueError(msg)
         if specified_count > 1:
-            msg = "Can only specify one of: command, script_module, or function"
+            msg = "Can only specify one of: command or function"
             raise ValueError(msg)
 
 

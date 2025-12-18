@@ -4,16 +4,10 @@ The partitioning strategy creates independent chunks of work (partitions).
 This module implements partitioning by grouping files into partitions based on
 a configured number of files per partition.
 
-Possible alternative partitioning strategies (not currently implemented):
-- By file size: Group files to balance total data size per partition
-- By data characteristics: Partition based on spatial/temporal bounds
-- By geographic region: Group files by spatial proximity
 """
 
 from __future__ import annotations
 
-import fnmatch
-import os
 from pathlib import Path
 
 from loguru import logger
@@ -23,41 +17,6 @@ from ogdc_runner.models.parallel_config import (
     FilePartition,
 )
 from ogdc_runner.models.recipe_config import InputParam, ParallelConfig
-
-
-def _discover_files_from_artifact(
-    artifact_path: str,
-    file_patterns: list[str] | None = None,
-) -> list[str]:
-    """Discover files from an artifact directory.
-
-    Args:
-        artifact_path: Path to artifact directory (e.g., /input_dir/)
-        file_patterns: Optional glob patterns to filter files
-
-    Returns:
-        List of discovered file paths (relative to artifact_path)
-    """
-    artifact_dir = Path(artifact_path)
-
-    if not artifact_dir.exists():
-        logger.warning(f"Artifact path does not exist: {artifact_path}")
-        return []
-
-    discovered_files = []
-    for root, _, files in os.walk(artifact_dir):
-        for file in files:
-            file_path = Path(root) / file
-            relative_path = str(file_path.relative_to(artifact_dir))
-
-            # Apply file patterns if specified
-            if not file_patterns or any(
-                fnmatch.fnmatch(relative_path, pattern) for pattern in file_patterns
-            ):
-                discovered_files.append(relative_path)
-
-    logger.info(f"Discovered {len(discovered_files)} files from {artifact_path}")
-    return discovered_files
 
 
 def _extract_files_from_inputs(
@@ -78,8 +37,6 @@ def create_partitions(
     inputs: list[InputParam] | list[Path] | None = None,
     execution_function: ExecutionFunction | None = None,
     parallel_config: ParallelConfig | None = None,
-    artifact_path: str | None = None,
-    file_patterns: list[str] | None = None,
 ) -> list[FilePartition]:
     """Create partitions by grouping files based on partition_size.
 
@@ -87,8 +44,6 @@ def create_partitions(
         inputs: List of input parameters or file paths
         execution_function: Execution function to create partitions for
         parallel_config: Parallel execution configuration
-        artifact_path: Path to artifact directory from previous step
-        file_patterns: Optional glob patterns to filter discovered files
 
     Returns:
         List of FilePartition objects
@@ -101,10 +56,7 @@ def create_partitions(
         raise ValueError(msg)
 
     # Determine file source: static inputs or dynamic discovery
-    if artifact_path:
-        files = _discover_files_from_artifact(artifact_path, file_patterns)
-        logger.info(f"Using dynamic file discovery from {artifact_path}")
-    elif inputs:
+    if inputs:
         if isinstance(inputs[0], Path):
             files = [str(p) for p in inputs]
             logger.info("Using static file paths from inputs")
@@ -112,12 +64,12 @@ def create_partitions(
             files = _extract_files_from_inputs(inputs)
             logger.info("Using static files from recipe inputs")
     else:
-        msg = "Either 'inputs' or 'artifact_path' must be provided"
+        msg = "Arg 'inputs' must be provided"
         raise ValueError(msg)
 
     # Validate that we have files to partition
     if not files:
-        msg = f"No files discovered/provided for execution function '{execution_function.name}'"
+        msg = f"No files provided for execution function '{execution_function.name}'"
         raise ValueError(msg)
 
     # Determine number of files per partition

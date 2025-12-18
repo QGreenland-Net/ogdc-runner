@@ -78,16 +78,9 @@ def make_and_submit_shell_workflow(
 
                 previous_tasks = [fetch_task]
                 for orchestrator, template in orchestrators_with_templates:
-                    # Get the output artifact from the previous task
-                    # For the first iteration, it's from fetch_task
-                    source_task = previous_tasks[0]
-
                     # Create parallel tasks for this command
                     parallel_tasks = orchestrator.create_parallel_tasks(
                         template=template,
-                        source_task=source_task,
-                        source_artifact_name="output-dir",
-                        input_artifact_name="input-dir",
                     )
 
                     # Set dependencies
@@ -98,7 +91,6 @@ def make_and_submit_shell_workflow(
                     previous_tasks = parallel_tasks
 
         else:
-            # SEQUENTIAL MODE: Create templates outside Steps context
             cmd_templates = []
             for idx, command in enumerate(commands):
                 cmd_template = make_cmd_template(
