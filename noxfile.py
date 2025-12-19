@@ -65,11 +65,7 @@ def test_ci(session: nox.Session) -> None:
 @nox.session(requires=["test_ci", "test_integration"])
 def tests(session: nox.Session) -> None:
     """Run all the tests."""
-    session.install(".[test]")
-    session.run(
-        "pytest",
-        *session.posargs,
-    )
+    pass
 
 
 @nox.session(reuse_venv=True)
