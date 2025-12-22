@@ -96,7 +96,9 @@ def create_admin_user() -> None:
     try:
         with Session(db.get_engine()) as session:
             create_user(
-                session=session, username=ADMIN_USERNAME, password=admin_password
+                session=session,
+                username=ADMIN_USERNAME,
+                password=admin_password,
             )
     except OgdcUserAlreadyExists:
         logger.info("Admin user already created.")
