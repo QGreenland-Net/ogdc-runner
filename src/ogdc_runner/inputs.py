@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from hera.workflows import (
     Artifact,
     Container,
@@ -67,7 +69,7 @@ def _get_output_directory(recipe_id: str, use_pvc: bool) -> str:
     return "/output_dir"
 
 
-def _build_fetch_commands(params: list, output_dir: str) -> str:
+def _build_fetch_commands(params: list[Any], output_dir: str) -> str:
     """Build shell commands to fetch all input parameters.
 
     Args:

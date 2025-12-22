@@ -22,6 +22,7 @@ def test_parallel_recipe_partition_calculation(
     )
     num_files = len(config.input.params)
     partition_size = config.workflow.parallel.partition_size
+    assert partition_size is not None, "partition_size should be configured"
     expected_partitions = (num_files + partition_size - 1) // partition_size
 
     assert expected_partitions == 3

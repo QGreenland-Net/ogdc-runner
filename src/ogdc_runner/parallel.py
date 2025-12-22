@@ -154,6 +154,10 @@ class ParallelExecutionOrchestrator:
         Returns:
             Container template configured for parallel partition processing
         """
+        if func.command is None:
+            raise ValueError(
+                f"ExecutionFunction {func.name} must have a command for shell workflows"
+            )
         command_script = self._build_partition_processing_script(func.command)
 
         return Container(

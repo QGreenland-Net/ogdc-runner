@@ -141,13 +141,16 @@ def _create_sequential_workflow(
         for idx, cmd_template in enumerate(cmd_templates):
             step = cmd_template(
                 name=f"step-{idx}",
-                arguments=step.get_artifact("output-dir").with_name("input-dir"),
+                arguments=step.get_artifact("output-dir").with_name("input-dir")
+                if step
+                else None,
             )
 
-        publish_template(
-            name="publish-data",
-            arguments=step.get_artifact("output-dir").with_name("input-dir"),
-        )
+        if step:
+            publish_template(
+                name="publish-data",
+                arguments=step.get_artifact("output-dir").with_name("input-dir"),
+            )
 
 
 def make_and_submit_shell_workflow(
@@ -163,7 +166,7 @@ def make_and_submit_shell_workflow(
     Returns:
         Workflow name
     """
-    commands = recipe_config.workflow.get_commands_from_sh_file()
+    commands = recipe_config.workflow.get_commands_from_sh_file()  # type: ignore[union-attr]
     parallel_config = recipe_config.workflow.parallel
 
     with Workflow(

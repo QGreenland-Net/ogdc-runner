@@ -72,7 +72,8 @@ def _extract_file_paths(inputs: list[InputParam] | list[Path]) -> list[str]:
     if isinstance(inputs[0], Path):
         return [str(p) for p in inputs]
 
-    return [str(param.value) for param in inputs]
+    # InputParam objects have a value attribute
+    return [str(param.value) for param in inputs if hasattr(param, "value")]
 
 
 def _validate_files(files: list[str], function_name: str) -> None:
