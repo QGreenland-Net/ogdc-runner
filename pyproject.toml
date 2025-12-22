@@ -48,6 +48,7 @@ test = [
   "pytest-order",
   "types-pyyaml",
   "types-requests",
+  "nox",
 ]
 dev = [
   "mypy ~=1.10.0",
