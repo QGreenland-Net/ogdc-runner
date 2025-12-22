@@ -67,22 +67,26 @@ be re-pulled, ensuring that the latest `main` branch image is being used.
 
 ## Testing, linting, rendering docs with Nox
 
-The fastest way to start is to use Nox. If you don't have Nox, you can use
-`pipx run nox` to run it without installing, or `pipx install nox`. If you don't
-have pipx, then you can install with `pip install pipx`. If you use macOS, use
-`brew install pipx nox`. To use:
+To run all tests, simply run `nox`:
 
 ```console
 nox
 ```
 
-This will test using every installed version of Python on your system, skipping
-ones that are not installed.
+This will run the typechecker, unit, and integration tests (requiring
+`ogdc-helm` to be deployed locally).
 
 ### Running specific tasks with Nox
 
 ```console
 nox -s {job-name}
+```
+
+For example, to run only the tests run in CI, which are fast and do not require
+a locally deployed OGDC stack:
+
+```
+nox -s test_ci
 ```
 
 To view available jobs:
@@ -93,6 +97,28 @@ nox -l
 
 Nox handles everything for you, including setting up an temporary virtual
 environment for each run.
+
+### Testing
+
+Use `nox` to run all tests (with pytest):
+
+```bash
+nox
+```
+
+### Building docs
+
+You can build the docs using:
+
+```bash
+nox -s docs
+```
+
+You can see a preview with:
+
+```bash
+nox -s docs -- --serve
+```
 
 ### Reusing Nox virtual environments
 
@@ -117,32 +143,6 @@ pre-commit install  # install Git pre-commit hook from .pre-commit-config.yml
 
 You can also/alternatively run `pre-commit run` (will run for changed files
 only) or `pre-commit run --all-files` to check even without installing the hook.
-
-## Testing
-
-Use `nox` to run `pytest` to run tests:
-
-```bash
-nox
-```
-
-```bash
-pytest
-```
-
-## Building docs
-
-You can build the docs using:
-
-```bash
-nox -s docs
-```
-
-You can see a preview with:
-
-```bash
-nox -s docs -- --serve
-```
 
 ## Continuous Integration
 
