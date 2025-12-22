@@ -67,10 +67,19 @@ in the function signature.
 
 ### Adding new users
 
-TODO.
+Currently, only the admin user can create other users. Ensure that you have
+admin credentials set:
 
-This is currently done manually, and will be addressed in
-[#133](https://github.com/QGreenland-Net/ogdc-runner/issues/133).
+```
+export OGDC_API_USERNAME=admin
+export OGDC_API_password=admin-password
+```
+
+Then, use the `ogdc-runner` CLI to create the new user:
+
+```
+ogdc-runner create-user my-username my-password
+```
 
 ## Required envvars
 
