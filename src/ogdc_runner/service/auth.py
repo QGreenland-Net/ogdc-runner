@@ -22,10 +22,8 @@ from jwt.exceptions import InvalidTokenError
 from ogdc_runner.exceptions import OgdcMissingEnvvar
 from ogdc_runner.service.db import (
     SessionDependency,
-    User,
-    get_user,
-    get_user_with_password,
 )
+from ogdc_runner.service.user import User, get_user, get_user_with_password
 
 router = APIRouter()
 

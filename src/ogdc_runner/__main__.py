@@ -252,3 +252,31 @@ def validate_all_recipes(recipes_location: str, ref: str) -> None:
     except subprocess.CalledProcessError as e:
         print(f"Failed to clone repository: {e}\n{e.stderr}")
         sys.exit(1)
+
+
+@cli.command
+@click.argument(
+    "username",
+    required=True,
+    metavar="USERNAME",
+    type=str,
+)
+@click.argument(
+    "password",
+    required=True,
+    metavar="PASSWORD",
+    type=str,
+)
+def create_user(username: str, password: str) -> None:
+    """Create a new OGDC user. This operation is only supported for the admin user."""
+    response = requests.post(
+        url=f"{OGDC_API_URL}/create_user",
+        data={
+            "username": username,
+            "password": password,
+        },
+        headers={"Authorization": f"Bearer {get_api_token()}"},
+    )
+
+    _check_ogdc_api_error(response)
+    print(response.json()["message"])

@@ -41,3 +41,9 @@ class OgdcMissingEnvvar(OgdcRunnerException):
     """Exception raised when an expected environment variable is unset."""
 
     pass
+
+
+class OgdcUserAlreadyExists(OgdcRunnerException):
+    """Exception raised when an OGDC user with the given username is already created."""
+
+    pass

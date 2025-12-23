@@ -14,11 +14,7 @@ from fastapi import FastAPI
 from loguru import logger
 
 from ogdc_runner import __version__
-from ogdc_runner.service import auth, auth_routes
-from ogdc_runner.service.db import (
-    close_db,
-    init_db,
-)
+from ogdc_runner.service import auth, auth_routes, db, user
 
 
 @asynccontextmanager
@@ -34,9 +30,12 @@ async def lifespan(_app: FastAPI):  # type: ignore[no-untyped-def]
     Code after the `yield` happens as a final step as the server is shutdown.
     """
     logger.info("FastAPI Lifespan start")
-    init_db()
+    # Initialize the database.
+    db.init_db()
+    # Create the admin user.
+    user.create_admin_user()
     yield
-    close_db()
+    db.close_db()
     logger.info("FastAPI Lifespan end")
 
 
