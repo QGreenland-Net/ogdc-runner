@@ -9,6 +9,17 @@ description of best practices for developing scientific packages.
 Add yourself as an author in `pyproject.toml`
 ```
 
+## Familiarize yourself with the project
+
+- Be sure to look over the [Architecture](./architecture/index.md) docs to get
+  an understanding of the `ogdc-runner` before contributing any code.
+
+- The `ogdc-runner` is one component of the QGreenland-Net Open Geospatial Data
+  Cloud (OGDC). See the [QGreenland-Net](https://qgreenland-net.github.io/)
+  webpage for more information about how this project fits into that larger
+  effort. In particular, check out the
+  [QGreenland-Net Contributing docs](https://qgreenland-net.github.io/contributing/)!
+
 ## Setting up a local development environment
 
 First, ensure you have [ogdc-helm](https://github.com/QGreenland-Net/ogdc-helm)
