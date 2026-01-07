@@ -86,8 +86,25 @@ class RecipeInput(OgdcBaseModel):
         return params
 
 
+# create config for publishing to DataOne
+class PublishConfig(BaseModel):
+    enabled: bool = False
+    target_dataset: str | None = None
+    # NOTE: maybe this should be an environment variable
+    member_node: str = "https://test.arcticdata.io/metacat/d1/mn"
+    coordinating_node: str | None = None
+    format_id: str
+    entity_name: str
+    entity_description: str | None = None
+    # TODO: rightsHolder, submitter, accessPolicy
+
+
 class RecipeOutput(OgdcBaseModel):
-    dataone_id: str = "TODO"
+    # path to the output file
+    path: str
+    publish: PublishConfig | None
+    # filled after publishing
+    dataone_id: str | None = None
 
 
 class Workflow(OgdcBaseModel):
