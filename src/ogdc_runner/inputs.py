@@ -19,6 +19,7 @@ def make_fetch_input_template(
     Supports:
     - HTTP/HTTPS URLs
     - File paths (including PVC paths)
+    - DataONE objects
     """
     # Create commands to fetch each input
     fetch_commands = []
@@ -39,6 +40,15 @@ def make_fetch_input_template(
             # step's container, so no move should be necessary.
             err_msg = "PVC mounts are not yet supported"
             raise NotImplementedError(err_msg)
+        elif param.type == "dataone":
+            # Use the helper script to fetch DataONE objects
+            cmd_parts = [
+                "python3 -m ogdc_runner.scripts.fetch_dataone",
+                f"--identifier {param.identifier}",
+                f"--member-node {param.member_node}",
+                "--output-dir /output_dir/",
+            ]
+            fetch_commands.append(" ".join(cmd_parts))
         else:
             raise OgdcWorkflowExecutionError(
                 f"Unsupported input type: {param.type} for parameter {param.value}"

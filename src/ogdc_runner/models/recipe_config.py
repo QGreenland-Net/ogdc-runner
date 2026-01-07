@@ -28,8 +28,14 @@ class OgdcBaseModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class BaseInputParam(OgdcBaseModel):
+    "Base class for input params"
+
+    pass
+
+
 # Input parameter with type and value
-class InputParam(OgdcBaseModel):
+class UrlInputParam(OgdcBaseModel):
     """Input parameter for a recipe.
 
     When instantiated with `context={"check_urls": True}`, URL-type parameters
@@ -37,7 +43,7 @@ class InputParam(OgdcBaseModel):
     """
 
     value: AnyUrl | str
-    type: Literal["url", "pvc_mount", "file_system"]
+    type: Literal["url"]
 
     @model_validator(mode="after")
     def validate_url_accessible(self, info: ValidationInfo) -> Self:
@@ -71,6 +77,52 @@ class InputParam(OgdcBaseModel):
             raise ValueError(f"URL validation failed for {url}: {e}") from e
 
         return self
+
+
+class DataONEInputParam(BaseInputParam):
+    """DataONE object input parameter.
+
+    Fetches data objects from DataONE repositories using their persistent identifier.
+
+    Example:
+        type: dataone
+        identifier: "urn:uuid:31162eb9-7e3b-4b88-948f-f4c99f13a83f"
+        member_node: "https://arcticdata.io/metacat/d1/mn"
+        filename: "ct71_ODV.csv"
+    """
+
+    type: Literal["dataone"]
+    identifier: str = Field(
+        ...,
+        description="DataONE persistent identifier (PID)",
+    )
+    member_node: str = Field(
+        default="https://arcticdata.io/metacat/d1/mn",
+        description="DataONE member node base URL",
+    )
+    filename: str | None = Field(
+        default=None,
+        description="Optional filename for downloaded object (auto-detected if not provided)",
+    )
+
+
+class PvcMountInputParam(BaseInputParam):
+    """PVC mount input parameter."""
+
+    type: Literal["pvc_mount"]
+    value: str
+
+
+class FileSystemInputParam(BaseInputParam):
+    """File system input parameter."""
+
+    type: Literal["file_system"]
+    value: str
+
+
+InputParam = (
+    UrlInputParam | PvcMountInputParam | FileSystemInputParam | DataONEInputParam
+)
 
 
 # Create a model for the recipe input
