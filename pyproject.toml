@@ -42,6 +42,9 @@ dependencies = [
   # required for auth
   "pyjwt",
   "pwdlib[argon2]",
+  # d1_python package
+  "dataone.libclient>=3.5.0",
+  "pyyaml>=6.0"
 ]
 
 [project.optional-dependencies]
