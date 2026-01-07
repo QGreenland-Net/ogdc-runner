@@ -5,12 +5,17 @@ import os
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 
 import click
 import requests
 from pydantic import ValidationError
 
-from ogdc_runner.exceptions import OgdcServiceApiError, OgdcWorkflowExecutionError
+from ogdc_runner.exceptions import (
+    OgdcMissingEnvvar,
+    OgdcServiceApiError,
+    OgdcWorkflowExecutionError,
+)
 from ogdc_runner.recipe import (
     get_recipe_config,
     stage_ogdc_recipe,
@@ -34,6 +39,68 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
+def _get_api_token_factory() -> Callable[[], str]:
+    """Helper function that creates a callable that returns an OGDC API token.
+
+    This is a closure (see e.g., https://realpython.com/python-closure/) - it
+    allows caching a requested access token based on its expiration datetime.
+    """
+    token_data: None | dict[str, str] = None
+
+    def _get_api_token() -> str:
+        """Get an OGDC API token using envvar-provided username/password.
+
+        `OGDC_API_USERNAME` and `OGDC_API_PASSWORD` must be set or an
+        `OgdcMissingEnvvar` exception will be raised.
+
+        The resulting access token can be used to authenticate with OGDC API
+        endpoitns.
+        """
+        nonlocal token_data
+
+        # Check if the token is valid.
+        if token_data is not None:
+            token_expiration_utc = dt.datetime.fromisoformat(
+                token_data["utc_expiration"]
+            )
+            # Use a 1 minute buffer to account for time between check and the
+            # next request.
+            current_utc = dt.datetime.now(dt.UTC) + dt.timedelta(minutes=1)
+            if token_expiration_utc > current_utc:
+                # Return the existing token - it is still valid.
+                return token_data["access_token"]
+
+        username = os.environ.get("OGDC_API_USERNAME")
+        password = os.environ.get("OGDC_API_PASSWORD")
+        if not username or not password:
+            err = "OGDC_API_USERNAME and OGDC_API_PASSWORD must be set."
+            raise OgdcMissingEnvvar(err)
+
+        response = requests.post(
+            f"{OGDC_API_URL}/token",
+            data={
+                "username": username,
+                "password": password,
+            },
+        )
+
+        response.raise_for_status()
+
+        token_data = response.json()
+        if not isinstance(token_data, dict) or not isinstance(
+            token_data.get("access_token"), str
+        ):
+            err_msg = "Failed to get valid access token from OGDC API."
+            raise OgdcServiceApiError(err_msg)
+
+        return token_data["access_token"]
+
+    return _get_api_token
+
+
+get_api_token = _get_api_token_factory()
+
+
 def _check_ogdc_api_error(response: requests.Response) -> None:
     """Raise an `OgdcServiceApiError` if the response is not OK."""
     if not response.ok:
@@ -52,6 +119,7 @@ def _get_workflow_status(workflow_name: str) -> str:
     """Get the given workflow's status as a string."""
     response = requests.get(
         url=f"{OGDC_API_URL}/status/{workflow_name}",
+        headers={"Authorization": f"Bearer {get_api_token()}"},
     )
 
     _check_ogdc_api_error(response)
@@ -66,7 +134,9 @@ def _wait_for_workflow_completion(workflow_name: str) -> None:
     while True:
         status = _get_workflow_status(workflow_name)
         if status:
-            print(f"Workflow status ({dt.datetime.now():%Y-%m-%dT%H:%m:%S}): {status}")
+            print(
+                f"Workflow status for {workflow_name} ({dt.datetime.now():%Y-%m-%d@%H:%M:%S}): {status}"
+            )
             # Terminal states
             if status == "Failed":
                 raise OgdcWorkflowExecutionError(
@@ -110,6 +180,7 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
             "recipe_path": recipe_path,
             "overwrite": overwrite,
         },
+        headers={"Authorization": f"Bearer {get_api_token()}"},
     )
 
     _check_ogdc_api_error(response)
@@ -181,3 +252,31 @@ def validate_all_recipes(recipes_location: str, ref: str) -> None:
     except subprocess.CalledProcessError as e:
         print(f"Failed to clone repository: {e}\n{e.stderr}")
         sys.exit(1)
+
+
+@cli.command
+@click.argument(
+    "username",
+    required=True,
+    metavar="USERNAME",
+    type=str,
+)
+@click.argument(
+    "password",
+    required=True,
+    metavar="PASSWORD",
+    type=str,
+)
+def create_user(username: str, password: str) -> None:
+    """Create a new OGDC user. This operation is only supported for the admin user."""
+    response = requests.post(
+        url=f"{OGDC_API_URL}/create_user",
+        data={
+            "username": username,
+            "password": password,
+        },
+        headers={"Authorization": f"Bearer {get_api_token()}"},
+    )
+
+    _check_ogdc_api_error(response)
+    print(response.json()["message"])

@@ -26,6 +26,7 @@ extensions = [
 autodoc_pydantic_model_show_field_summary = False
 autodoc_pydantic_model_show_json = False
 
+autodoc_typehints = "description"
 
 typehints_use_signature = True
 typehints_use_signature_return = True
@@ -54,6 +55,7 @@ intersphinx_mapping = {
 autodoc_mock_imports = [
     "hera",
     "jinja",
+    "fastapi",
 ]
 
 

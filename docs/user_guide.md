@@ -15,6 +15,15 @@ Use `pip` to install the `ogdc-runner`:
 pip install ogdc-runner
 ```
 
+```{note}
+If the installation fails with a message about `psycopg2` failing to build, you
+may need to install the postgresql dev kit/client on your machine first.
+
+E.g., on Ubuntu: `apt install libpq-dev`.
+
+On MacOS: `brew install postgresql`
+```
+
 ## Using the CLI
 
 Use the `--help` flag for the most up-to-date usage information:
@@ -30,6 +39,7 @@ Options:
 
 Commands:
   check-workflow-status  Check an argo workflow's status.
+  create-user            Create a new OGDC user.
   submit                 Submit a recipe to OGDC for execution.
   validate-all-recipes   Validate all OGDC recipes in a git...
   validate-recipe        Validate an OGDC recipe directory.
@@ -37,7 +47,15 @@ Commands:
 
 ### Submitting a recipe
 
-To submit an OGDC recipe, use the `submit` subcommand.
+In order to submit recipes to the OGDC service backend, the `OGDC_API_USERNAME`
+and `OGDC_API_PASSWORD` must be set:
+
+```
+export OGDC_API_USERNAME=my-username
+export OGDC_API_PASSWORD=my-password
+```
+
+Then, to submit an OGDC recipe, use the `submit` subcommand.
 
 ```
 ogdc-runner submit --wait github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags
