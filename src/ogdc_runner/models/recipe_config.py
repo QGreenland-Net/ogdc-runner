@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from functools import cache, cached_property
 from pathlib import Path
 from typing import Literal, Self
@@ -17,7 +18,10 @@ from pydantic import (
     model_validator,
 )
 
+from ogdc_runner.dataone import resolve_dataone_input
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
+
+logger = logging.getLogger(__name__)
 
 
 class OgdcBaseModel(BaseModel):
@@ -80,30 +84,24 @@ class UrlInputParam(OgdcBaseModel):
 
 
 class DataONEInputParam(BaseInputParam):
-    """DataONE object input parameter.
+    """DataONE dataset input parameter.
 
-    Fetches data objects from DataONE repositories using their persistent identifier.
-
-    Example:
-        type: dataone
-        identifier: "urn:uuid:31162eb9-7e3b-4b88-948f-f4c99f13a83f"
-        member_node: "https://arcticdata.io/metacat/d1/mn"
-        filename: "ct71_ODV.csv"
+    Provides a dataset identifier which will be resolved to data object URLs.
     """
 
     type: Literal["dataone"]
     identifier: str = Field(
         ...,
-        description="DataONE persistent identifier (PID)",
+        description="DataONE dataset/package persistent identifier (PID)",
     )
     member_node: str = Field(
         default="https://arcticdata.io/metacat/d1/mn",
         description="DataONE member node base URL",
     )
-    filename: str | None = Field(
-        default=None,
-        description="Optional filename for downloaded object (auto-detected if not provided)",
-    )
+    # These get populated by the resolver
+    resolved_url: str | None = Field(default=None, exclude=True)
+    entity_name: str | None = Field(default=None, exclude=True)
+    entity_description: str | None = Field(default=None, exclude=True)
 
 
 class PvcMountInputParam(BaseInputParam):
@@ -329,6 +327,37 @@ class RecipeConfig(RecipeMeta):
         k8s_name = self.name.lower().replace(" ", "-")
 
         return k8s_name
+
+    @model_validator(mode="after")
+    def resolve_dataone_inputs(self) -> RecipeConfig:
+        """Resolve DataONE dataset identifiers to data object URLs."""
+
+        for param in self.input.params:
+            if param.type == "dataone":
+                # Resolve the dataset to get data objects
+                data_objects = resolve_dataone_input(
+                    dataset_identifier=param.identifier,
+                    member_node=param.member_node,
+                )
+
+                if not data_objects:
+                    raise ValueError(
+                        f"No data objects found in dataset {param.identifier}"
+                    )
+
+                # For now, use the first data object
+                # TODO: Allow user to specify which object or handle multiple
+                first_obj = data_objects[0]
+
+                # Populate the resolved fields
+                param.resolved_url = first_obj["url"]
+                param.entity_name = first_obj["entity_name"]
+                param.entity_description = first_obj["entity_description"]
+
+                msg = "Resolved {param.identifier} -> {first_obj['identifier']}"
+                logger.info(msg)
+
+        return self
 
 
 class RecipeImage(OgdcBaseModel):

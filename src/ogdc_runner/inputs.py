@@ -41,14 +41,9 @@ def make_fetch_input_template(
             err_msg = "PVC mounts are not yet supported"
             raise NotImplementedError(err_msg)
         elif param.type == "dataone":
-            # Use the helper script to fetch DataONE objects
-            cmd_parts = [
-                "python3 -m ogdc_runner.scripts.fetch_dataone",
-                f"--identifier {param.identifier}",
-                f"--member-node {param.member_node}",
-                "--output-dir /output_dir/",
-            ]
-            fetch_commands.append(" ".join(cmd_parts))
+            fetch_commands.append(
+                f"wget --content-disposition -P /output_dir/ {param.resolved_url}"
+            )
         else:
             raise OgdcWorkflowExecutionError(
                 f"Unsupported input type: {param.type} for parameter {param.value}"
