@@ -171,3 +171,81 @@ def data_already_published(
     return check_for_existing_published_data(
         recipe_config=recipe_config,
     )
+
+
+def make_publish_to_dataone_template(
+    recipe_id: str,
+    recipe_config: RecipeConfig,
+) -> Container:
+    """Creates a container template that publishes data to DataONE.
+
+    This step reads data from the PVC (where it was published by make_publish_template)
+    and uploads it to DataONE if publishing is enabled in the recipe config.
+
+    Args:
+        recipe_id: The recipe identifier
+        recipe_config: The recipe configuration containing publish settings
+
+    Returns:
+        Container template for DataONE publishing
+    """
+    # Check if DataONE publishing is enabled
+    publish_config = getattr(recipe_config.output, "publish", None)
+    enabled = publish_config.enabled if publish_config else False
+
+    if not enabled:
+        return Container(
+            name="skip-dataone-publish-",
+            image="alpine:latest",
+            command=["echo"],
+            args=[f"DataONE publishing not enabled for recipe {recipe_id}"],
+        )
+
+    # Build environment variables
+    env_vars = [
+        models.EnvVar(name="DATAONE_ENABLED", value="true"),
+        models.EnvVar(name="DATAONE_CERT_PATH", value="/etc/dataone/cert.pem"),
+        models.EnvVar(
+            name="DATAONE_MEMBER_NODE",
+            value=publish_config.member_node,
+        ),
+    ]
+
+    if publish_config.coordinating_node:
+        env_vars.append(
+            models.EnvVar(
+                name="DATAONE_CN_BASE_URL",
+                value=publish_config.coordinating_node,
+            )
+        )
+
+    template = Container(
+        name="publish-to-dataone-",
+        # TODO: does this need to be actual image or is latest ok for now?
+        image="ghcr.io/qgreenland-net/ogdc-runner:latest",
+        command=["python", "-m", "ogdc_runner.publish.dataone_cli"],
+        args=[
+            "--recipe-id",
+            recipe_id,
+            "--input-dir",
+            "/data/",
+            "--meta-path",
+            f"/recipes/{recipe_id}/meta.yml",
+        ],
+        env=env_vars,
+        volume_mounts=[
+            models.VolumeMount(
+                name=OGDC_WORKFLOW_PVC.name,
+                mount_path="/data/",
+                sub_path=recipe_id,
+                read_only=True,
+            ),
+            models.VolumeMount(
+                name="dataone-cert",
+                mount_path="/etc/dataone/",
+                read_only=True,
+            ),
+        ],
+    )
+
+    return template
