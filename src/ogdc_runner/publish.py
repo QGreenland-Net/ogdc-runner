@@ -68,7 +68,7 @@ def _publish_template_for_temporary_output(
         inputs=[Artifact(name="input-dir", path="/input_dir/")],
         outputs=[
             Artifact(
-                name=f"{recipe_config.id}_zip",
+                name="published_zip",
                 path=output_filepath,
                 archive=NoneArchiveStrategy(),
             )
@@ -230,3 +230,22 @@ def data_already_published(
     return check_for_existing_published_data(
         recipe_config=recipe_config,
     )
+
+
+def get_temporary_published_output_key(*, workflow_name: str):
+    """Return the s3 key for the temporary published output.
+
+    Raises an `OgdcWorkflowExecutionError` if the key is not found.
+
+    TODO: construct full url; consider better error;
+    """
+    completed_workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=workflow_name)
+    for node in completed_workflow.status.nodes.values():  # type: ignore[union-attr]
+        if node.outputs and node.outputs.artifacts:
+            for artifact in node.outputs.artifacts:
+                if artifact.name == "published_zip":
+                    # There is only one expected `published_zip`. Retrurn.
+                    return artifact.s3.key
+
+    err_msg = "Failed to extract output s3 location from workflow."
+    raise OgdcWorkflowExecutionError(err_msg)
