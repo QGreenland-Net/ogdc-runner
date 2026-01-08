@@ -5,6 +5,7 @@ from __future__ import annotations
 from hera.workflows import (
     Artifact,
     Container,
+    NoneArchiveStrategy,
     Parameter,
     Steps,
     Workflow,
@@ -57,16 +58,19 @@ def _publish_template_for_temporary_output(
 ) -> Container:
     """Creates a container template that will zip final output data and store
     the output as an artifact in minio."""
+    output_filepath = f"/output_dir/{recipe_config.id}.zip"
     template = Container(
         name="publish-data-",
         command=["sh", "-c"],
         args=[
-            "mkdir -p /output_dir/ && cd /input_dir/ && zip -r /output_dir/output.zip ./*",
+            f"mkdir -p /output_dir/ && cd /input_dir/ && zip -r {output_filepath} ./*",
         ],
         inputs=[Artifact(name="input-dir", path="/input_dir/")],
         outputs=[
             Artifact(
-                name=f"{recipe_config.id}_output_zip", path="/output_dir/output.zip"
+                name=f"{recipe_config.id}_zip",
+                path=output_filepath,
+                archive=NoneArchiveStrategy(),
             )
         ],
     )
