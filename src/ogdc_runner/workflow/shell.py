@@ -76,7 +76,7 @@ def make_and_submit_shell_workflow(
 
         # Create publication template
         publish_template = make_publish_template(
-            recipe_id=recipe_config.id,
+            recipe_config=recipe_config,
         )
 
         # Create the workflow steps

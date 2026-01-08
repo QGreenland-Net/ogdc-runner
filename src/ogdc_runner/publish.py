@@ -22,7 +22,8 @@ from ogdc_runner.models.recipe_config import RecipeConfig
 
 
 def make_publish_template(
-    recipe_id: str,
+    *,
+    recipe_config: RecipeConfig,
 ) -> Container:
     """Creates a container template that will move final output data into the
     OGDC data storage volume under a subpath named for the recipe_id."""
@@ -37,7 +38,7 @@ def make_publish_template(
             models.VolumeMount(
                 name=OGDC_WORKFLOW_PVC.name,
                 mount_path="/output_dir/",
-                sub_path=recipe_id,
+                sub_path=recipe_config.id,
             )
         ],
     )
