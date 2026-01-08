@@ -86,17 +86,21 @@ class RecipeInput(OgdcBaseModel):
         return params
 
 
-class DataOneRecipeOutput(OgdcBaseModel):
+class RecipeOutput(OgdcBaseModel):
+    type: Literal["dataone", "temporary", "pvc"]
+
+
+class DataOneRecipeOutput(RecipeOutput):
+    type: Literal["dataone"] = "dataone"
     dataone_id: str = "TODO"
 
 
-class TemporaryRecipeOutput(OgdcBaseModel):
-    # TODO: do we actually need any attrs here?
-    pass
+class TemporaryRecipeOutput(RecipeOutput):
+    type: Literal["temporary"] = "temporary"
 
 
-class PvcRecipeOutput(OgdcBaseModel):
-    pass
+class PvcRecipeOutput(RecipeOutput):
+    type: Literal["pvc"] = "pvc"
 
 
 class Workflow(OgdcBaseModel):
