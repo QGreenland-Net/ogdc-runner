@@ -18,10 +18,15 @@ from ogdc_runner.argo import (
     submit_workflow,
 )
 from ogdc_runner.exceptions import OgdcWorkflowExecutionError
-from ogdc_runner.models.recipe_config import RecipeConfig
+from ogdc_runner.models.recipe_config import (
+    DataOneRecipeOutput,
+    PvcRecipeOutput,
+    RecipeConfig,
+    TemporaryRecipeOutput,
+)
 
 
-def make_publish_template(
+def _publish_template_for_pvc(
     *,
     recipe_config: RecipeConfig,
 ) -> Container:
@@ -44,6 +49,42 @@ def make_publish_template(
     )
 
     return template
+
+
+def _publish_template_for_temporary_output(
+    *,
+    recipe_config: RecipeConfig,
+) -> Container:
+    """Creates a container template that will zip final output data and store
+    the output as an artifact in minio."""
+    err = "TODO!"
+    raise NotImplementedError(err)
+
+
+def _publish_template_for_dataone(
+    *,
+    recipe_config: RecipeConfig,
+) -> Container:
+    """Creates a container template that will zip final output data and store
+    the output as an artifact in minio."""
+    err = "TODO!"
+    raise NotImplementedError(err)
+
+
+def make_publish_template(
+    *,
+    recipe_config: RecipeConfig,
+) -> Container:
+    """Creates a container template that will move final output data into the
+    OGDC data storage volume under a subpath named for the recipe_id."""
+    if isinstance(recipe_config.output, PvcRecipeOutput):
+        return _publish_template_for_pvc(recipe_config=recipe_config)
+    if isinstance(recipe_config.output, TemporaryRecipeOutput):
+        return _publish_template_for_temporary_output(recipe_config=recipe_config)
+    if isinstance(recipe_config.output, DataOneRecipeOutput):
+        return _publish_template_for_dataone(recipe_config=recipe_config)
+    err_msg = f"{type(recipe_config.output)} is not a recognized publication method."  # type: ignore[unreachable]
+    raise NotImplementedError(err_msg)
 
 
 def remove_existing_published_data(

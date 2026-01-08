@@ -86,8 +86,17 @@ class RecipeInput(OgdcBaseModel):
         return params
 
 
-class RecipeOutput(OgdcBaseModel):
+class DataOneRecipeOutput(OgdcBaseModel):
     dataone_id: str = "TODO"
+
+
+class TemporaryRecipeOutput(OgdcBaseModel):
+    # TODO: do we actually need any attrs here?
+    pass
+
+
+class PvcRecipeOutput(OgdcBaseModel):
+    pass
 
 
 class Workflow(OgdcBaseModel):
@@ -251,7 +260,9 @@ class RecipeMeta(OgdcBaseModel):
     workflow: ShellWorkflow | VizWorkflow
 
     input: RecipeInput
-    output: RecipeOutput = RecipeOutput()
+    output: DataOneRecipeOutput | TemporaryRecipeOutput | PvcRecipeOutput = (
+        PvcRecipeOutput()
+    )
 
     # Optional Docker image (supports both local and hosted images)
     # Examples: "my-local-image", "ghcr.io/owner/image:latest"
