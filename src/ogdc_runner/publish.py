@@ -57,8 +57,21 @@ def _publish_template_for_temporary_output(
 ) -> Container:
     """Creates a container template that will zip final output data and store
     the output as an artifact in minio."""
-    err = "TODO!"
-    raise NotImplementedError(err)
+    template = Container(
+        name="publish-data-",
+        command=["sh", "-c"],
+        args=[
+            "mkdir -p /output_dir/ && cd /input_dir/ && zip -r /output_dir/output.zip ./*",
+        ],
+        inputs=[Artifact(name="input-dir", path="/input_dir/")],
+        outputs=[
+            Artifact(
+                name=f"{recipe_config.id}_output_zip", path="/output_dir/output.zip"
+            )
+        ],
+    )
+
+    return template
 
 
 def _publish_template_for_dataone(
