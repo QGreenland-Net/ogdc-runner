@@ -145,9 +145,10 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
 [[tool.mypy.overrides]]
-module = "ogdc_runner.*"
+module = ["ogdc_runner.*", "d1_client.*", "d1_common.*"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = [
@@ -199,6 +200,8 @@ isort.required-imports = ["from __future__ import annotations"]
 # Uncomment if using a _compat.typing backport
 # typing-modules = ["ogdc_runner._compat.typing"]
 
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["T20"]
 "noxfile.py" = ["T20"]
+"**/recipe_config.py" = ["UP007"]

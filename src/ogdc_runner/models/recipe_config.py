@@ -18,7 +18,7 @@ from pydantic import (
     model_validator,
 )
 
-from ogdc_runner.dataone import resolve_dataone_input
+from ogdc_runner.dataone.resolver import resolve_dataone_input
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
 
 logger = logging.getLogger(__name__)
@@ -32,14 +32,7 @@ class OgdcBaseModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class BaseInputParam(OgdcBaseModel):
-    "Base class for input params"
-
-    pass
-
-
-# Input parameter with type and value
-class UrlInputParam(OgdcBaseModel):
+class InputParam(OgdcBaseModel):
     """Input parameter for a recipe.
 
     When instantiated with `context={"check_urls": True}`, URL-type parameters
@@ -47,7 +40,17 @@ class UrlInputParam(OgdcBaseModel):
     """
 
     value: AnyUrl | str
-    type: Literal["url"]
+    type: Literal["url", "pvc_mount", "file_system", "dataone"]
+
+    # Optional fields for DataONE inputs
+    member_node: str | None = None
+
+    # Private fields populated during resolution (for dataone type)
+    _resolved_url: str | None = None
+    _entity_name: str | None = None
+    _entity_description: str | None = None
+    _format_id: str | None = None
+    _dataset_pid: str | None = None
 
     @model_validator(mode="after")
     def validate_url_accessible(self, info: ValidationInfo) -> Self:
@@ -81,46 +84,6 @@ class UrlInputParam(OgdcBaseModel):
             raise ValueError(f"URL validation failed for {url}: {e}") from e
 
         return self
-
-
-class DataONEInputParam(BaseInputParam):
-    """DataONE dataset input parameter.
-
-    Provides a dataset identifier which will be resolved to data object URLs.
-    """
-
-    type: Literal["dataone"]
-    identifier: str = Field(
-        ...,
-        description="DataONE dataset/package persistent identifier (PID)",
-    )
-    member_node: str = Field(
-        default="https://arcticdata.io/metacat/d1/mn",
-        description="DataONE member node base URL",
-    )
-    # These get populated by the resolver
-    resolved_url: str | None = Field(default=None, exclude=True)
-    entity_name: str | None = Field(default=None, exclude=True)
-    entity_description: str | None = Field(default=None, exclude=True)
-
-
-class PvcMountInputParam(BaseInputParam):
-    """PVC mount input parameter."""
-
-    type: Literal["pvc_mount"]
-    value: str
-
-
-class FileSystemInputParam(BaseInputParam):
-    """File system input parameter."""
-
-    type: Literal["file_system"]
-    value: str
-
-
-InputParam = (
-    UrlInputParam | PvcMountInputParam | FileSystemInputParam | DataONEInputParam
-)
 
 
 # Create a model for the recipe input
@@ -335,27 +298,37 @@ class RecipeConfig(RecipeMeta):
         for param in self.input.params:
             if param.type == "dataone":
                 # Resolve the dataset to get data objects
-                data_objects = resolve_dataone_input(
-                    dataset_identifier=param.identifier,
-                    member_node=param.member_node,
-                )
+                member_node = param.member_node or "https://arcticdata.io/metacat/d1/mn"
 
-                if not data_objects:
-                    raise ValueError(
-                        f"No data objects found in dataset {param.identifier}"
+                try:
+                    data_objects = resolve_dataone_input(
+                        dataset_identifier=str(param.value),
+                        member_node=member_node,
                     )
 
-                # For now, use the first data object
-                # TODO: Allow user to specify which object or handle multiple
-                first_obj = data_objects[0]
+                    if not data_objects:
+                        raise ValueError(
+                            f"No data objects found in dataset {param.value}"
+                        )
 
-                # Populate the resolved fields
-                param.resolved_url = first_obj["url"]
-                param.entity_name = first_obj["entity_name"]
-                param.entity_description = first_obj["entity_description"]
+                    # For now, use the first data object
+                    # TODO: Allow user to specify which object or handle multiple
+                    obj = data_objects[0]
 
-                msg = "Resolved {param.identifier} -> {first_obj['identifier']}"
-                logger.info(msg)
+                    # Populate the resolved fields
+                    param._resolved_url = obj["url"]
+                    param._entity_name = obj["entity_name"]
+                    param._entity_description = obj["entity_description"]
+                    param._format_id = obj["format_id"]
+                    param._dataset_pid = str(param.value)
+
+                    msg = "Resolved {param.value} -> {obj['identifier']}"
+                    logger.info(msg)
+
+                except Exception:
+                    msg = "Failed to resolve DataONE input: {e}"
+                    logger.error(msg)
+                    raise
 
         return self
 

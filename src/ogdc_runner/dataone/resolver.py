@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 from urllib.parse import quote
 
 import requests
@@ -23,7 +24,7 @@ class DataONEResolver:
         self.member_node = member_node
         self.client = MemberNodeClient_2_0(base_url=member_node)
 
-    def resolve_dataset(self, dataset_identifier: str) -> list[dict]:
+    def resolve_dataset(self, dataset_identifier: str) -> list[dict[str, Any]]:
         """Resolve a dataset identifier to its data objects.
 
         Args:
@@ -110,39 +111,39 @@ class DataONEResolver:
         encoded_pid = quote(identifier, safe="")
         return f"{self.member_node}/v2/object/{encoded_pid}"
 
-    def _get_filename(self, doc: dict) -> str:
+    def _get_filename(self, doc: dict[str, Any]) -> str:
         """Extract filename from Solr document."""
         if filename := doc.get("fileName"):
             if isinstance(filename, list):
-                return filename[0]
-            return filename
+                return str(filename[0])
+            return str(filename)
 
         # Fallback: derive from identifier
         obj_id = doc.get("id", "unknown")
-        return obj_id.split(":")[-1]
+        return str(obj_id).split(":")[-1]
 
-    def _get_entity_name(self, doc: dict) -> str:
+    def _get_entity_name(self, doc: dict[str, Any]) -> str:
         """Extract entity name from Solr document."""
         if title := doc.get("title"):
             if isinstance(title, list):
-                return title[0]
+                return str(title[0])
             return str(title)
 
         # Fallback to filename
         return self._get_filename(doc)
 
-    def _get_entity_description(self, doc: dict) -> str:
+    def _get_entity_description(self, doc: dict[str, Any]) -> str:
         """Extract entity description from Solr document."""
         # Try abstract first
         if abstract := doc.get("abstract"):
             if isinstance(abstract, list):
-                return abstract[0]
+                return str(abstract[0])
             return str(abstract)
 
         # Try description
         if description := doc.get("description"):
             if isinstance(description, list):
-                return description[0]
+                return str(description[0])
             return str(description)
 
         return ""
@@ -151,7 +152,7 @@ class DataONEResolver:
 def resolve_dataone_input(
     dataset_identifier: str,
     member_node: str = "https://arcticdata.io/metacat/d1/mn",
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Resolve a DataONE dataset to its data objects.
 
     Args:
