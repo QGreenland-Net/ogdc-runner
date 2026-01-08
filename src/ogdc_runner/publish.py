@@ -66,7 +66,7 @@ def _publish_template_for_dataone(
     recipe_config: RecipeConfig,
 ) -> Container:
     """Creates a container template that will zip final output data and store
-    the output as an artifact in minio."""
+    the output as an artifact in dataone."""
     err = "TODO!"
     raise NotImplementedError(err)
 
