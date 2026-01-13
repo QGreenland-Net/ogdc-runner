@@ -62,9 +62,9 @@ available cluster resources.
 
 Key modules:
 
-- `ogdc_runner.parallel`: Orchestration logic for parallel task creation
-- `ogdc_runner.partitioning`: Partitioning strategies for dividing work
-- `ogdc_runner.models.parallel_config`: Configuration models for parallel
+- {mod} `ogdc_runner.parallel`: Orchestration logic for parallel task creation
+- {mod} `ogdc_runner.partitioning`: Partitioning strategies for dividing work
+- {mod} `ogdc_runner.models.parallel_config`: Configuration models for parallel
   execution
 
 ## Aspirational
