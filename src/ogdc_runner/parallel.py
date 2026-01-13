@@ -33,22 +33,12 @@ from hera.workflows.models import VolumeMount
 from loguru import logger
 
 from ogdc_runner.argo import OGDC_WORKFLOW_PVC
-from ogdc_runner.constants import MAX_PARALLEL_LIMIT
 from ogdc_runner.models.parallel_config import (
     ExecutionFunction,
     FilePartition,
 )
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.partitioning import create_partitions
-
-
-def get_max_parallelism() -> int:
-    """Get the maximum parallelism limit for workflow execution.
-
-    Returns:
-        int: Maximum number of parallel tasks allowed
-    """
-    return MAX_PARALLEL_LIMIT
 
 
 class ParallelExecutionOrchestrator:

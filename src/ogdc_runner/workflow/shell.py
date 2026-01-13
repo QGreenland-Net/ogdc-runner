@@ -13,10 +13,11 @@ from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
     submit_workflow,
 )
+from ogdc_runner.constants import MAX_PARALLEL_LIMIT
 from ogdc_runner.inputs import make_fetch_input_template
 from ogdc_runner.models.parallel_config import ExecutionFunction
 from ogdc_runner.models.recipe_config import RecipeConfig
-from ogdc_runner.parallel import ParallelExecutionOrchestrator, get_max_parallelism
+from ogdc_runner.parallel import ParallelExecutionOrchestrator
 from ogdc_runner.publish import make_publish_template
 
 
@@ -173,7 +174,7 @@ def make_and_submit_shell_workflow(
         generate_name=f"{recipe_config.id}-",
         entrypoint="main",
         workflows_service=ARGO_WORKFLOW_SERVICE,
-        parallelism=get_max_parallelism() if parallel_config.enabled else None,
+        parallelism=MAX_PARALLEL_LIMIT if parallel_config.enabled else None,
     ) as w:
         if parallel_config.enabled:
             _create_parallel_workflow(recipe_config, commands)
