@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from functools import cache, cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Self
+from typing import Literal, Self
 
 import requests  # type: ignore[import-untyped]
 from pydantic import (
@@ -17,9 +17,6 @@ from pydantic import (
 
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
 from ogdc_runner.models.base import OgdcBaseModel
-
-if TYPE_CHECKING:
-    pass
 
 
 class ParallelConfig(OgdcBaseModel):
@@ -153,7 +150,7 @@ class ShellWorkflow(Workflow):
     sh_file: str | Path = "recipe.sh"
     # Optional parallel execution configuration
     parallel: ParallelConfig = Field(
-        default_factory=lambda: _get_parallel_config_default(),
+        default_factory=lambda: ParallelConfig(),
         description="Configuration for parallel execution",
     )
 
@@ -225,7 +222,7 @@ class VizWorkflow(Workflow):
 
     # Optional parallel execution configuration
     parallel: ParallelConfig = Field(
-        default_factory=lambda: _get_parallel_config_default(),
+        default_factory=lambda: ParallelConfig(),
         description="Configuration for parallel execution",
     )
 
@@ -268,11 +265,6 @@ class VizWorkflow(Workflow):
             return _read_config_json(self.config_file)
 
         return "{}"
-
-
-def _get_parallel_config_default() -> ParallelConfig:
-    """Get default ParallelConfig instance."""
-    return ParallelConfig()
 
 
 class RecipeMeta(OgdcBaseModel):
@@ -329,17 +321,3 @@ class RecipeImage(OgdcBaseModel):
     def full_image_path(self) -> str:
         """Return the full image path including tag."""
         return f"{self.image}:{self.tag}"
-
-
-def get_parallel_config(
-    workflow: ShellWorkflow | VizWorkflow,
-) -> ParallelConfig:
-    """Get parallel configuration from a workflow.
-
-    Args:
-        workflow: Shell or Viz workflow instance
-
-    Returns:
-        ParallelConfig instance (always present)
-    """
-    return workflow.parallel

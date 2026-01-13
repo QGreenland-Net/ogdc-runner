@@ -54,17 +54,31 @@ def make_fetch_input_template(
     )
 
 
-def _get_output_directory(recipe_id: str, use_pvc: bool) -> str:
-    """Determine the output directory path based on storage type.
+def _get_output_directory(recipe_id: str, use_input_as_output: bool) -> str:
+    """Determine the output directory path based on whether inputs are stored for reuse.
 
     Args:
         recipe_id: Unique recipe identifier
-        use_pvc: Whether using PVC storage
+        use_input_as_output: If True, store inputs in PVC at a path that can be
+            referenced as output for downstream recipes. If False, use temporary
+            artifact storage.
 
     Returns:
         Output directory path
     """
-    if use_pvc:
+    if use_input_as_output:
+
+        def get_recipe_inputs_path(recipe_id: str) -> str:
+            """Get the standardized PVC path for recipe inputs.
+
+            Args:
+                recipe_id: Unique recipe identifier
+
+            Returns:
+                PVC path where recipe inputs are stored
+            """
+            return f"/mnt/workflow/{recipe_id}/inputs"
+
         return f"/mnt/workflow/{recipe_id}/inputs"
     return "/output_dir"
 
