@@ -8,7 +8,7 @@ import time
 from collections.abc import Callable
 
 import click
-import requests
+import requests  # type: ignore[import-untyped]
 from pydantic import ValidationError
 
 from ogdc_runner.exceptions import (

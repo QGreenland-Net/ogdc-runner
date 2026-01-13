@@ -5,7 +5,7 @@ from functools import cache, cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Self
 
-import requests
+import requests  # type: ignore[import-untyped]
 from pydantic import (
     AnyUrl,
     Field,
