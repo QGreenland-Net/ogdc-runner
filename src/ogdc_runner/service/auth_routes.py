@@ -135,7 +135,11 @@ def create_user_route(
 
 @router.get("/output/{recipe_workflow_name}")
 def get_output(recipe_workflow_name: str) -> str:
-    """Check an argo workflow's status."""
+    """Get a presigned s3 url for the outputs of the given recipe workflow.
+
+    TODO: support other output types. This assumes a temporary output stored on
+    Argo's artifact s3 storage.
+    """
     s3_location = get_temporary_published_output_key(workflow_name=recipe_workflow_name)
 
     return s3_location
