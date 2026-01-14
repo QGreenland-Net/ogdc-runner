@@ -11,6 +11,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
+from ogdc_runner.exceptions import OgdcOutputDataRetrievalError
 from ogdc_runner.publish import get_temporary_published_output_key
 from ogdc_runner.recipe import stage_ogdc_recipe
 from ogdc_runner.service import auth, db, user
@@ -140,6 +141,14 @@ def get_output(recipe_workflow_name: str) -> str:
     TODO: support other output types. This assumes a temporary output stored on
     Argo's artifact s3 storage.
     """
-    s3_location = get_temporary_published_output_key(workflow_name=recipe_workflow_name)
+    try:
+        s3_location = get_temporary_published_output_key(
+            workflow_name=recipe_workflow_name
+        )
+    except OgdcOutputDataRetrievalError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"The requested output for {recipe_workflow_name} was not found: {e}.",
+        ) from e
 
     return s3_location
