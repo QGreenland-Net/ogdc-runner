@@ -246,17 +246,16 @@ def data_already_published(
 def _get_s3_client():
     s3_secret_access_key_id = os.environ.get("S3_SECRET_KEY_ID")
     s3_secret_access_key = os.environ.get("S3_SECRET_KEY_KEY")
-    # s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
-    s3_endpoint_url = "http://qgnet-ogdc-minio:9000"
-    if not all((s3_secret_access_key_id, s3_secret_access_key, s3_endpoint_url)):
-        err_msg = (
-            "S3_SECRET_KEY_ID, S3_SECRET_KEY_KEY, and S3_ENDPOINT_URL must be set."
-        )
+    internal_s3_endpoint_url = os.environ.get("INTERNAL_S3_ENDPOINT_URL")
+    if not all(
+        (s3_secret_access_key_id, s3_secret_access_key, internal_s3_endpoint_url)
+    ):
+        err_msg = "S3_SECRET_KEY_ID, S3_SECRET_KEY_KEY, and INTERNAL_S3_ENDPOINT_URL must be set."
         raise OgdcMissingEnvvar(err_msg)
 
     s3_client = boto3.client(
         service_name="s3",
-        endpoint_url=s3_endpoint_url,
+        endpoint_url=internal_s3_endpoint_url,
         aws_access_key_id=s3_secret_access_key_id,
         aws_secret_access_key=s3_secret_access_key,
     )
@@ -284,11 +283,22 @@ def _get_presigned_s3_url(s3_key: str) -> str:
             # 2 hours.
             ExpiresIn=60 * 120,
         )
+        presigned_url = str(presigned_url)
     except ClientError as e:
         err_msg = f"Error creating pre-signed url for {s3_key}: {e}"
         raise OgdcOutputDataRetrievalError(err_msg) from e
 
-    return str(presigned_url)
+    public_s3_endpoint_url = os.environ.get("PUBLIC_S3_ENDPOINT_URL")
+    internal_s3_endpoint_url = os.environ.get("INTERNAL_S3_ENDPOINT_URL")
+    if not all((internal_s3_endpoint_url, public_s3_endpoint_url)):
+        err_msg = "INTERNAL_S3_ENDPOINT_URL and PUBLIC_S3_ENDPOINT_URL must be set."
+        raise OgdcMissingEnvvar(err_msg)
+
+    public_presigned_url = presigned_url.replace(
+        str(internal_s3_endpoint_url), str(public_s3_endpoint_url)
+    )
+
+    return public_presigned_url
 
 
 def _check_s3_key_object_exists(s3_key: str) -> bool:
@@ -301,7 +311,7 @@ def _check_s3_key_object_exists(s3_key: str) -> bool:
     try:
         response = s3_client.head_object(Bucket="argo-workflows", Key=s3_key)
         logger.info(
-            f"Found object with key {s3_key}. Size: {response.ContentLength} (bytes)."
+            f"Found object with key {s3_key}. Size: {response.get('ContentLength')}."
         )
         return True
     except ClientError as e:
