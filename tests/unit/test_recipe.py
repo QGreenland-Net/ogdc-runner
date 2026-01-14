@@ -3,7 +3,7 @@ from __future__ import annotations
 from unittest.mock import Mock, patch
 
 import pytest
-import requests  # type: ignore[import-untyped]
+import requests
 from pydantic import ValidationError
 
 from ogdc_runner.recipe import get_recipe_config

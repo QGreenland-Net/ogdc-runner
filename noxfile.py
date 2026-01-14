@@ -20,14 +20,14 @@ else:
     nox.options.reuse_existing_virtualenvs = False
 
 
-@nox.session
+@nox.session(python=["3.11", "3.12"])
 def typecheck(session: nox.Session) -> None:
     """Run typechecker (mypy)."""
     session.install(".[test]")
     session.run("mypy", *session.posargs)
 
 
-@nox.session
+@nox.session(python=["3.11", "3.12"])
 def test_unit(session: nox.Session) -> None:
     """Run unit tests."""
     session.install(".[test]")
@@ -38,7 +38,7 @@ def test_unit(session: nox.Session) -> None:
     )
 
 
-@nox.session
+@nox.session(python=["3.11", "3.12"])
 def test_integration(session: nox.Session) -> None:
     """Run integration tests.
 
@@ -113,7 +113,7 @@ def docs(session: nox.Session) -> None:
         session.run("sphinx-build", "--keep-going", *shared_args)
 
 
-@nox.session
+@nox.session(python=["3.11", "3.12"])
 def build(session: nox.Session) -> None:
     """Build an SDist and wheel."""
 
