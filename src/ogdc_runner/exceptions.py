@@ -47,3 +47,9 @@ class OgdcUserAlreadyExists(OgdcRunnerException):
     """Exception raised when an OGDC user with the given username is already created."""
 
     pass
+
+
+class OgdcOutputDataRetrievalError(OgdcRunnerException):
+    """Exception raised when something goes wrong with retrieval of otuput data."""
+
+    pass

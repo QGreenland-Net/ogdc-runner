@@ -42,6 +42,8 @@ dependencies = [
   # required for auth
   "pyjwt",
   "pwdlib[argon2]",
+  # s3 API
+  "boto3",
 ]
 
 [project.optional-dependencies]
@@ -151,6 +153,8 @@ module = [
   "jinja2.*",
   "kubernetes.*",
   "fsspec",
+  "boto3",
+  "botocore.exceptions",
 ]
 ignore_missing_imports = true
 

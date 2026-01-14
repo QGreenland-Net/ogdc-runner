@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import os
+
+import boto3
+from botocore.exceptions import ClientError
 from hera.workflows import (
     Artifact,
     Container,
@@ -18,7 +22,11 @@ from ogdc_runner.argo import (
     make_generate_name,
     submit_workflow,
 )
-from ogdc_runner.exceptions import OgdcWorkflowExecutionError
+from ogdc_runner.exceptions import (
+    OgdcMissingEnvvar,
+    OgdcOutputDataRetrievalError,
+    OgdcWorkflowExecutionError,
+)
 from ogdc_runner.models.recipe_config import (
     DataOneRecipeOutput,
     PvcRecipeOutput,
@@ -232,20 +240,66 @@ def data_already_published(
     )
 
 
-def get_temporary_published_output_key(*, workflow_name: str):
+def _get_presigned_s3_url(s3_key: str) -> str:
+    """Get a pre-signed s3 URL for the given s3 key.
+
+    This returns a URL that is only valid for 2 hours, allowing the user to
+    download the data before we clean it up.
+
+    See: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-presigned-urls.html
+    """
+    s3_secret_access_key_id = os.environ.get("S3_SECRET_KEY_ID")
+    s3_secret_access_key = os.environ.get("S3_SECRET_KEY_KEY")
+    s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
+    if not all((s3_secret_access_key_id, s3_secret_access_key, s3_endpoint_url)):
+        err_msg = (
+            "S3_SECRET_KEY_ID, S3_SECRET_KEY_KEY, and S3_ENDPOINT_URL must be set."
+        )
+        raise OgdcMissingEnvvar(err_msg)
+
+    s3_client = boto3.client(
+        service_name="s3",
+        endpoint_url=s3_endpoint_url,
+        aws_access_key_id=s3_secret_access_key_id,
+        aws_secret_access_key=s3_secret_access_key,
+    )
+    try:
+        presigned_url = s3_client.generate_presigned_url(
+            "get_object",
+            Params={
+                "Bucket": "argo-workflows",
+                "Key": s3_key,
+            },
+            # Time in seconds for the presigned URL to remain valid:
+            # 2 hours.
+            ExpiresIn=60 * 120,
+        )
+    except ClientError as e:
+        err_msg = f"Error creating pre-signed url for {s3_key}: {e}"
+        raise OgdcOutputDataRetrievalError(err_msg) from e
+
+    return str(presigned_url)
+
+
+def get_temporary_published_output_key(*, workflow_name: str) -> str:
     """Return the s3 key for the temporary published output.
 
     Raises an `OgdcWorkflowExecutionError` if the key is not found.
 
-    TODO: construct full url; consider better error;
+    TODO:
+
+      * Ensure the object is still present/valid
     """
     completed_workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=workflow_name)
     for node in completed_workflow.status.nodes.values():  # type: ignore[union-attr]
         if node.outputs and node.outputs.artifacts:
             for artifact in node.outputs.artifacts:
+                # There is only one expected `published_zip`.
                 if artifact.name == "published_zip":
-                    # There is only one expected `published_zip`. Retrurn.
-                    return artifact.s3.key
+                    s3_key = artifact.s3.key  # type: ignore[union-attr]
+                    assert s3_key is not None
+                    s3_url = _get_presigned_s3_url(str(s3_key))
+                    return s3_url
 
-    err_msg = "Failed to extract output s3 location from workflow."
-    raise OgdcWorkflowExecutionError(err_msg)
+    err_msg = "Failed to find an output s3 location from workflow."
+    raise OgdcOutputDataRetrievalError(err_msg)

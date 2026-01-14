@@ -11,6 +11,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
+from ogdc_runner.publish import get_temporary_published_output_key
 from ogdc_runner.recipe import stage_ogdc_recipe
 from ogdc_runner.service import auth, db, user
 
@@ -130,3 +131,11 @@ def create_user_route(
     )
 
     return CreateUserResponse(message=f'User with username "{new_user.name}" created.')
+
+
+@router.get("/output/{recipe_workflow_name}")
+def get_output(recipe_workflow_name: str) -> str:
+    """Check an argo workflow's status."""
+    s3_location = get_temporary_published_output_key(workflow_name=recipe_workflow_name)
+
+    return s3_location
