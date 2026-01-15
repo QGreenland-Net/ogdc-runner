@@ -91,8 +91,8 @@ class DataONEResolver:
             logger.info(msg)
             return data_objects
 
-        except Exception:
-            msg = "Failed to resolve dataset: {e}"
+        except Exception as e:
+            msg = f"Failed to resolve dataset: {e}"
             logger.error(msg)
             raise
 
