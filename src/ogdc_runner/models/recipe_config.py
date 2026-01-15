@@ -322,7 +322,7 @@ class RecipeConfig(RecipeMeta):
                     param._format_id = obj["format_id"]
                     param._dataset_pid = str(param.value)
 
-                    msg = "Resolved {param.value} -> {obj['identifier']}"
+                    msg = f"Resolved {param.value} -> {obj['identifier']}"
                     logger.info(msg)
 
                 except Exception as e:
