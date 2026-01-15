@@ -6,6 +6,8 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable
+from pathlib import Path
+from urllib.parse import urlparse
 
 import click
 import requests
@@ -280,3 +282,41 @@ def create_user(username: str, password: str) -> None:
 
     _check_ogdc_api_error(response)
     print(response.json()["message"])
+
+
+@cli.command
+@click.argument(
+    "workflow_name",
+    required=True,
+    type=str,
+)
+@click.option(
+    "--output-dir",
+    default=Path("./"),
+    help="Output directory to place the workflow output.",
+    type=click.Path(
+        writable=True, file_okay=False, dir_okay=True, resolve_path=True, path_type=Path
+    ),
+)
+def get_output(workflow_name: str, output_dir: Path) -> None:
+    """Get the temporary output for the given workflow."""
+    response = requests.get(
+        url=f"{OGDC_API_URL}/output/{workflow_name}",
+        headers={"Authorization": f"Bearer {get_api_token()}"},
+    )
+
+    _check_ogdc_api_error(response)
+    data_url = response.json()["data_url"]
+
+    data_filename = Path(urlparse(data_url).path).name
+    assert data_filename.endswith(".zip")
+
+    # Download the data for the user to the given directory.
+    output_filepath = output_dir / data_filename
+    with requests.get(data_url, stream=True) as response:
+        response.raise_for_status()
+        with output_filepath.open("wb") as f:
+            for chunk in response.iter_content():
+                f.write(chunk)
+
+    print(f"Wrote {output_filepath}")
