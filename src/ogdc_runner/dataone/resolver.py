@@ -25,16 +25,23 @@ class DataONEResolver:
         self.client = MemberNodeClient_2_0(base_url=member_node)
 
     def resolve_dataset(self, dataset_identifier: str) -> list[dict[str, Any]]:
-        """Resolve a dataset identifier to its data objects.
+        """Resolve a dataset/package identifier to its data objects.
 
         Args:
-            dataset_identifier: Dataset/package PID
+            dataset_identifier: Dataset package PID (resource_map_urb:uuid:... format)
 
         Returns:
-            List of data objects with metadata
+            List of data objects found in the package
         """
         msg = "Resolving dataset: {dataset_identifier}"
         logger.info(msg)
+
+        if not dataset_identifier.startswith("resource_map_urn:uuid:"):
+            raise ValueError(
+                f"Invalid package identifier: {dataset_identifier}. "
+                f"Expected format: resource_map_urn:uuid:... "
+                f"(This should be a package/resource map ID, not a data object ID)"
+            )
 
         # Query Solr for objects in this dataset
         solr_url = f"{self.member_node}/v2/query/solr/"

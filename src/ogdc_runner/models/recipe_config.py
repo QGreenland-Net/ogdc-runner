@@ -325,10 +325,14 @@ class RecipeConfig(RecipeMeta):
                     msg = "Resolved {param.value} -> {obj['identifier']}"
                     logger.info(msg)
 
-                except Exception:
-                    msg = "Failed to resolve DataONE input: {e}"
+                except Exception as e:
+                    msg = f"Failed to resolve DataONE input {param.value}: {e}"
                     logger.error(msg)
-                    raise
+                    raise ValueError(
+                        f"Failed to resolve DataONE package {param.value}. "
+                        f"Make sure the value is a dataset package identifier (e.g., urn:uuid:...). "
+                        f"Error: {e}"
+                    ) from e
 
         return self
 
