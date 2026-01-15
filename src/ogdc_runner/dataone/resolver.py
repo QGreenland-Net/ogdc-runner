@@ -28,12 +28,12 @@ class DataONEResolver:
         """Resolve a dataset/package identifier to its data objects.
 
         Args:
-            dataset_identifier: Dataset package PID (resource_map_urb:uuid:... format)
+            dataset_identifier: Dataset package PID (resource_map_urn:uuid:... format)
 
         Returns:
             List of data objects found in the package
         """
-        msg = "Resolving dataset: {dataset_identifier}"
+        msg = f"Resolving dataset: {dataset_identifier}"
         logger.info(msg)
 
         if not dataset_identifier.startswith("resource_map_urn:uuid:"):
@@ -60,7 +60,7 @@ class DataONEResolver:
             docs = data.get("response", {}).get("docs", [])
 
             if not docs:
-                msg = "No objects found for dataset {dataset_identifier}"
+                msg = f"No objects found for dataset {dataset_identifier}"
                 logger.warning(msg)
                 return []
 
@@ -87,7 +87,7 @@ class DataONEResolver:
 
                 data_objects.append(obj_info)
 
-            msg = "Found {len(data_objects)} data objects in dataset"
+            msg = f"Found {len(data_objects)} data objects in dataset"
             logger.info(msg)
             return data_objects
 

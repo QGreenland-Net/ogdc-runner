@@ -330,7 +330,7 @@ class RecipeConfig(RecipeMeta):
                     logger.error(msg)
                     raise ValueError(
                         f"Failed to resolve DataONE package {param.value}. "
-                        f"Make sure the value is a dataset package identifier (e.g., urn:uuid:...). "
+                        f"Make sure the value is a dataset package identifier (e.g., resource_map_urn:uuid:...). "
                         f"Error: {e}"
                     ) from e
 

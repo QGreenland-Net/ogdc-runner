@@ -30,7 +30,7 @@ classifiers = [
 dependencies = [
   "click >=8",
   "pydantic >=2.7.1",
-  "pyyaml",
+  "pyyaml>=6.0",
   "loguru",
   "fastapi[standard]",
   "hera >=5.18.0",
@@ -44,7 +44,6 @@ dependencies = [
   "pwdlib[argon2]",
   # d1_python package
   "dataone.libclient>=3.5.0",
-  "pyyaml>=6.0"
 ]
 
 [project.optional-dependencies]
