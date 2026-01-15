@@ -6,6 +6,7 @@ import os
 from functools import cache
 
 import boto3
+import botocore
 from botocore.exceptions import ClientError
 from hera.workflows import (
     Artifact,
@@ -243,7 +244,7 @@ def data_already_published(
 
 
 @cache
-def _get_s3_client():
+def _get_s3_client() -> botocore.client.S3:
     s3_secret_access_key_id = os.environ.get("S3_SECRET_KEY_ID")
     s3_secret_access_key = os.environ.get("S3_SECRET_KEY_KEY")
     internal_s3_endpoint_url = os.environ.get("INTERNAL_S3_ENDPOINT_URL")
@@ -298,7 +299,7 @@ def _get_presigned_s3_url(s3_key: str) -> str:
         str(internal_s3_endpoint_url), str(public_s3_endpoint_url)
     )
 
-    return public_presigned_url
+    return str(public_presigned_url)
 
 
 def _check_s3_key_object_exists(s3_key: str) -> bool:

@@ -5,3 +5,5 @@ input:
       type: "url"
 workflow:
   type: "shell"
+output:
+  type: "temporary"

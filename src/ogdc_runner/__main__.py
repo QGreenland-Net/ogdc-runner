@@ -284,22 +284,7 @@ def create_user(username: str, password: str) -> None:
     print(response.json()["message"])
 
 
-@cli.command
-@click.argument(
-    "workflow_name",
-    required=True,
-    type=str,
-)
-@click.option(
-    "--output-dir",
-    default=Path("./"),
-    help="Output directory to place the workflow output.",
-    type=click.Path(
-        writable=True, file_okay=False, dir_okay=True, resolve_path=True, path_type=Path
-    ),
-)
-def get_output(workflow_name: str, output_dir: Path) -> None:
-    """Get the temporary output for the given workflow."""
+def _download_output_for_workflow(workflow_name: str, output_dir: Path) -> None:
     response = requests.get(
         url=f"{OGDC_API_URL}/output/{workflow_name}",
         headers={"Authorization": f"Bearer {get_api_token()}"},
@@ -320,3 +305,22 @@ def get_output(workflow_name: str, output_dir: Path) -> None:
                 f.write(chunk)
 
     print(f"Wrote {output_filepath}")
+
+
+@cli.command
+@click.argument(
+    "workflow_name",
+    required=True,
+    type=str,
+)
+@click.option(
+    "--output-dir",
+    default=Path("./"),
+    help="Output directory to place the workflow output.",
+    type=click.Path(
+        writable=True, file_okay=False, dir_okay=True, resolve_path=True, path_type=Path
+    ),
+)
+def get_output(workflow_name: str, output_dir: Path) -> None:
+    """Get the temporary output for the given workflow."""
+    _download_output_for_workflow(workflow_name, output_dir)

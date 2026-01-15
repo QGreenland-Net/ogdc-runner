@@ -155,6 +155,7 @@ module = [
   "fsspec",
   "boto3",
   "botocore.exceptions",
+  "botocore",
 ]
 ignore_missing_imports = true
 
