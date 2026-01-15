@@ -53,7 +53,7 @@ class DataONEResolver:
         }
 
         try:
-            response = requests.get(solr_url, params=params, timeout=30)
+            response = requests.get(solr_url, params=params, timeout=30)  # type: ignore[arg-type]
             response.raise_for_status()
             data = response.json()
 
