@@ -319,10 +319,10 @@ def _check_s3_key_object_exists(s3_key: str) -> bool:
         raise OgdcOutputDataRetrievalError(err_msg) from e
 
 
-def get_temporary_published_output_key(*, workflow_name: str) -> str:
-    """Return the s3 key for the temporary published output.
+def get_temporary_output_data_url(*, workflow_name: str) -> str:
+    """Return the s3 URL for the temporary published output.
 
-    Raises an `OgdcWorkflowExecutionError` if the key is not found.
+    Raises an `OgdcOutputDataRetrievalError` if the published output is not found.
     """
     completed_workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=workflow_name)
     for node in completed_workflow.status.nodes.values():  # type: ignore[union-attr]
