@@ -145,9 +145,12 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
 [[tool.mypy.overrides]]
-module = ["ogdc_runner.*", "d1_client.*", "d1_common.*"]
+module = ["ogdc_runner.*"]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+module = ["d1_client.*", "d1_common.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
