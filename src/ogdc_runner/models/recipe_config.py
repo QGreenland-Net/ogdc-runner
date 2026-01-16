@@ -34,14 +34,27 @@ class OgdcBaseModel(BaseModel):
 
 
 class InputParam(OgdcBaseModel):
-    """Input parameter for a recipe.
+    """Input parameter for a recipe."""
+
+    type: Literal["url", "pvc_mount", "file_system", "dataone"]
+
+
+class UrlInput(InputParam):
+    """Inpurt from URL.
 
     When instantiated with `context={"check_urls": True}`, URL-type parameters
     will be validated to ensure they are accessible via HTTP HEAD request.
     """
 
+    type: Literal["url"] = "url"
     value: AnyUrl | str
-    type: Literal["url", "pvc_mount", "file_system", "dataone"]
+
+
+class DataOneInput(InputParam):
+    """DataOne input parameters."""
+
+    type: Literal["dataone"] = "dataone"
+    value: str
 
     # Optional fields for DataONE inputs
     member_node: str | None = None
