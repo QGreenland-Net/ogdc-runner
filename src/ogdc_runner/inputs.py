@@ -7,8 +7,7 @@ from hera.workflows import (
     Container,
 )
 
-from ogdc_runner.exceptions import OgdcWorkflowExecutionError
-from ogdc_runner.models.recipe_config import RecipeConfig
+from ogdc_runner.models.recipe_config import DataOneInput, RecipeConfig, UrlInput
 
 
 def make_fetch_input_template(
@@ -26,27 +25,17 @@ def make_fetch_input_template(
 
     for param in recipe_config.input.params:
         # Check if the parameter is a URL
-        if param.type == "url":
+        if isinstance(param, UrlInput):
             # It's a URL, use wget
             fetch_commands.append(
                 f"wget --content-disposition -P /output_dir/ {param.value}"
             )
-        elif param.type == "file_system":
-            filename = str(param.value).split("/")[-1]
-            fetch_commands.append(f"cp {param.value} /output_dir/{filename}")
-        elif param.type == "pvc_mount":
-            # TODO: support PVC paths as input.
-            # Because it is a PVC, we expect it to be mounted to the first
-            # step's container, so no move should be necessary.
-            err_msg = "PVC mounts are not yet supported"
-            raise NotImplementedError(err_msg)
-        elif param.type == "dataone":
+        elif isinstance(param, DataOneInput):
             url = param._resolved_url or param.value
             fetch_commands.append(f"wget --content-disposition -P /output_dir/ {url}")
         else:
-            raise OgdcWorkflowExecutionError(
-                f"Unsupported input type: {param.type} for parameter {param.value}"
-            )
+            err_msg = f"{param.type} is not yet supported as an input type."
+            raise NotImplementedError(err_msg)
 
     # Join all commands with && for sequential execution
     combined_command = " && ".join(fetch_commands)

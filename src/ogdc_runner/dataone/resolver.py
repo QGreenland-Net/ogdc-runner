@@ -3,29 +3,34 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 from urllib.parse import quote
 
 import requests
 from d1_client.mnclient_2_0 import MemberNodeClient_2_0
 
-from ogdc_runner.constants import DATAONE_MEMBER_NODE
+from ogdc_runner.exceptions import OgdcMissingEnvvar
 
 logger = logging.getLogger(__name__)
+DATAONE_NODE_URL = os.environ.get("DATAONE_NODE_URL")
+if DATAONE_NODE_URL is None:
+    msg = "Must have DATAONE_NODE_URL envvar set"
+    raise OgdcMissingEnvvar(msg)
 
 
 class DataONEResolver:
     """Resolves DataONE dataset identifiers to data objects."""
 
-    def __init__(self, member_node: str = DATAONE_MEMBER_NODE):
+    def __init__(self) -> None:
         """Initialize resolver.
 
-        Args:
+        Args:11
             member_node: DataONE member node base URL
-            Defaults to value of DATAONE_MEMBER_NODE envvar.
+            Defaults to value of DATAONE_NODE_URL envvar.
         """
-        self.member_node = member_node
-        self.client = MemberNodeClient_2_0(base_url=member_node)
+        self.member_node = DATAONE_NODE_URL
+        self.client = MemberNodeClient_2_0(base_url=DATAONE_NODE_URL)
 
     def resolve_dataset(self, dataset_identifier: str) -> list[dict[str, Any]]:
         """Resolve a dataset/package identifier to its data objects.
@@ -165,7 +170,6 @@ class DataONEResolver:
 
 def resolve_dataone_input(
     dataset_identifier: str,
-    member_node: str = "https://arcticdata.io/metacat/d1/mn",
 ) -> list[dict[str, Any]]:
     """Resolve a DataONE dataset to its data objects.
 
@@ -176,5 +180,5 @@ def resolve_dataone_input(
     Returns:
         List of data objects with URLs and metadata
     """
-    resolver = DataONEResolver(member_node)
+    resolver = DataONEResolver()
     return resolver.resolve_dataset(dataset_identifier)
