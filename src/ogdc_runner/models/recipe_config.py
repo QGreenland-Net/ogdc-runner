@@ -4,7 +4,7 @@ import json
 import logging
 from functools import cache, cached_property
 from pathlib import Path
-from typing import Literal, Self
+from typing import Literal, Self, TypeAlias
 
 import requests
 from pydantic import (
@@ -133,12 +133,15 @@ class DataOneInput(InputParam):
         return self
 
 
+InputParamType: TypeAlias = DataOneInput | UrlInput
+
+
 # Create a model for the recipe input
 class RecipeInput(OgdcBaseModel):
-    params: list[UrlInput | DataOneInput]
+    params: list[InputParamType]
 
     @field_validator("params")
-    def validate_params(cls, params: list[InputParam]) -> list[InputParam]:
+    def validate_params(cls, params: list[InputParamType]) -> list[InputParamType]:
         """Ensure there's at least one input parameter."""
         if not params:
             error_msg = "At least one input parameter is required"
