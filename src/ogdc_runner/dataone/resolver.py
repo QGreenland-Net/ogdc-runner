@@ -126,7 +126,11 @@ class DataONEResolver:
             return str(filename)
 
         # Fallback: derive from identifier
-        obj_id = doc.get("id", "unknown")
+        obj_id = doc.get("id")
+        if not obj_id:
+            error_msg = "DataONE object missing required 'id' field"
+            raise ValueError(error_msg)
+
         return str(obj_id).split(":")[-1]
 
     def _get_entity_name(self, doc: dict[str, Any]) -> str:
