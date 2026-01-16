@@ -149,11 +149,11 @@ def remove_existing_published_data(
     ARGO_WORKFLOW_SERVICE.delete_workflow(workflow_name)
 
 
-def check_for_existing_published_data(
+def check_for_existing_pvc_published_data(
     *,
     recipe_config: RecipeConfig,
 ) -> bool:
-    """Execute argo workflow that checks if the given recipe has published data.
+    """Execute argo workflow that checks if the given recipe has published data to PVC.
 
     Returns `True` if data have already been published for the given recipe,
     otherwise `False`.
@@ -215,6 +215,32 @@ def check_for_existing_published_data(
     ARGO_WORKFLOW_SERVICE.delete_workflow(workflow_name)
 
     return result == "yes"
+
+
+def check_for_existing_published_data(
+    *,
+    recipe_config: RecipeConfig,
+) -> bool:
+    """Execute argo workflow that checks if the given recipe has published data.
+
+    Returns `True` if data have already been published for the given recipe,
+    otherwise `False`.
+    """
+    if recipe_config.output.type == "pvc":
+        return check_for_existing_pvc_published_data(recipe_config=recipe_config)
+    if recipe_config.output.type == "temporary":
+        # TODO: implement check for temporary output status. This cannot be
+        # derived from the recipe_config alone, because the temporary output
+        # location uses a key that's based on the argo workflow name. We could
+        # probably use `hera` to filter for a matching workflow based on the
+        # `recipe_config.id`, and check its output, but this will be much easier
+        # to implement once we track recipe executions in the database.
+        logger.warning(
+            f"Assuming temporary data are not published for '{recipe_config.name}'"
+        )
+        return False
+    err_msg = "Checking publication status of {recipe_config.output.type} output type is not supported."
+    raise NotImplementedError(err_msg)
 
 
 def data_already_published(
