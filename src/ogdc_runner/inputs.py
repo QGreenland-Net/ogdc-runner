@@ -33,9 +33,6 @@ def make_fetch_input_template(
         elif isinstance(param, DataOneInput):
             url = param._resolved_url or param.value
             fetch_commands.append(f"wget --content-disposition -P /output_dir/ {url}")
-        else:
-            err_msg = f"{param.type} is not yet supported as an input type."
-            raise NotImplementedError(err_msg)
 
     # Join all commands with && for sequential execution
     combined_command = " && ".join(fetch_commands)
