@@ -18,6 +18,7 @@ from pydantic import (
     model_validator,
 )
 
+from ogdc_runner.constants import DATAONE_MEMBER_NODE
 from ogdc_runner.dataone.resolver import resolve_dataone_input
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
 
@@ -297,13 +298,10 @@ class RecipeConfig(RecipeMeta):
 
         for param in self.input.params:
             if param.type == "dataone":
-                # Resolve the dataset to get data objects
-                member_node = param.member_node or "https://arcticdata.io/metacat/d1/mn"
-
                 try:
                     data_objects = resolve_dataone_input(
                         dataset_identifier=str(param.value),
-                        member_node=member_node,
+                        member_node=DATAONE_MEMBER_NODE,
                     )
 
                     if not data_objects:

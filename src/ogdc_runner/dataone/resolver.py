@@ -9,17 +9,20 @@ from urllib.parse import quote
 import requests
 from d1_client.mnclient_2_0 import MemberNodeClient_2_0
 
+from ogdc_runner.constants import DATAONE_MEMBER_NODE
+
 logger = logging.getLogger(__name__)
 
 
 class DataONEResolver:
     """Resolves DataONE dataset identifiers to data objects."""
 
-    def __init__(self, member_node: str = "https://arcticdata.io/metacat/d1/mn"):
+    def __init__(self, member_node: str = DATAONE_MEMBER_NODE):
         """Initialize resolver.
 
         Args:
             member_node: DataONE member node base URL
+            Defaults to value of DATAONE_MEMBER_NODE envvar.
         """
         self.member_node = member_node
         self.client = MemberNodeClient_2_0(base_url=member_node)
