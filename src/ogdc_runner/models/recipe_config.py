@@ -52,7 +52,6 @@ class UrlInput(InputParam):
     def validate_url_accessible(self, info: ValidationInfo) -> Self:
         """Validate that URL-type parameters are accessible."""
         context = info.context or {}
-        # breakpoint()
         if not context.get("check_urls", False):
             return self
 
@@ -136,7 +135,7 @@ class DataOneInput(InputParam):
 
 # Create a model for the recipe input
 class RecipeInput(OgdcBaseModel):
-    params: list[InputParam]
+    params: list[UrlInput | DataOneInput]
 
     @field_validator("params")
     def validate_params(cls, params: list[InputParam]) -> list[InputParam]:
