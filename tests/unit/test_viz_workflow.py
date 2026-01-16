@@ -7,9 +7,9 @@ import pytest
 
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
 from ogdc_runner.models.recipe_config import (
-    InputParam,
     RecipeConfig,
     RecipeInput,
+    UrlInput,
     VizWorkflow,
 )
 from ogdc_runner.recipe import get_recipe_config
@@ -37,7 +37,7 @@ def test_get_viz_config_json_defaults():
         ),
         input=RecipeInput(
             params=[
-                InputParam(
+                UrlInput(
                     value="https://example.com/path/to/data.gpkg",
                     type="url",
                 ),
@@ -66,7 +66,7 @@ def test_get_viz_config_json_invalid_json(tmp_path):
             ),
             input=RecipeInput(
                 params=[
-                    InputParam(
+                    UrlInput(
                         value="https://example.com/path/to/data.gpkg",
                         type="url",
                     ),
