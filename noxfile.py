@@ -19,6 +19,8 @@ else:
     # All other envs should have the nox venvs recreated.
     nox.options.reuse_existing_virtualenvs = False
 
+nox.options.stop_on_first_error = True
+
 
 @nox.session
 def typecheck(session: nox.Session) -> None:

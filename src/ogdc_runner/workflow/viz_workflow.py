@@ -24,7 +24,7 @@ from ogdc_runner.argo import (
     submit_workflow,
 )
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
-from ogdc_runner.models.recipe_config import RecipeConfig
+from ogdc_runner.models.recipe_config import PvcRecipeOutput, RecipeConfig
 
 # ruff: noqa: PLC0415
 
@@ -141,6 +141,15 @@ def make_and_submit_viz_workflow(
     """
     if recipe_config.workflow.type != "visualization":
         err_msg = f"Expected recipe configuration with workflow type `visualization`. Got: {recipe_config.workflow.type}"
+        raise OgdcInvalidRecipeConfig(err_msg)
+
+    if not isinstance(recipe_config.output, PvcRecipeOutput):
+        # The viz workflow writes outputs to PVC (eventually this will write to
+        # a tile store). Temporary outputs and publishing to a dataset are not
+        # supported.
+        err_msg = (
+            f"Expected PVC output type for viz workflow. Got: {recipe_config.output}"
+        )
         raise OgdcInvalidRecipeConfig(err_msg)
 
     input_param = recipe_config.input.params[0]

@@ -87,7 +87,20 @@ class RecipeInput(OgdcBaseModel):
 
 
 class RecipeOutput(OgdcBaseModel):
+    type: Literal["dataone", "temporary", "pvc"]
+
+
+class DataOneRecipeOutput(RecipeOutput):
+    type: Literal["dataone"] = "dataone"
     dataone_id: str = "TODO"
+
+
+class TemporaryRecipeOutput(RecipeOutput):
+    type: Literal["temporary"] = "temporary"
+
+
+class PvcRecipeOutput(RecipeOutput):
+    type: Literal["pvc"] = "pvc"
 
 
 class Workflow(OgdcBaseModel):
@@ -251,7 +264,9 @@ class RecipeMeta(OgdcBaseModel):
     workflow: ShellWorkflow | VizWorkflow
 
     input: RecipeInput
-    output: RecipeOutput = RecipeOutput()
+    output: DataOneRecipeOutput | TemporaryRecipeOutput | PvcRecipeOutput = (
+        PvcRecipeOutput()
+    )
 
     # Optional Docker image (supports both local and hosted images)
     # Examples: "my-local-image", "ghcr.io/owner/image:latest"

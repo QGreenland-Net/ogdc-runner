@@ -6,4 +6,4 @@ input:
 workflow:
   type: "shell"
 output:
-  type: "pvc"
+  type: "temporary"

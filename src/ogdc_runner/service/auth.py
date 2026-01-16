@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import os
 from functools import cache
+from pathlib import Path
 from typing import Annotated
 
 import jwt
@@ -36,8 +37,10 @@ JWT_USERNAME_KEY = "sub"
 AUTH_TOKEN_URL = "/token"
 
 # Create OAuth2 scheme for the application. The tokenUrl points to the `token/`
-# route below.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=AUTH_TOKEN_URL)
+# route below, but must be set behind any API root path explicitly.
+api_root_path = os.environ.get("API_ROOT_PATH", "/")
+token_url = str(Path(api_root_path) / Path(AUTH_TOKEN_URL.lstrip("/")))
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=token_url)
 
 
 async def get_user_by_auth_token(
