@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 import click
 import requests
+import urllib3
 from pydantic import ValidationError
 
 from ogdc_runner.exceptions import (
@@ -27,13 +28,20 @@ from ogdc_runner.recipe import (
 # Default the OGDC API URL based on the environment, falling back to the prod
 # URL.
 env = os.environ.get("ENVIRONMENT")
+verify_ssl = True
 if env == "local":
-    default_url = "http://localhost:8000"
+    default_url = "https://localhost:7443/ogdc/api"
+    verify_ssl = False
+    # Disable urllib3 insecure connection warnings for local development.
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 elif env == "dev":
-    default_url = "http://api.test.dataone.org/ogdc"
+    default_url = "https://api.test.dataone.org/ogdc/api"
 else:
-    default_url = "http://api.dataone.org/ogdc"
+    default_url = "https://api.dataone.org/ogdc/api"
 OGDC_API_URL = os.environ.get("OGDC_API_URL", default_url)
+
+SESSION = requests.Session()
+SESSION.verify = verify_ssl
 
 
 @click.group
@@ -78,7 +86,7 @@ def _get_api_token_factory() -> Callable[[], str]:
             err = "OGDC_API_USERNAME and OGDC_API_PASSWORD must be set."
             raise OgdcMissingEnvvar(err)
 
-        response = requests.post(
+        response = SESSION.post(
             f"{OGDC_API_URL}/token",
             data={
                 "username": username,
@@ -119,7 +127,7 @@ def _check_ogdc_api_error(response: requests.Response) -> None:
 
 def _get_workflow_status(workflow_name: str) -> str:
     """Get the given workflow's status as a string."""
-    response = requests.get(
+    response = SESSION.get(
         url=f"{OGDC_API_URL}/status/{workflow_name}",
         headers={"Authorization": f"Bearer {get_api_token()}"},
     )
@@ -176,7 +184,7 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     representing a remote and publicly accessible recipe directory (e.g., for
     GitHub, 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
     """
-    response = requests.post(
+    response = SESSION.post(
         url=f"{OGDC_API_URL}/submit",
         json={
             "recipe_path": recipe_path,
@@ -271,7 +279,7 @@ def validate_all_recipes(recipes_location: str, ref: str) -> None:
 )
 def create_user(username: str, password: str) -> None:
     """Create a new OGDC user. This operation is only supported for the admin user."""
-    response = requests.post(
+    response = SESSION.post(
         url=f"{OGDC_API_URL}/create_user",
         data={
             "username": username,
@@ -285,7 +293,7 @@ def create_user(username: str, password: str) -> None:
 
 
 def _download_output_for_workflow(workflow_name: str, output_dir: Path) -> None:
-    response = requests.get(
+    response = SESSION.get(
         url=f"{OGDC_API_URL}/output/{workflow_name}",
         headers={"Authorization": f"Bearer {get_api_token()}"},
     )
@@ -298,7 +306,7 @@ def _download_output_for_workflow(workflow_name: str, output_dir: Path) -> None:
 
     # Download the data for the user to the given directory.
     output_filepath = output_dir / data_filename
-    with requests.get(data_url, stream=True) as response:
+    with SESSION.get(data_url, stream=True) as response:
         response.raise_for_status()
         with output_filepath.open("wb") as f:
             for chunk in response.iter_content():

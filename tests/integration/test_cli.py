@@ -5,6 +5,7 @@ Requires that the `OGDC_API_USERNAME` and `OGDC_API_PASSWORD` be set.
 
 from __future__ import annotations
 
+import urllib3
 from click.testing import CliRunner
 
 from ogdc_runner.__main__ import cli
@@ -21,6 +22,9 @@ def test_submit(monkeypatch):
     # Ensure we target the local environment for these tests.
     monkeypatch.setenv("ENVIRONMENT", "local")
 
+    # Ensure that urllib3 warnings about insecure hosts (our self-signed SSL
+    # cert in local dev) is suppressed.
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
     # Submit seal tags recipe and wait until completion.
     runner = CliRunner()
     result = runner.invoke(
