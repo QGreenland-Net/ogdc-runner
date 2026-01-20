@@ -43,7 +43,7 @@ dependencies = [
   "pyjwt",
   "pwdlib[argon2]",
   # s3 API
-  "boto3",
+  "boto3 >=1.42",
 ]
 
 [project.optional-dependencies]
