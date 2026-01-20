@@ -103,8 +103,7 @@ def make_publish_template(
     *,
     recipe_config: RecipeConfig,
 ) -> Container:
-    """Creates a container template that will move final output data into the
-    OGDC data storage volume under a subpath named for the recipe_id."""
+    """Creates a container template that will publish final output data."""
     if isinstance(recipe_config.output, PvcRecipeOutput):
         return _publish_template_for_pvc(recipe_config=recipe_config)
     if isinstance(recipe_config.output, TemporaryRecipeOutput):
