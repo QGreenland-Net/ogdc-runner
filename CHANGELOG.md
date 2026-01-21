@@ -3,6 +3,8 @@
 - Create service interface for ogdc-runner.
 - Refactor URL validation to use Pydantic model validators.
 - Add recipe ID truncation to avoid Kubernetes name length limits.
+- Add `temporary` output type and support retrieval of those outputs from s3
+  storage via the `ogdc-runner get-output` CLI.
 
 # v0.2.0
 
