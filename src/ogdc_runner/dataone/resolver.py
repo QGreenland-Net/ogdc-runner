@@ -44,6 +44,7 @@ class DataONEResolver:
         msg = f"Resolving dataset: {dataset_identifier}"
         logger.info(msg)
 
+        # TODO: update this after chatting with Rushiraj
         if not dataset_identifier.startswith("resource_map_urn:uuid:"):
             raise ValueError(
                 f"Invalid package identifier: {dataset_identifier}. "
@@ -54,7 +55,7 @@ class DataONEResolver:
         # Query Solr for objects in this dataset
         solr_url = f"{self.member_node}/v2/query/solr/"
         params = {
-            "q": f'resourceMap:"{dataset_identifier}"',
+            "q": f'resourceMap:"{dataset_identifier}" AND -formatType:METADATA',
             "fl": "id,title,formatId,size,fileName,abstract,description",
             "rows": 100,
             "wt": "json",
@@ -76,18 +77,13 @@ class DataONEResolver:
             data_objects = []
             for doc in docs:
                 obj_id = doc.get("id")
-                format_id = doc.get("formatId", "")
-
-                # Skip metadata objects (EML, resource maps)
-                if self._is_metadata_object(format_id):
-                    continue
 
                 # Build object info
                 obj_info = {
                     "identifier": obj_id,
                     "url": self._build_object_url(obj_id),
                     "filename": self._get_filename(doc),
-                    "format_id": format_id,
+                    "format_id": doc.get("format_id", ""),
                     "size": doc.get("size", 0),
                     "entity_name": self._get_entity_name(doc),
                     "entity_description": self._get_entity_description(doc),
@@ -103,16 +99,6 @@ class DataONEResolver:
             msg = f"Failed to resolve dataset: {e}"
             logger.error(msg)
             raise
-
-    def _is_metadata_object(self, format_id: str) -> bool:
-        """Check if a format ID indicates a metadata object."""
-        metadata_formats = [
-            "eml://",
-            "http://www.openarchives.org/ore/terms",  # codespell:ignore
-            "FGDC",
-            "http://ns.dataone.org/metadata/schema/onedcx",
-        ]
-        return any(fmt in format_id for fmt in metadata_formats)
 
     def _build_object_url(self, identifier: str) -> str:
         """Build the download URL for an object.
