@@ -4,7 +4,7 @@ import json
 import logging
 from functools import cache, cached_property
 from pathlib import Path
-from typing import Literal, Self
+from typing import Literal, Self, TypeAlias
 
 import requests
 from pydantic import (
@@ -33,31 +33,24 @@ class OgdcBaseModel(BaseModel):
 
 
 class InputParam(OgdcBaseModel):
-    """Input parameter for a recipe.
+    """Input parameter for a recipe."""
+
+    type: Literal["url", "pvc_mount", "file_system", "dataone"]
+    value: AnyUrl | str
+
+
+class UrlInput(InputParam):
+    """Inpurt from URL.
 
     When instantiated with `context={"check_urls": True}`, URL-type parameters
     will be validated to ensure they are accessible via HTTP HEAD request.
     """
 
-    value: AnyUrl | str
-    type: Literal["url", "pvc_mount", "file_system", "dataone"]
-
-    # Optional fields for DataONE inputs
-    member_node: str | None = None
-
-    # Private fields populated during resolution (for dataone type)
-    _resolved_url: str | None = None
-    _entity_name: str | None = None
-    _entity_description: str | None = None
-    _format_id: str | None = None
-    _dataset_pid: str | None = None
+    type: Literal["url"] = "url"
 
     @model_validator(mode="after")
     def validate_url_accessible(self, info: ValidationInfo) -> Self:
         """Validate that URL-type parameters are accessible."""
-        if self.type != "url":
-            return self
-
         context = info.context or {}
         if not context.get("check_urls", False):
             return self
@@ -86,12 +79,69 @@ class InputParam(OgdcBaseModel):
         return self
 
 
+class DataOneInput(InputParam):
+    """DataOne input parameters."""
+
+    type: Literal["dataone"] = "dataone"
+    value: str
+
+    # Optional fields for DataONE inputs
+    member_node: str | None = None
+
+    # Private fields populated during resolution (for dataone type)
+    _resolved_url: str | None = None
+    _entity_name: str | None = None
+    _entity_description: str | None = None
+    _format_id: str | None = None
+    _dataset_pid: str | None = None
+
+    @model_validator(mode="after")
+    def resolve_dataone_inputs(self) -> DataOneInput:
+        """Resolve DataONE dataset identifiers to data object URLs."""
+
+        try:
+            data_objects = resolve_dataone_input(
+                dataset_identifier=str(self.value),
+            )
+
+            if not data_objects:
+                raise ValueError(f"No data objects found in dataset {self.value}")
+
+            # For now, use the first data object
+            # TODO: Allow user to specify which object or handle multiple
+            obj = data_objects[0]
+
+            # Populate the resolved fields
+            self._resolved_url = obj["url"]
+            self._entity_name = obj["entity_name"]
+            self._entity_description = obj["entity_description"]
+            self._format_id = obj["format_id"]
+            self._dataset_pid = str(self.value)
+
+            msg = f"Resolved {self.value} -> {obj['identifier']}"
+            logger.info(msg)
+
+        except Exception as e:
+            msg = f"Failed to resolve DataONE input {self.value}: {e}"
+            logger.error(msg)
+            raise ValueError(
+                f"Failed to resolve DataONE package {self.value}. "
+                f"Make sure the value is a dataset package identifier (e.g., resource_map_urn:uuid:...). "
+                f"Error: {e}"
+            ) from e
+
+        return self
+
+
+InputParamType: TypeAlias = DataOneInput | UrlInput
+
+
 # Create a model for the recipe input
 class RecipeInput(OgdcBaseModel):
-    params: list[InputParam]
+    params: list[InputParamType]
 
     @field_validator("params")
-    def validate_params(cls, params: list[InputParam]) -> list[InputParam]:
+    def validate_params(cls, params: list[InputParamType]) -> list[InputParamType]:
         """Ensure there's at least one input parameter."""
         if not params:
             error_msg = "At least one input parameter is required"
@@ -290,51 +340,6 @@ class RecipeConfig(RecipeMeta):
         k8s_name = self.name.lower().replace(" ", "-")
 
         return k8s_name
-
-    @model_validator(mode="after")
-    def resolve_dataone_inputs(self) -> RecipeConfig:
-        """Resolve DataONE dataset identifiers to data object URLs."""
-
-        for param in self.input.params:
-            if param.type == "dataone":
-                # Resolve the dataset to get data objects
-                member_node = param.member_node or "https://arcticdata.io/metacat/d1/mn"
-
-                try:
-                    data_objects = resolve_dataone_input(
-                        dataset_identifier=str(param.value),
-                        member_node=member_node,
-                    )
-
-                    if not data_objects:
-                        raise ValueError(
-                            f"No data objects found in dataset {param.value}"
-                        )
-
-                    # For now, use the first data object
-                    # TODO: Allow user to specify which object or handle multiple
-                    obj = data_objects[0]
-
-                    # Populate the resolved fields
-                    param._resolved_url = obj["url"]
-                    param._entity_name = obj["entity_name"]
-                    param._entity_description = obj["entity_description"]
-                    param._format_id = obj["format_id"]
-                    param._dataset_pid = str(param.value)
-
-                    msg = f"Resolved {param.value} -> {obj['identifier']}"
-                    logger.info(msg)
-
-                except Exception as e:
-                    msg = f"Failed to resolve DataONE input {param.value}: {e}"
-                    logger.error(msg)
-                    raise ValueError(
-                        f"Failed to resolve DataONE package {param.value}. "
-                        f"Make sure the value is a dataset package identifier (e.g., resource_map_urn:uuid:...). "
-                        f"Error: {e}"
-                    ) from e
-
-        return self
 
 
 class RecipeImage(OgdcBaseModel):
