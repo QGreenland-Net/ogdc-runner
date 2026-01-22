@@ -44,14 +44,6 @@ class DataONEResolver:
         msg = f"Resolving dataset: {dataset_identifier}"
         logger.info(msg)
 
-        # TODO: update this after chatting with Rushiraj
-        if not dataset_identifier.startswith("resource_map_urn:uuid:"):
-            raise ValueError(
-                f"Invalid package identifier: {dataset_identifier}. "
-                f"Expected format: resource_map_urn:uuid:... "
-                f"(This should be a package/resource map ID, not a data object ID)"
-            )
-
         # Query Solr for objects in this dataset
         solr_url = f"{self.member_node}/v2/query/solr/"
         params = {
