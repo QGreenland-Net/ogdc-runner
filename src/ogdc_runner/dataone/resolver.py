@@ -86,7 +86,7 @@ class DataONEResolver:
                     "format_id": doc.get("format_id", ""),
                     "size": doc.get("size", 0),
                     "entity_name": self._get_entity_name(doc),
-                    "entity_description": self._get_entity_description(doc),
+                    "entity_description": "",  # will be generated during publishing
                 }
 
                 data_objects.append(obj_info)
@@ -136,22 +136,6 @@ class DataONEResolver:
 
         # Fallback to filename
         return self._get_filename(doc)
-
-    def _get_entity_description(self, doc: dict[str, Any]) -> str:
-        """Extract entity description from Solr document."""
-        # Try abstract first
-        if abstract := doc.get("abstract"):
-            if isinstance(abstract, list):
-                return str(abstract[0])
-            return str(abstract)
-
-        # Try description
-        if description := doc.get("description"):
-            if isinstance(description, list):
-                return str(description[0])
-            return str(description)
-
-        return ""
 
 
 def resolve_dataone_input(
