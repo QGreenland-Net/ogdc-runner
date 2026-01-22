@@ -87,13 +87,11 @@ class DataOneInput(InputParam):
 
     # Optional fields for DataONE inputs
     member_node: str | None = None
+    filename: str | None = None
 
-    # Private fields populated during resolution (for dataone type)
-    _resolved_url: str | None = None
-    _entity_name: str | None = None
-    _entity_description: str | None = None
-    _format_id: str | None = None
+    # Private fields for all matched objects with full metadata
     _dataset_pid: str | None = None
+    _resolved_objects: list[dict] = []
 
     @model_validator(mode="after")
     def resolve_dataone_inputs(self) -> DataOneInput:
@@ -107,18 +105,16 @@ class DataOneInput(InputParam):
             if not data_objects:
                 raise ValueError(f"No data objects found in dataset {self.value}")
 
-            # For now, use the first data object
-            # TODO: Allow user to specify which object or handle multiple
-            obj = data_objects[0]
+            # Select data object(s) based on filename pattern
+            selected_objects = self._select_data_objects(data_objects)
 
-            # Populate the resolved fields
-            self._resolved_url = obj["url"]
-            self._entity_name = obj["entity_name"]
-            self._entity_description = obj["entity_description"]
-            self._format_id = obj["format_id"]
+            # Store all matched objects
+            self._resolved_objects = selected_objects
             self._dataset_pid = str(self.value)
 
-            msg = f"Resolved {self.value} -> {obj['identifier']}"
+            matched_files = [obj["filename"] for obj in selected_objects]
+
+            msg = f"Resolved {self.value} -> {len(selected_objects)} file(s): {matched_files}"
             logger.info(msg)
 
         except Exception as e:

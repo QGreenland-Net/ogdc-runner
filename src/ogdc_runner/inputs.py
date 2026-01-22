@@ -7,6 +7,7 @@ from hera.workflows import (
     Container,
 )
 
+from ogdc_runner.exceptions import OgdcWorkflowExecutionError
 from ogdc_runner.models.recipe_config import DataOneInput, RecipeConfig, UrlInput
 
 
@@ -31,8 +32,17 @@ def make_fetch_input_template(
                 f"wget --content-disposition -P /output_dir/ {param.value}"
             )
         elif isinstance(param, DataOneInput):
-            url = param._resolved_url or param.value
-            fetch_commands.append(f"wget --content-disposition -P /output_dir/ {url}")
+            # DataONE input - download all resolved objects
+            if param._resolved_objects:
+                for obj in param._resolved_objects:
+                    url = obj["url"]
+                    fetch_commands.append(
+                        f"wget --content-disposition -P /output_dir/ {url}"
+                    )
+            else:
+                raise OgdcWorkflowExecutionError(
+                    f"DataONE input has no resolved objects: {param.value}"
+                )
 
     # Join all commands with && for sequential execution
     combined_command = " && ".join(fetch_commands)
