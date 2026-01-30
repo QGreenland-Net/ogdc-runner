@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+from typing import Any
 
 from hera.shared import global_config
 from hera.workflows import (
@@ -128,6 +129,48 @@ class ArgoManager:
             host=self._config.workflows_service_url, namespace=self._config.namespace
         )
 
+    def _workflow_archival_and_deletion_config(self) -> dict[str, Any]:
+        """Setup workflow TTL and artifact garbage collection.
+
+        These two settings work together.
+
+        TTLStrategy sets the number of seconds until a workflow is deleted when
+        the workflow is successful. On deletion, artifacts are cleaned up, per
+        the ArtifactGC configuration.
+
+        TTL is set for 7 days to provide sufficient time for inspection of
+        intermediate outputs and retrieval of temporary final outputs. Temporary
+        final outputs are stored as artifacts associated with the workflow, so
+        when the workflow is cleaned up so will the output associatged with it.
+
+        Only successful workflows are automatically cleaned up. Failed workflows
+        are not automatically archived or cleaned up to provide unlimited time
+        for debugging/inspection of outputs.
+        """
+        # Setup default TTL strategy
+        ttl_strategy = models.TTLStrategy(
+            # Only cleanup successful workflows.
+            # Sufficient time should be provided to allow users to download
+            # outputs if they are of the "temporary" type (7 days)
+            # TODO: consider delegating that responsibility to the workflows
+            # themselves _if_ the output type is temporary. If not, the
+            # output is persisted someplace else, and we don't need to keep
+            # the workflow (and thus the artifacts) around for very
+            # long. This could default to a day or something like that.
+            seconds_after_success=60 * 24 * 7,
+        )
+
+        # Setup artifact garbage collection
+        artifact_gc = models.ArtifactGC(
+            strategy="OnWorkflowDeletion",
+            service_account_name=self._config.service_account_name,
+        )
+
+        return {
+            "artifact_gc": artifact_gc,
+            "ttl_strategy": ttl_strategy,
+        }
+
     def _apply_global_config(self) -> None:
         """Apply the current configuration to Hera's global config."""
         global_config.namespace = self._config.namespace
@@ -141,25 +184,10 @@ class ArgoManager:
 
         global_config.set_class_defaults(
             Workflow,
-            # Setup artifact garbage collection
-            artifact_gc=models.ArtifactGC(
-                strategy="OnWorkflowDeletion",
-                service_account_name=self._config.service_account_name,
-            ),
             # Setup default OGDC workflow pvc
             volumes=[OGDC_WORKFLOW_PVC],
-            # Setup default TTL strategy
-            ttl_strategy=models.TTLStrategy(
-                # Only cleanup successful workflows.
-                # Sufficient time should be provided to allow users to download
-                # outputs if they are of the "temporary" type (7 days)
-                # TODO: consider delegating that responsibility to the workflows
-                # themselves _if_ the output type is temporary. If not, the
-                # output is persisted someplace else, and we don't need to keep
-                # the workflow (and thus the artifacts) around for very
-                # long. This could default to a day or something like that.
-                seconds_after_success=60 * 24 * 7,
-            ),
+            # Setup workflow archival and deletion
+            **self._workflow_archival_and_deletion_config(),
         )
 
     @property
