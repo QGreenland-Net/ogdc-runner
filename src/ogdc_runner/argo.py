@@ -148,6 +148,18 @@ class ArgoManager:
             ),
             # Setup default OGDC workflow pvc
             volumes=[OGDC_WORKFLOW_PVC],
+            # Setup default TTL strategy
+            ttl_strategy=models.TTLStrategy(
+                # Only cleanup successful workflows.
+                # Sufficient time should be provided to allow users to download
+                # outputs if they are of the "temporary" type (7 days)
+                # TODO: consider delegating that responsibility to the workflows
+                # themselves _if_ the output type is temporary. If not, the
+                # output is persisted someplace else, and we don't need to keep
+                # the workflow (and thus the artifacts) around for very
+                # long. This could default to a day or something like that.
+                seconds_after_success=60 * 24 * 7,
+            ),
         )
 
     @property
