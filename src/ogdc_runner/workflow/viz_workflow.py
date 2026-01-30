@@ -171,7 +171,10 @@ def make_and_submit_viz_workflow(
         annotations={
             "workflows.argoproj.io/description": "Visualization workflow for OGDC",
         },
-        labels={"workflows.argoproj.io/archive-strategy": "false"},
+        labels={
+            "workflows.argoproj.io/archive-strategy": "false",
+            "ogdc/persist-workflow-in-archive": "true",
+        },
     ) as w:
         # Create templates outside the DAG context
         # Read the config.json file content from the recipe directory

@@ -59,6 +59,7 @@ def make_and_submit_shell_workflow(
         generate_name=make_generate_name(recipe_config.id),
         entrypoint="steps",
         workflows_service=ARGO_WORKFLOW_SERVICE,
+        labels={"ogdc/persist-workflow-in-archive": "true"},
     ) as w:
         # Create command templates
         cmd_templates = []
