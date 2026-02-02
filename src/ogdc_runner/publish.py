@@ -67,7 +67,7 @@ def _publish_template_for_temporary_output(
     recipe_config: RecipeConfig,
 ) -> Container:
     """Creates a container template that will zip final output data and store
-    the output as an artifact in minio."""
+    the output as an artifact in s3."""
     output_filepath = f"/output_dir/{recipe_config.id}.zip"
     template = Container(
         name="publish-data-",
