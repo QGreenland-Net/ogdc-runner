@@ -155,7 +155,7 @@ class ArgoManager:
         # Setup default TTL strategy
         ttl_strategy = models.TTLStrategy(
             # Cleanup successful workflows after 1 day.
-            seconds_after_success=60 * 24 * 1,
+            seconds_after_success=60 * 60 * 24 * 1,
         )
 
         # Setup artifact garbage collection
@@ -334,7 +334,7 @@ def OgdcWorkflow(
         # Sufficient time should be provided to allow users to download
         # outputs if they are of the "temporary" type (7 days)
         ttl_strategy = models.TTLStrategy(
-            seconds_after_success=60 * 24 * 7,
+            seconds_after_success=60 * 60 * 24 * 7,
         )
         workflow_kwargs["ttl_strategy"] = ttl_strategy
 
