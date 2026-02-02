@@ -143,10 +143,10 @@ class ArgoManager:
         the workflow is successful. On deletion, artifacts are cleaned up, per
         the ArtifactGC configuration.
 
-        TTL is set for 7 days to provide sufficient time for inspection of
-        intermediate outputs and retrieval of temporary final outputs. Temporary
-        final outputs are stored as artifacts associated with the workflow, so
-        when the workflow is cleaned up so will the output associatged with it.
+        TTL is set for 1 day to provide sufficient time for inspection of
+        intermediate outputs if necessary. Workflows that need artifacts stored
+        for longer should override this option (e.g., recipes with the
+        `temporary` output type).
 
         Only successful workflows are automatically cleaned up. Failed workflows
         are not automatically archived or cleaned up to provide unlimited time
@@ -154,15 +154,8 @@ class ArgoManager:
         """
         # Setup default TTL strategy
         ttl_strategy = models.TTLStrategy(
-            # Only cleanup successful workflows.
-            # Sufficient time should be provided to allow users to download
-            # outputs if they are of the "temporary" type (7 days)
-            # TODO: consider delegating that responsibility to the workflows
-            # themselves _if_ the output type is temporary. If not, the
-            # output is persisted someplace else, and we don't need to keep
-            # the workflow (and thus the artifacts) around for very
-            # long. This could default to a day or something like that.
-            seconds_after_success=60 * 24 * 7,
+            # Cleanup successful workflows after 1 day.
+            seconds_after_success=60 * 24 * 1,
         )
 
         # Setup artifact garbage collection
@@ -311,6 +304,9 @@ def OgdcWorkflow(
     * `workflows_service`: uses the ogdc's configured Argo workflows service
     * `labels`: Adds `ogdc/persist-workflow-in-archive` label based on
       `archive_workflow` kwarg. Other passed `labels` are preserved.
+    * `ttl_strategy`: Set to 7 days if the recipe's output type is `temporary`
+      to allow sufficient type for the submitter of the recipe to retrieve the
+      results. Otherwise this is left unset.
 
     All other kwargs are passed directly to `argo.workflows.Workflow.
     """
@@ -333,6 +329,14 @@ def OgdcWorkflow(
         "workflows_service": ARGO_WORKFLOW_SERVICE,
         "labels": labels,
     }
+
+    if recipe_config.output.type == "temporary":
+        # Sufficient time should be provided to allow users to download
+        # outputs if they are of the "temporary" type (7 days)
+        ttl_strategy = models.TTLStrategy(
+            seconds_after_success=60 * 24 * 7,
+        )
+        workflow_kwargs["ttl_strategy"] = ttl_strategy
 
     with Workflow(
         **workflow_kwargs,
