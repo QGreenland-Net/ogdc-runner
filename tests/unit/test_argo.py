@@ -144,6 +144,7 @@ def test_OgdcWorfklow_no_archive(test_shell_workflow_recipe_directory):
         archive_workflow=False,
     ) as w:
         assert w.generate_name == f"{recipe_config.id}-{workflow_name}-"
+        assert w.labels
         assert "ogdc/persist-workflow-in-archive" in w.labels
         assert w.labels["ogdc/persist-workflow-in-archive"] == "false"
 
@@ -159,6 +160,7 @@ def test_OgdcWorfklow_with_archive(test_shell_workflow_recipe_directory):
         name=workflow_name,
         archive_workflow=True,
     ) as w:
+        assert w.labels
         assert w.labels["ogdc/persist-workflow-in-archive"] == "true"
 
 
@@ -174,4 +176,5 @@ def test_OgdcWorfklow_with_temp_output(test_temp_output_recipe_directory):
         archive_workflow=False,
     ) as w:
         # Expect 7 days for recipes with temporary output type.
+        assert w.ttl_strategy
         assert w.ttl_strategy.seconds_after_success == 60 * 60 * 24 * 7
