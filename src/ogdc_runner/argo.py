@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Generator
+from contextlib import contextmanager
 from typing import Any
 
 from hera.shared import global_config
@@ -14,6 +16,7 @@ from hera.workflows import (
 from loguru import logger
 
 from ogdc_runner.exceptions import OgdcWorkflowExecutionError
+from ogdc_runner.models.recipe_config import RecipeConfig
 
 # Kubernetes names must be no more than 63 characters.
 # Argo appends a 5-character random suffix to generate_name, so we reserve space for it.
@@ -21,7 +24,7 @@ KUBERNETES_NAME_MAX_LENGTH = 63
 ARGO_GENERATED_SUFFIX_LENGTH = 5
 
 
-def make_generate_name(recipe_id: str, suffix: str = "-") -> str:
+def make_generate_name(*, recipe_id: str, suffix: str = "") -> str:
     """Create a workflow generate_name, truncating recipe_id if necessary.
 
     Kubernetes names must be no more than 63 characters. Argo appends a 5-character
@@ -30,7 +33,7 @@ def make_generate_name(recipe_id: str, suffix: str = "-") -> str:
 
     Args:
         recipe_id: The recipe identifier to use as the base name
-        suffix: The suffix to append (e.g., "-", "-remove-existing-data-")
+        suffix: The suffix to append (e.g., "remove-existing-data")
 
     Returns:
         A generate_name string that will produce a valid Kubernetes name
@@ -39,7 +42,9 @@ def make_generate_name(recipe_id: str, suffix: str = "-") -> str:
     max_generate_name_length = KUBERNETES_NAME_MAX_LENGTH - ARGO_GENERATED_SUFFIX_LENGTH
     max_id_length = max_generate_name_length - len(suffix)
     truncated_id = recipe_id[:max_id_length]
-    return f"{truncated_id}{suffix}"
+    if suffix:
+        return f"{truncated_id}-{suffix}-"
+    return truncated_id
 
 
 OGDC_WORKFLOW_PVC = models.Volume(
@@ -278,3 +283,58 @@ def submit_workflow(workflow: Workflow, *, wait: bool = False) -> str:
         wait_for_workflow_completion(workflow_name)
 
     return workflow_name
+
+
+@contextmanager
+def OgdcWorkflow(
+    *,
+    recipe_config: RecipeConfig,
+    name: str,
+    archive_workflow: bool,
+    **kwargs: Any,
+) -> Generator[Workflow, None, None]:
+    """Contexts manager that yields an argo workflow with configuration driven by `recipe_config`.
+
+    kwargs:
+
+        - `recipe_config`: Recipe configuration that is driving this workflow.
+        - `name`: name of this workflow. Used with the recipe ID to generate a
+          name for the argo workflow.
+        - `archive_workflow`: Set to `True` to archive this workflow on workflow
+          success. It is recommended to archive workflows that are used to
+          transform data for provenance and metrics reasons. Workflows that do
+          some task not related to data transformation can set this to `False`.
+
+    This context manager sets the following on argo.workflows.Workflow:
+
+    * `generate_name`: based on recipe ID and the `name`.
+    * `workflows_service`: uses the ogdc's configured Argo workflows service
+    * `labels`: Adds `ogdc/persist-workflow-in-archive` label based on
+      `archive_workflow` kwarg. Other passed `labels` are preserved.
+
+    All other kwargs are passed directly to `argo.workflows.Workflow.
+    """
+
+    # Merge labels provided by user with `ogdc/persist-workflow-in-archive`.
+    labels = {
+        **kwargs.pop("labels", {}),
+        "ogdc/persist-workflow-in-archive": "true" if archive_workflow else "false",
+    }
+
+    workflow_kwargs = {
+        # user kwargs first. This ensures that configurations set by this
+        # function get priority (everything after this).
+        **kwargs,
+        # OGDC-specific behavior that we want to be consistent about.
+        "generate_name": make_generate_name(
+            recipe_id=recipe_config.id,
+            suffix=name.replace(" ", "-"),
+        ),
+        "workflows_service": ARGO_WORKFLOW_SERVICE,
+        "labels": labels,
+    }
+
+    with Workflow(
+        **workflow_kwargs,
+    ) as w:
+        yield w

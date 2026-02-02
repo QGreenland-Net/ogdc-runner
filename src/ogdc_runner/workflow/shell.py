@@ -4,12 +4,10 @@ from hera.workflows import (
     Artifact,
     Container,
     Steps,
-    Workflow,
 )
 
 from ogdc_runner.argo import (
-    ARGO_WORKFLOW_SERVICE,
-    make_generate_name,
+    OgdcWorkflow,
     submit_workflow,
 )
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
@@ -55,11 +53,11 @@ def make_and_submit_shell_workflow(
     # Parse commands from the recipe's shell file
     commands = recipe_config.workflow.get_commands_from_sh_file()
 
-    with Workflow(
-        generate_name=make_generate_name(recipe_config.id),
+    with OgdcWorkflow(
+        name="shell",
+        recipe_config=recipe_config,
+        archive_workflow=True,
         entrypoint="steps",
-        workflows_service=ARGO_WORKFLOW_SERVICE,
-        labels={"ogdc/persist-workflow-in-archive": "true"},
     ) as w:
         # Create command templates
         cmd_templates = []
