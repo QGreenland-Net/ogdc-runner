@@ -39,9 +39,8 @@ Example: `"Water measurements from seal tag data"`
 #### `workflow`
 
 Section containing configuration on what type of workflow this recipe uses, and
-any workflow-specific configuration options. See
-[Workflow types](#workflow-types) below for more information about different
-workflow types.
+any workflow-specific configuration options. See {ref}`workflow-types` below for
+more information about different workflow types.
 
 See the {class}`ogdc_runner.models.recipe_config.Workflow` class for details.
 
@@ -55,6 +54,8 @@ The input data source. See the
 ```{warning}
 Although `dataone_id` is a documented output type, it is currently **unused**. As of this  writing, outputs are stored on the `qgnet-ogdc-workflow-pvc`, under a directory named after the `recipe_id`. This is an evolving part of the API, and we expect new output types to be supported soon.
 ```
+
+(workflow-types)=
 
 ## Workflow types
 
