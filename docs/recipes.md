@@ -55,9 +55,10 @@ The input data source. See the
 Although `dataone_id` is a documented output type, it is currently **unused**. As of this  writing, outputs are stored on the `qgnet-ogdc-workflow-pvc`, under a directory named after the `recipe_id`. This is an evolving part of the API, and we expect new output types to be supported soon.
 ```
 
+<!-- prettier-ignore-start -->
 (workflow-types)=
-
 ## Workflow types
+<!-- prettier-ignore-end -->
 
 There are multiple types of OGDC workflow. Which an author should use depends on
 the data processing use-case.

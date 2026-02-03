@@ -34,9 +34,10 @@ Artifacts will be automatically garbage collected on workflow deletion. See the
 {ref}`workflow-persistence` section below for details on automatic workflow
 deletion.
 
+<!-- prettier-ignore-start -->
 (workflow-persistence)=
-
 ## Workflow persistence
+<!-- prettier-ignore-end -->
 
 Successful Argo workflows are retained for 1 day. Workflows associated with
 recipes with the `temporary` output type are retained for 7 days to allow for
