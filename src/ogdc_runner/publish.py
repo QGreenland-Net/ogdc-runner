@@ -142,10 +142,7 @@ def remove_existing_published_data(
         with Steps(name="steps"):
             overwrite_template()
 
-    workflow_name = submit_workflow(workflow=w, wait=True)
-
-    # Cleanup this workflow, it is no longer needed
-    ARGO_WORKFLOW_SERVICE.delete_workflow(workflow_name)
+    submit_workflow(workflow=w, wait=True)
 
 
 def check_for_existing_pvc_published_data(
