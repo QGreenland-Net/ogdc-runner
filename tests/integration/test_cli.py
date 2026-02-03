@@ -29,7 +29,7 @@ def test_submit(monkeypatch):
             "submit",
             "--wait",
             "--overwrite",
-            "github://qgreenland-net:ogdc-recipes@output-to-temp/recipes/seal-tags",
+            "github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags",
         ],
     )
 
