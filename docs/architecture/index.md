@@ -5,6 +5,7 @@
 :hidden:
 
 service.md
+argo.md
 ```
 
 ```{mermaid}

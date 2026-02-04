@@ -5,7 +5,6 @@ from pathlib import Path
 
 from ogdc_runner.__main__ import _download_output_for_workflow
 from ogdc_runner.api import submit_ogdc_recipe
-from ogdc_runner.argo import ARGO_WORKFLOW_SERVICE
 
 
 def test_temporary_output_recipe(test_temp_output_recipe_directory, tmpdir):
@@ -44,6 +43,3 @@ def test_temporary_output_recipe(test_temp_output_recipe_directory, tmpdir):
     shutil.unpack_archive(zip_file, tmpdir_path)
     gpkg_files = list(tmpdir_path.glob("*.gpkg"))
     assert len(gpkg_files) == 1
-
-    # Cleanup test workflow.
-    ARGO_WORKFLOW_SERVICE.delete_workflow(workflow_name)
