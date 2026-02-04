@@ -285,12 +285,6 @@ class RecipeMeta(OgdcBaseModel):
         PvcRecipeOutput()
     )
 
-    # Optional Docker image (supports both local and hosted images)
-    # Examples: "my-local-image", "ghcr.io/owner/image:latest"
-    image: str | None = Field(
-        default=None, description="Docker image with optional tag"
-    )
-
 
 class RecipeConfig(RecipeMeta):
     """Model for a recipe's configuration.
