@@ -8,8 +8,6 @@ from typing import Literal, Self
 import requests
 from pydantic import (
     AnyUrl,
-    BaseModel,
-    ConfigDict,
     Field,
     ValidationInfo,
     computed_field,
@@ -18,14 +16,33 @@ from pydantic import (
 )
 
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
+from ogdc_runner.models.base import OgdcBaseModel
 
 
-class OgdcBaseModel(BaseModel):
-    """Base pydantic model for the ogdc-runner."""
+class ParallelConfig(OgdcBaseModel):
+    """Configuration for parallel execution behavior.
 
-    # Disallow "extra" config that we do not expect. We want users to know if
-    # they've made a mistake and added something that has no effect.
-    model_config = ConfigDict(extra="forbid")
+    Attributes:
+        enabled: Whether parallel execution is enabled
+        partition_strategy: Strategy for dividing work ("files" or "file_chunks")
+        partition_size: Number of partitions or items per chunk, depending on strategy
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable parallel execution for this workflow",
+    )
+
+    # Partitioning strategy for parallel execution
+    # "files": One or more files per partition based on partition_size
+    partition_strategy: Literal["files"] = Field(
+        default="files",
+        description="Strategy for partitioning work across parallel tasks",
+    )
+    partition_size: int | None = Field(
+        default=None,
+        description="Size parameter for the chosen partitioning strategy",
+    )
 
 
 # Input parameter with type and value
@@ -37,7 +54,7 @@ class InputParam(OgdcBaseModel):
     """
 
     value: AnyUrl | str
-    type: Literal["url", "pvc_mount", "file_system"]
+    type: Literal["url", "pvc_mount"]
 
     @model_validator(mode="after")
     def validate_url_accessible(self, info: ValidationInfo) -> Self:
@@ -161,6 +178,11 @@ class ShellWorkflow(Workflow):
     type: Literal["shell"] = "shell"
     # the name of the `.sh` file containing the list of commands to run.
     sh_file: str | Path = "recipe.sh"
+    # Optional parallel execution configuration
+    parallel: ParallelConfig = Field(
+        default_factory=lambda: ParallelConfig(),
+        description="Configuration for parallel execution",
+    )
 
     @model_validator(mode="after")
     def sh_file_path(
@@ -227,6 +249,12 @@ class VizWorkflow(Workflow):
     config_file: str | Path | None = None
 
     batch_size: int = 250
+
+    # Optional parallel execution configuration
+    parallel: ParallelConfig = Field(
+        default_factory=lambda: ParallelConfig(),
+        description="Configuration for parallel execution",
+    )
 
     @model_validator(mode="after")
     def config_file_path(

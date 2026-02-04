@@ -63,6 +63,7 @@ dev = [
   "pytest >=6",
   "pytest-cov >=3",
   "types-pyyaml",
+  "types-requests",
   "nox",
 ]
 docs = [

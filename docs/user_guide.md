@@ -76,4 +76,9 @@ The QGreenland-Net team maintains the
 which contains operational examples of data transformation recipes that can be
 used as examples.
 
+Recipes support parallel execution for processing multiple input files
+concurrently. This is configured via the `parallel` section in the workflow
+configuration. See [Parallel Execution](./recipes.md#parallel-execution) for
+details.
+
 To learn more about recipes, see [OGDC Recipes](./recipes.md).
