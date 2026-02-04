@@ -38,6 +38,7 @@ def submit(
     submit_recipe_request: SubmitRecipeRequest,
     # Ensure submissions require an authenticated user.
     # _current_user: auth.AuthenticatedUserDependency,
+    session: db.SessionDependency,
 ) -> SubmitRecipeResponse:
     """Submit a recipe to OGDC for execution.
 
@@ -51,6 +52,7 @@ def submit(
                 # responsive and async.
                 wait=False,
                 overwrite=submit_recipe_request.overwrite,
+                db_session=session,
             )
             return SubmitRecipeResponse(
                 message=f"Successfully submitted recipe with {recipe_workflow_name=}",

@@ -11,6 +11,7 @@ import fsspec
 import yaml
 from loguru import logger
 from pydantic import ValidationError
+from sqlmodel import Session
 
 from ogdc_runner.constants import RECIPE_CONFIG_FILENAME
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig, OgdcInvalidRecipeDir
@@ -54,6 +55,14 @@ def clone_recipes_repo(repo_url: str, ref: str = "main") -> Generator[Path, None
         )
 
         yield Path(tmpdir)
+
+
+def get_recipe_in_db(
+    *, recipe_config: RecipeConfig, db_session: Session
+) -> Recipe | None:
+    results = session.exec(select(Recpie).where(Recipe.name == name)).one_or_none()
+
+    return results
 
 
 def get_recipe_config(

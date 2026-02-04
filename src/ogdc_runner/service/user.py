@@ -6,25 +6,16 @@ import os
 
 from loguru import logger
 from pwdlib import PasswordHash
-from sqlmodel import Field, Session, SQLModel, select
+from sqlmodel import Session, select
 
 from ogdc_runner.exceptions import OgdcMissingEnvvar, OgdcUserAlreadyExists
 from ogdc_runner.service import db
+from ogdc_runner.service.db_tables import User
 
 password_hash = PasswordHash.recommended()
 
 
 ADMIN_USERNAME = "admin"
-
-
-class User(SQLModel, table=True):
-    """Model representing the `users` table in the OGDC database."""
-
-    __tablename__ = "users"
-    # `id` field is auto-created
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    password_hash: str
 
 
 def hash_password(password: str) -> str:

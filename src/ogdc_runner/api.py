@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from sqlmodel import Session
+
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished
 from ogdc_runner.publish import data_already_published
 from ogdc_runner.recipe import get_recipe_config
@@ -16,6 +18,7 @@ def submit_ogdc_recipe(
     recipe_dir: Path,
     wait: bool,
     overwrite: bool,
+    db_session: Session,
 ) -> str:
     """Submit an OGDC recipe for processing via argo workflows.
 
@@ -23,11 +26,12 @@ def submit_ogdc_recipe(
         recipe_dir: Path to the recipe directory
         wait: Whether to wait for the workflow to complete
         overwrite: Whether to overwrite existing published data
+        session: OGDC database session
 
     Returns the name of the OGDC shell recipe submitted to Argo.
     """
     # Get the recipe configuration
-    recipe_config = get_recipe_config(recipe_dir)
+    recipe_config = get_recipe_config(recipe_dir, db_session=db_session)
 
     # Check if the user-submitted workflow has already been published
     if data_already_published(

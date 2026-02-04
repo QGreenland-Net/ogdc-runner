@@ -332,3 +332,16 @@ def _download_output_for_workflow(workflow_name: str, output_dir: Path) -> None:
 def get_output(workflow_name: str, output_dir: Path) -> None:
     """Get the temporary output for the given workflow."""
     _download_output_for_workflow(workflow_name, output_dir)
+
+
+@cli.command
+@click.argument(
+    "recipe_path",
+    required=True,
+    type=str,
+)
+def serialized_recipe(recipe_path: str) -> None:
+    """Get the temporary output for the given workflow."""
+    with stage_ogdc_recipe(recipe_path) as recipe_dir:
+        config = get_recipe_config(recipe_dir)
+        print(config.model_dump_json())

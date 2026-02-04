@@ -285,6 +285,7 @@ class RecipeMeta(OgdcBaseModel):
         PvcRecipeOutput()
     )
 
+    # TODO: is this used/can it be removed?
     # Optional Docker image (supports both local and hosted images)
     # Examples: "my-local-image", "ghcr.io/owner/image:latest"
     image: str | None = Field(
@@ -305,10 +306,9 @@ class RecipeConfig(RecipeMeta):
 
     @computed_field  # type: ignore[misc]
     @cached_property
-    def id(self) -> str:
-        k8s_name = self.name.lower().replace(" ", "-")
-
-        return k8s_name
+    def k8s_name(self) -> str:
+        """Return a name compatible with k8s."""
+        return self.name.lower().replace(" ", "-")
 
 
 class RecipeImage(OgdcBaseModel):
