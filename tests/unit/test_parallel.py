@@ -12,7 +12,7 @@ from ogdc_runner.models.recipe_config import (
     RecipeOutput,
     ShellWorkflow,
 )
-from ogdc_runner.parallel import ParallelExecutionOrchestrator
+from ogdc_runner.workflow.shell import ShellParallelExecutionOrchestrator
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ def sample_recipe_config(tmpdir):
 
 
 def test_orchestrator_creates_correct_partitions(sample_recipe_config):
-    orchestrator = ParallelExecutionOrchestrator(
+    orchestrator = ShellParallelExecutionOrchestrator(
         recipe_config=sample_recipe_config,
         execution_function=ExecutionFunction(name="cmd-0", command="bash recipe.sh"),
     )
