@@ -1,3 +1,7 @@
+#!/bin/sh
+# shellcheck disable=SC1073,SC1054,SC1083,SC1009,SC1056,SC1072
+# This is a template file with {user_command} placeholder that will be replaced by Python code
+# Shellcheck cannot parse the placeholder syntax, so we disable those specific checks
 set -eu
 
 # Get parameters

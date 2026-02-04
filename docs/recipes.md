@@ -158,6 +158,13 @@ of this size, creating one parallel task per partition. For example, with 5
 input files and `partition_size: 2`, three partitions are created: two with 2
 files and one with 1 file.
 
+```{note}
+Partitions may have different numbers of files. If the total number of input
+files doesn't divide evenly by `partition_size`, the last partition will contain
+the remainder. For instance, 7 files with `partition_size: 3` creates partitions
+of [3, 3, 1] files.
+```
+
 ### Execution Model
 
 Parallel execution uses Argo's DAG (Directed Acyclic Graph) to create
@@ -168,6 +175,14 @@ as cluster resources become available.
 Each parallel task:
 
 - Receives a partition of input files via workflow parameters
-- Executes the same command/function independently
-- Writes outputs to isolated directories
+- Executes the same command independently for **each file** in its partition
+- Writes outputs to isolated directories (one per partition)
 - Runs in a separate container with its own resource allocation
+
+```{important}
+**File-level execution**: Each command in the recipe is executed once per file
+in the partition. The runner sets environment variables (`$INPUT_FILE` and
+`$OUTPUT_FILE`) for each file, and your command processes them one at a time
+within the partition. You don't need to handle the partition splitting - the
+orchestrator does this automatically.
+```
