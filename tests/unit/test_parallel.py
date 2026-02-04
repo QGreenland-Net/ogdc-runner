@@ -6,10 +6,10 @@ import pytest
 
 from ogdc_runner.models.parallel_config import ExecutionFunction
 from ogdc_runner.models.recipe_config import (
+    DataOneRecipeOutput,
     InputParam,
     RecipeConfig,
     RecipeInput,
-    RecipeOutput,
     ShellWorkflow,
 )
 from ogdc_runner.workflow.shell import ShellParallelExecutionOrchestrator
@@ -29,7 +29,7 @@ def sample_recipe_config(tmpdir):
                 for i in range(1, 6)
             ]
         ),
-        output=RecipeOutput(dataone_id="12345"),
+        output=DataOneRecipeOutput(dataone_id="12345"),
         workflow=ShellWorkflow.model_validate(
             {
                 "sh_file": fake_sh_file.basename,
