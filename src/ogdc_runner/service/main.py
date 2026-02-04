@@ -7,6 +7,7 @@ into one or more Argo workflows that are executed.
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 
 import pydantic
@@ -44,6 +45,7 @@ app = FastAPI(
     version=__version__,
     title="Open Geospatial Data Cloud (OGDC) API",
     lifespan=lifespan,
+    root_path=os.environ.get("API_ROOT_PATH", "/"),
 )
 
 app.include_router(auth.router)

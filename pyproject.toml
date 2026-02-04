@@ -44,6 +44,8 @@ dependencies = [
   "pwdlib[argon2]",
   # d1_python package
   "dataone.libclient>=3.5.0",
+  # s3 API
+  "boto3 >=1.42",
 ]
 
 [project.optional-dependencies]
@@ -116,6 +118,10 @@ addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
 xfail_strict = true
 filterwarnings = [
   "error",
+  # Ignore insecure request warnings in tests. We run against a server that uses
+  # a self-signed (unverified) cert in test, so this must be ignored or pytest
+  # will raise errors about the insecure connection attempt.
+  "ignore::urllib3.exceptions.InsecureRequestWarning",
 ]
 log_cli_level = "INFO"
 testpaths = [
@@ -157,6 +163,9 @@ module = [
   "jinja2.*",
   "kubernetes.*",
   "fsspec",
+  "boto3",
+  "botocore.exceptions",
+  "botocore",
 ]
 ignore_missing_imports = true
 
