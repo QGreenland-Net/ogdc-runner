@@ -284,7 +284,7 @@ def _create_sequential_workflow(
         commands: List of shell commands to execute sequentially
     """
     fetch_template = make_fetch_input_template(recipe_config, use_pvc=False)
-    publish_template = make_publish_template(recipe_id=recipe_config.id)
+    publish_template = make_publish_template(recipe_config=recipe_config)
 
     cmd_templates = [
         make_cmd_template(name=f"run-cmd-{idx}", command=command)

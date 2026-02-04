@@ -6,11 +6,12 @@ import pytest
 from pydantic import AnyUrl, ValidationError
 
 from ogdc_runner.models.recipe_config import (
+    DataOneRecipeOutput,
     InputParam,
     ParallelConfig,
+    PvcRecipeOutput,
     RecipeConfig,
     RecipeInput,
-    RecipeOutput,
     ShellWorkflow,
 )
 
@@ -21,7 +22,7 @@ def test_recipe_meta(tmpdir):
     recipe_input = RecipeInput(
         params=[InputParam(value=AnyUrl("http://www.example.com"), type="url")]
     )
-    recipe_output = RecipeOutput(dataone_id="12345")
+    recipe_output = PvcRecipeOutput()
     name = "Test Recipe"
     recipe_id = "test-recipe"
 
@@ -46,7 +47,7 @@ def test_recipe_meta_failure_bad_id():
     recipe_input = RecipeInput(
         params=[InputParam(value=AnyUrl("http://www.example.com"), type="url")]
     )
-    recipe_output = RecipeOutput(dataone_id="12345")
+    recipe_output = PvcRecipeOutput()
 
     # This name should raise a validation error, as `*` is not allowed.
     name = "Test Recipe*"
@@ -133,7 +134,7 @@ def test_recipe_config_with_parallel_workflow(tmpdir):
             InputParam(value=AnyUrl("http://www.example.com/file3.txt"), type="url"),
         ]
     )
-    recipe_output = RecipeOutput(dataone_id="12345")
+    recipe_output = DataOneRecipeOutput(dataone_id="12345")
 
     recipe_directory = Path(tmpdir)
     recipe_config = RecipeConfig(
