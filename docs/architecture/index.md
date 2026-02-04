@@ -55,16 +55,16 @@ runner:
 2. **Creates** independent Argo tasks for each partition
 3. **Orchestrates** parallel execution with configurable maximum parallelism
 
-The `ParallelExecutionOrchestrator` class manages this process, creating Argo
-Container templates and DAG tasks with proper dependencies and parameters. Argo
-handles task scheduling and resource allocation, distributing work across
-available cluster resources.
+The {class}`ogdc_runner.parallel.ParallelExecutionOrchestrator` class manages
+this process, creating Argo Container templates and DAG tasks with proper
+dependencies and parameters. Argo handles task scheduling and resource
+allocation, distributing work across available cluster resources.
 
 Key modules:
 
-- {mod} `ogdc_runner.parallel`: Orchestration logic for parallel task creation
-- {mod} `ogdc_runner.partitioning`: Partitioning strategies for dividing work
-- {mod} `ogdc_runner.models.parallel_config`: Configuration models for parallel
+- {mod}`ogdc_runner.parallel`: Orchestration logic for parallel task creation
+- {mod}`ogdc_runner.partitioning`: Partitioning strategies for dividing work
+- {mod}`ogdc_runner.models.parallel_config`: Configuration models for parallel
   execution
 
 ## Aspirational

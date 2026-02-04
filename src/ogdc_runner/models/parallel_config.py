@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from ogdc_runner.models.base import OgdcBaseModel
 
@@ -37,25 +37,6 @@ class ExecutionFunction(OgdcBaseModel):
         description="Python callable (e.g., Hera @script decorated function)",
         exclude=True,
     )
-
-    @field_validator("function", mode="before")
-    @classmethod
-    def validate_function(cls, v: Any) -> Any:
-        """Validate that function is callable if provided.
-
-        Args:
-            v: Value to validate
-
-        Returns:
-            The validated callable
-
-        Raises:
-            ValueError: If value is not callable
-        """
-        if v is not None and not callable(v):
-            msg = "function must be callable"
-            raise ValueError(msg)
-        return v
 
     def model_post_init(self, __context: Any) -> None:
         """Validate that exactly one execution type is specified.

@@ -36,7 +36,9 @@ def make_publish_template(
     command = "rsync --progress /input_dir/* /output_dir/"
     volume_mounts = [
         models.VolumeMount(
-            name=OGDC_WORKFLOW_PVC.name, mount_path="/output_dir/", sub_path=recipe_id
+            name=OGDC_WORKFLOW_PVC.name,
+            mount_path="/output_dir/",
+            sub_path=recipe_id,
         )
     ]
     inputs = [Artifact(name="input-dir", path="/input_dir/")]

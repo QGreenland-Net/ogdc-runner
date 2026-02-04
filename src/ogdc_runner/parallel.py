@@ -64,14 +64,6 @@ class ParallelExecutionOrchestrator:
         self.recipe_config = recipe_config
         self.execution_function = execution_function
 
-    def create_execution_template(self) -> Container | Any:
-        """Create execution template. Must be called before entering DAG context.
-
-        Returns:
-            Container template or Hera @script decorated function
-        """
-        return self._create_execution_template()
-
     def create_parallel_tasks(
         self,
         template: Container | Any,
@@ -116,7 +108,7 @@ class ParallelExecutionOrchestrator:
             parallel_config=self.recipe_config.workflow.parallel,
         )
 
-    def _create_execution_template(self) -> Container | Any:
+    def create_execution_template(self) -> Container | Any:
         """Create Argo Container template for the execution function.
 
         Returns:
