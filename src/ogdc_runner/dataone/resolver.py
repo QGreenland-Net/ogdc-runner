@@ -10,7 +10,7 @@ from urllib.parse import quote
 import requests
 from d1_client.mnclient_2_0 import MemberNodeClient_2_0
 
-from ogdc_runner.exceptions import OgdcMissingEnvvar
+from ogdc_runner.exceptions import OgdcDataOneError, OgdcMissingEnvvar
 
 logger = logging.getLogger(__name__)
 DATAONE_NODE_URL = os.environ.get("DATAONE_NODE_URL")
@@ -87,10 +87,21 @@ class DataONEResolver:
             logger.info(msg)
             return data_objects
 
-        except Exception as e:
-            msg = f"Failed to resolve dataset: {e}"
+        except requests.exceptions.RequestException as e:
+            # Network-related errors
+            msg = f"Failed to resolve dataset {dataset_identifier}: {e}"
             logger.error(msg)
-            raise
+            raise OgdcDataOneError(msg) from e
+        except (KeyError, ValueError, TypeError) as e:
+            # Data parsing errors
+            msg = f"Failed to parse DataONE response for {dataset_identifier}: {e}"
+            logger.error(msg)
+            raise OgdcDataOneError(msg) from e
+        except Exception as e:
+            # Catch-all
+            msg = f"Unexpected error resolving dataset {dataset_identifier}: {e}"
+            logger.error(msg)
+            raise OgdcDataOneError(msg) from e
 
     def _build_object_url(self, identifier: str) -> str:
         """Build the download URL for an object.
