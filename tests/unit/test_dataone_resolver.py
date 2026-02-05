@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -140,7 +141,10 @@ class TestDataONEResolver:
         assert resolver._get_filename(doc) == "myfile.nc"
 
         # List filename (take first)
-        doc = {"id": "urn:uuid:123", "fileName": ["file1.nc", "file2.nc"]}
+        doc: dict[str, Any] = {
+            "id": "urn:uuid:123",
+            "fileName": ["file1.nc", "file2.nc"],
+        }
         assert resolver._get_filename(doc) == "file1.nc"
 
     @patch.dict("os.environ", {"DATAONE_NODE_URL": "https://test.dataone.org"})
@@ -167,7 +171,10 @@ class TestDataONEResolver:
         assert resolver._get_entity_name(doc) == "My Dataset"
 
         # List title
-        doc = {"id": "urn:uuid:123", "title": ["Dataset 1", "Dataset 2"]}
+        doc: dict[str, Any] = {
+            "id": "urn:uuid:123",
+            "title": ["Dataset 1", "Dataset 2"],
+        }
         assert resolver._get_entity_name(doc) == "Dataset 1"
 
         # No title - fallback to filename
