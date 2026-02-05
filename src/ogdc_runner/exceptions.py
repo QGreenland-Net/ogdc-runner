@@ -53,3 +53,9 @@ class OgdcOutputDataRetrievalError(OgdcRunnerException):
     """Exception raised when something goes wrong with retrieval of otuput data."""
 
     pass
+
+
+class OgdcDataOneError(OgdcRunnerException):
+    """Exception raised when DataONE operations fail."""
+
+    pass
