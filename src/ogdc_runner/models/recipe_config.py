@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 from functools import cache, cached_property
 from pathlib import Path
-from typing import Literal, Self
+from typing import Any, Literal, Self, TypeAlias
 
 import requests
 from pydantic import (
@@ -17,7 +19,10 @@ from pydantic import (
     model_validator,
 )
 
+from ogdc_runner.dataone.resolver import resolve_dataone_input
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
+
+logger = logging.getLogger(__name__)
 
 
 class OgdcBaseModel(BaseModel):
@@ -28,23 +33,25 @@ class OgdcBaseModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-# Input parameter with type and value
 class InputParam(OgdcBaseModel):
-    """Input parameter for a recipe.
+    """Input parameter for a recipe."""
+
+    type: Literal["url", "pvc_mount", "file_system", "dataone"]
+    value: AnyUrl | str
+
+
+class UrlInput(InputParam):
+    """Inpurt from URL.
 
     When instantiated with `context={"check_urls": True}`, URL-type parameters
     will be validated to ensure they are accessible via HTTP HEAD request.
     """
 
-    value: AnyUrl | str
-    type: Literal["url", "pvc_mount", "file_system"]
+    type: Literal["url"] = "url"
 
     @model_validator(mode="after")
     def validate_url_accessible(self, info: ValidationInfo) -> Self:
         """Validate that URL-type parameters are accessible."""
-        if self.type != "url":
-            return self
-
         context = info.context or {}
         if not context.get("check_urls", False):
             return self
@@ -73,12 +80,113 @@ class InputParam(OgdcBaseModel):
         return self
 
 
+class DataOneInput(InputParam):
+    """DataOne input parameters."""
+
+    type: Literal["dataone"] = "dataone"
+    value: str
+
+    # Optional fields for DataONE inputs
+    member_node: str | None = None
+    filename: str | None = None
+
+    # Private fields for all matched objects with full metadata
+    _dataset_pid: str | None = None
+    _resolved_objects: list[dict[str, Any]] = []
+
+    @model_validator(mode="after")
+    def resolve_dataone_inputs(self) -> DataOneInput:
+        """Resolve DataONE dataset identifiers to data object URLs."""
+
+        try:
+            data_objects = resolve_dataone_input(
+                dataset_identifier=str(self.value),
+            )
+
+            if not data_objects:
+                raise ValueError(f"No data objects found in dataset {self.value}")
+
+            # Select data object(s) based on filename pattern
+            selected_objects = self._select_data_objects(data_objects)
+
+            # Store all matched objects
+            self._resolved_objects = selected_objects
+            self._dataset_pid = str(self.value)
+
+            matched_files = [obj["filename"] for obj in selected_objects]
+
+            msg = f"Resolved {self.value} -> {len(selected_objects)} file(s): {matched_files}"
+            logger.info(msg)
+
+        except Exception as e:
+            msg = f"Failed to resolve DataONE input {self.value}: {e}"
+            logger.error(msg)
+            raise ValueError(
+                f"Failed to resolve DataONE package {self.value}. "
+                f"Make sure the value is a dataset package identifier (e.g., resource_map_urn:uuid:...). "
+                f"Error: {e}"
+            ) from e
+
+        return self
+
+    def _select_data_objects(
+        self, data_objects: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Select data object(s) based on filename pattern.
+
+        Args:
+            data_objects: List of data objects from resolver
+
+        Returns:
+            List of selected data objects (can be multiple)
+
+        Raises:
+            ValueError: If no objects match the pattern
+        """
+        # If no filename pattern specified, use all data objects
+        if not self.filename:
+            msg = f"No filename pattern specified, using all {len(data_objects)} data objects"
+            logger.info(msg)
+            return data_objects
+
+        # Convert glob pattern to regex
+        if "*" in self.filename or "?" in self.filename:
+            pattern = self.filename.replace(".", r"\.")
+            pattern = pattern.replace("*", ".*")
+            pattern = pattern.replace("?", ".")
+            pattern = f"^{pattern}$"
+        else:
+            pattern = f"^{re.escape(self.filename)}$"
+
+        # Find matching objects
+        matches = []
+        for obj in data_objects:
+            filename = obj.get("filename", "")
+            if re.match(pattern, filename, re.IGNORECASE):
+                matches.append(obj)
+
+        if len(matches) == 0:
+            available = [obj["filename"] for obj in data_objects]
+            raise ValueError(
+                f"No data objects matching pattern '{self.filename}' found in dataset. "
+                f"Available files: {available}"
+            )
+
+        matched_names = [obj["filename"] for obj in matches]
+        msg = f"Selected {len(matches)} data object(s) matching pattern '{self.filename}': {matched_names}"
+        logger.info(msg)
+        return matches
+
+
+InputParamType: TypeAlias = DataOneInput | UrlInput
+
+
 # Create a model for the recipe input
 class RecipeInput(OgdcBaseModel):
-    params: list[InputParam]
+    params: list[InputParamType]
 
     @field_validator("params")
-    def validate_params(cls, params: list[InputParam]) -> list[InputParam]:
+    def validate_params(cls, params: list[InputParamType]) -> list[InputParamType]:
         """Ensure there's at least one input parameter."""
         if not params:
             error_msg = "At least one input parameter is required"
