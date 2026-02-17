@@ -11,14 +11,13 @@ from hera.workflows import (
     Parameter,
     Steps,
     Task,
-    Workflow,
 )
 from hera.workflows.models import VolumeMount
 from loguru import logger
 
 from ogdc_runner.argo import (
-    ARGO_WORKFLOW_SERVICE,
     OGDC_WORKFLOW_PVC,
+    OgdcWorkflow,
     submit_workflow,
 )
 from ogdc_runner.constants import MAX_PARALLEL_LIMIT
@@ -325,10 +324,11 @@ def make_and_submit_shell_workflow(
     commands = recipe_config.workflow.get_commands_from_sh_file()  # type: ignore[union-attr]
     parallel_config = recipe_config.workflow.parallel
 
-    with Workflow(
-        generate_name=f"{recipe_config.id}-",
+    with OgdcWorkflow(
+        name="shell",
+        recipe_config=recipe_config,
+        archive_workflow=True,
         entrypoint="main",
-        workflows_service=ARGO_WORKFLOW_SERVICE,
         parallelism=MAX_PARALLEL_LIMIT if parallel_config.enabled else None,
     ) as w:
         if parallel_config.enabled:

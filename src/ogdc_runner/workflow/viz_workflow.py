@@ -9,7 +9,6 @@ from hera.workflows import (
     HTTPArtifact,
     Parameter,
     Task,
-    Workflow,
     script,
 )
 from hera.workflows.models import (
@@ -17,10 +16,8 @@ from hera.workflows.models import (
 )
 
 from ogdc_runner.argo import (
-    ARGO_MANAGER,
-    ARGO_WORKFLOW_SERVICE,
     OGDC_WORKFLOW_PVC,
-    make_generate_name,
+    OgdcWorkflow,
     submit_workflow,
 )
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
@@ -161,17 +158,18 @@ def make_and_submit_viz_workflow(
             f"Only 'url' input type is currently supported."
         )
 
-    with Workflow(
-        generate_name=make_generate_name(recipe_config.id),
+    with OgdcWorkflow(
+        name="visualization",
+        recipe_config=recipe_config,
+        archive_workflow=True,
         entrypoint="main",
-        namespace=ARGO_MANAGER.config.namespace,
-        service_account_name="argo-workflow",
-        workflows_service=ARGO_WORKFLOW_SERVICE,
         volumes=[OGDC_WORKFLOW_PVC],
         annotations={
             "workflows.argoproj.io/description": "Visualization workflow for OGDC",
         },
-        labels={"workflows.argoproj.io/archive-strategy": "false"},
+        labels={
+            "workflows.argoproj.io/archive-strategy": "false",
+        },
     ) as w:
         # Create templates outside the DAG context
         # Read the config.json file content from the recipe directory

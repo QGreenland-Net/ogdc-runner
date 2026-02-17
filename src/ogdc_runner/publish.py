@@ -14,7 +14,6 @@ from hera.workflows import (
     NoneArchiveStrategy,
     Parameter,
     Steps,
-    Workflow,
     models,
 )
 from loguru import logger
@@ -22,7 +21,7 @@ from loguru import logger
 from ogdc_runner.argo import (
     ARGO_WORKFLOW_SERVICE,
     OGDC_WORKFLOW_PVC,
-    make_generate_name,
+    OgdcWorkflow,
     submit_workflow,
 )
 from ogdc_runner.exceptions import (
@@ -75,7 +74,7 @@ def _publish_template_for_temporary_output(
     recipe_config: RecipeConfig,
 ) -> Container:
     """Creates a container template that will zip final output data and store
-    the output as an artifact in minio."""
+    the output as an artifact in s3."""
     output_filepath = f"/output_dir/{recipe_config.id}.zip"
     template = Container(
         name="publish-data-",
@@ -127,10 +126,11 @@ def remove_existing_published_data(
 ) -> None:
     """Executes an argo workflow that removes published data for a recipe if it
     exists."""
-    with Workflow(
-        generate_name=make_generate_name(recipe_config.id, "-remove-existing-data-"),
+    with OgdcWorkflow(
+        recipe_config=recipe_config,
+        archive_workflow=False,
+        name="remove-existing-data",
         entrypoint="steps",
-        workflows_service=ARGO_WORKFLOW_SERVICE,
     ) as w:
         overwrite_template = Container(
             name="overwrite-already-published-",
@@ -149,10 +149,7 @@ def remove_existing_published_data(
         with Steps(name="steps"):
             overwrite_template()
 
-    workflow_name = submit_workflow(workflow=w, wait=True)
-
-    # Cleanup this workflow, it is no longer needed
-    ARGO_WORKFLOW_SERVICE.delete_workflow(workflow_name)
+    submit_workflow(workflow=w, wait=True)
 
 
 def check_for_existing_pvc_published_data(
@@ -164,8 +161,10 @@ def check_for_existing_pvc_published_data(
     Returns `True` if data have already been published for the given recipe,
     otherwise `False`.
     """
-    with Workflow(
-        generate_name=make_generate_name(recipe_config.id, "-check-published-"),
+    with OgdcWorkflow(
+        recipe_config=recipe_config,
+        archive_workflow=False,
+        name="check-published",
         entrypoint="steps",
         workflows_service=ARGO_WORKFLOW_SERVICE,
     ) as w:
