@@ -77,3 +77,52 @@ which contains operational examples of data transformation recipes that can be
 used as examples.
 
 To learn more about recipes, see [OGDC Recipes](./recipes.md).
+
+### Input Types
+
+Recipes can fetch data from different types of sources.
+
+#### URL Inputs
+
+Provide a direct URL to your data:
+
+```yaml
+input:
+  params:
+    - type: "url"
+      value: "https://example.com/data.zip"
+```
+
+#### DataONE Inputs
+
+If your data is in a DataONE repository, you can fetch it using the dataset
+identifier:
+
+```yaml
+input:
+  params:
+    - type: "dataone"
+      value: "resource_map_doi:10.18739/A29G5GD39"
+```
+
+Need specific files from the dataset? Use wildcard patterns:
+
+```yaml
+input:
+  params:
+    - type: "dataone"
+      value: "resource_map_doi:10.18739/A29G5GD39"
+      filename: "*.nc" # Fetch only NetCDF files
+```
+
+Wildcard patterns work like you'd expect:
+
+- `*` matches anything (e.g., `data_*.nc` gets `data_1.nc`, `data_2.nc`, etc.)
+- `?` matches one character (e.g., `data_?.nc` gets `data_1.nc` but not
+  `data_10.nc`)
+
+Check out the
+[seal-tags](https://github.com/QGreenland-Net/ogdc-recipes/tree/main/recipes/seal-tags)
+and
+[greenland-ice-sheet](https://github.com/QGreenland-Net/ogdc-recipes/tree/main/recipes/greenland-ice-sheet)
+recipes to see DataONE inputs in practice.

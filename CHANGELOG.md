@@ -5,6 +5,8 @@
 - Add recipe ID truncation to avoid Kubernetes name length limits.
 - Add `temporary` output type and support retrieval of those outputs from s3
   storage via the `ogdc-runner get-output` CLI.
+- Add DataONE input type for fetching datasets directly from DataONE
+  repositories
 
 # v0.2.0
 
