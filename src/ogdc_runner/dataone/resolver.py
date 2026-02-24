@@ -23,9 +23,7 @@ class DataONEResolver:
     """Resolves DataONE dataset identifiers to data objects."""
 
     def __init__(self) -> None:
-        """Initialize resolver.
-
-        """
+        """Initialize resolver."""
         self.member_node = DATAONE_NODE_URL
         self.client = MemberNodeClient_2_0(base_url=DATAONE_NODE_URL)
 
