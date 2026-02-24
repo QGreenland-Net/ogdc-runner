@@ -133,8 +133,6 @@ class DataONEResolver:
     def _get_entity_name(self, doc: dict[str, Any]) -> str:
         """Extract entity name from Solr document."""
         if title := doc.get("title"):
-            if isinstance(title, list):
-                return str(title[0])
             return str(title)
 
         # Fallback to filename
