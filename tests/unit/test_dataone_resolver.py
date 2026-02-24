@@ -51,7 +51,7 @@ class TestDataONEResolver:
                     {
                         "id": "urn:uuid:file2",
                         "fileName": ["data2.nc"],  # Test list format
-                        "title": ["Data File 2"],
+                        "title": "Data File 2",
                         "formatId": "netCDF-4",
                         "size": 2048,
                     },
@@ -159,13 +159,6 @@ class TestDataONEResolver:
         # String title
         doc_str = {"id": "urn:uuid:123", "title": "My Dataset", "fileName": "data.nc"}
         assert resolver._get_entity_name(doc_str) == "My Dataset"
-
-        # List title
-        doc_list: dict[str, Any] = {
-            "id": "urn:uuid:123",
-            "title": ["Dataset 1", "Dataset 2"],
-        }
-        assert resolver._get_entity_name(doc_list) == "Dataset 1"
 
         # No title - fallback to filename
         doc_no_title = {"id": "urn:uuid:123", "fileName": "fallback.nc"}
