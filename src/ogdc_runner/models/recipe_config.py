@@ -92,7 +92,7 @@ class DataOneInput(InputParam):
 
     # Private fields for all matched objects with full metadata
     _dataset_pid: str | None = None
-    _resolved_objects: list[dict[str, Any]] = []
+    resolved_objects: list[dict[str, Any]] = []
 
     @model_validator(mode="after")
     def resolve_dataone_inputs(self) -> DataOneInput:
@@ -110,7 +110,7 @@ class DataOneInput(InputParam):
             selected_objects = self._select_data_objects(data_objects)
 
             # Store all matched objects
-            self._resolved_objects = selected_objects
+            self.resolved_objects = selected_objects
             self._dataset_pid = str(self.value)
 
             matched_files = [obj["filename"] for obj in selected_objects]

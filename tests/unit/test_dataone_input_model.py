@@ -34,8 +34,8 @@ class TestDataOneInput:
 
         assert input_param.type == "dataone"
         assert input_param.value == "resource_map_doi:10.18739/A29G5GD39"
-        assert len(input_param._resolved_objects) == 1
-        assert input_param._resolved_objects[0]["filename"] == "data.nc"
+        assert len(input_param.resolved_objects) == 1
+        assert input_param.resolved_objects[0]["filename"] == "data.nc"
         mock_resolve.assert_called_once_with(
             dataset_identifier="resource_map_doi:10.18739/A29G5GD39"
         )
@@ -79,13 +79,13 @@ class TestDataOneInput:
         )
 
         # Should only match the two .nc files with percent_gris prefix
-        assert len(input_param._resolved_objects) == 2
+        assert len(input_param.resolved_objects) == 2
         assert all(
             obj["filename"].startswith("percent_gris")
-            for obj in input_param._resolved_objects
+            for obj in input_param.resolved_objects
         )
         assert all(
-            obj["filename"].endswith(".nc") for obj in input_param._resolved_objects
+            obj["filename"].endswith(".nc") for obj in input_param.resolved_objects
         )
 
     @patch("ogdc_runner.models.recipe_config.resolve_dataone_input")
@@ -118,8 +118,8 @@ class TestDataOneInput:
         )
 
         # Should only match exact filename
-        assert len(input_param._resolved_objects) == 1
-        assert input_param._resolved_objects[0]["filename"] == "specific_file.nc"
+        assert len(input_param.resolved_objects) == 1
+        assert input_param.resolved_objects[0]["filename"] == "specific_file.nc"
 
     @patch("ogdc_runner.models.recipe_config.resolve_dataone_input")
     def test_dataone_input_wildcard_question_mark(self, mock_resolve):
@@ -160,8 +160,8 @@ class TestDataOneInput:
         )
 
         # Should match data1.nc and data2.nc but not data10.nc
-        assert len(input_param._resolved_objects) == 2
-        filenames = [obj["filename"] for obj in input_param._resolved_objects]
+        assert len(input_param.resolved_objects) == 2
+        filenames = [obj["filename"] for obj in input_param.resolved_objects]
         assert "data1.nc" in filenames
         assert "data2.nc" in filenames
         assert "data10.nc" not in filenames
@@ -196,7 +196,7 @@ class TestDataOneInput:
         )
 
         # Should include all files
-        assert len(input_param._resolved_objects) == 2
+        assert len(input_param.resolved_objects) == 2
 
     @patch("ogdc_runner.models.recipe_config.resolve_dataone_input")
     def test_dataone_input_case_insensitive_matching(self, mock_resolve):
@@ -219,8 +219,8 @@ class TestDataOneInput:
         )
 
         # Should match despite case difference
-        assert len(input_param._resolved_objects) == 1
-        assert input_param._resolved_objects[0]["filename"] == "DATA.NC"
+        assert len(input_param.resolved_objects) == 1
+        assert input_param.resolved_objects[0]["filename"] == "DATA.NC"
 
     @patch("ogdc_runner.models.recipe_config.resolve_dataone_input")
     def test_dataone_input_no_matching_files(self, mock_resolve):
