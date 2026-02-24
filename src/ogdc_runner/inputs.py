@@ -33,8 +33,8 @@ def make_fetch_input_template(
             )
         elif isinstance(param, DataOneInput):
             # DataONE input - download all resolved objects
-            if param._resolved_objects:
-                for obj in param._resolved_objects:
+            if param.resolved_objects:
+                for obj in param.resolved_objects:
                     url = obj["url"]
                     fetch_commands.append(
                         f"wget --content-disposition -P /output_dir/ {url}"
