@@ -25,9 +25,6 @@ class DataONEResolver:
     def __init__(self) -> None:
         """Initialize resolver.
 
-        Args:11
-            member_node: DataONE member node base URL
-            Defaults to value of DATAONE_NODE_URL envvar.
         """
         self.member_node = DATAONE_NODE_URL
         self.client = MemberNodeClient_2_0(base_url=DATAONE_NODE_URL)
