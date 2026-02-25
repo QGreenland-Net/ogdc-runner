@@ -10,7 +10,11 @@ import pytest
 import requests
 
 from ogdc_runner.dataone import resolver
-from ogdc_runner.dataone.resolver import DataONEResolver, resolve_dataone_input
+from ogdc_runner.dataone.resolver import (
+    DataONEResolver,
+    _filter_by_filename,
+    resolve_dataone_input,
+)
 from ogdc_runner.exceptions import OgdcDataOneError, OgdcMissingEnvvar
 
 
@@ -168,9 +172,20 @@ class TestDataONEResolver:
     def test_resolve_dataone_input_function(self, mock_resolve):
         """Test the convenience function wrapper."""
         mock_resolve.return_value = [{"identifier": "test", "url": "http://test"}]
-
         result = resolve_dataone_input("resource_map_urn:uuid:test")
 
         mock_resolve.assert_called_once_with("resource_map_urn:uuid:test")
         assert len(result) == 1
         assert result[0]["identifier"] == "test"
+
+    def test_filter_by_filename(self):
+        """Test _filter_by_filename raises error when no files match."""
+
+        data_objects = [
+            {"filename": "other_file.nc", "identifier": "urn:uuid:1"},
+        ]
+
+        with pytest.raises(
+            ValueError, match=r"No data objects matching pattern 'nonexistent.nc'"
+        ):
+            _filter_by_filename(data_objects, "nonexistent.nc")

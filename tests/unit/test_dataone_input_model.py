@@ -37,7 +37,8 @@ class TestDataOneInput:
         assert len(input_param.resolved_objects) == 1
         assert input_param.resolved_objects[0]["filename"] == "data.nc"
         mock_resolve.assert_called_once_with(
-            dataset_identifier="resource_map_doi:10.18739/A29G5GD39"
+            dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
+            filename=None,
         )
 
     @patch("ogdc_runner.models.recipe_config.resolve_dataone_input")
@@ -60,15 +61,6 @@ class TestDataOneInput:
                 "format_id": "netCDF-4",
                 "size": 2048,
                 "entity_name": "File 2",
-                "entity_description": "",
-            },
-            {
-                "identifier": "urn:uuid:file3",
-                "url": "https://test.org/file3",
-                "filename": "other_data.csv",
-                "format_id": "text/csv",
-                "size": 512,
-                "entity_name": "Other File",
                 "entity_description": "",
             },
         ]
@@ -101,15 +93,6 @@ class TestDataOneInput:
                 "entity_name": "Specific File",
                 "entity_description": "",
             },
-            {
-                "identifier": "urn:uuid:file2",
-                "url": "https://test.org/file2",
-                "filename": "other_file.nc",
-                "format_id": "netCDF-4",
-                "size": 2048,
-                "entity_name": "Other File",
-                "entity_description": "",
-            },
         ]
 
         input_param = DataOneInput(
@@ -117,9 +100,12 @@ class TestDataOneInput:
             filename="specific_file.nc",
         )
 
-        # Should only match exact filename
         assert len(input_param.resolved_objects) == 1
         assert input_param.resolved_objects[0]["filename"] == "specific_file.nc"
+        mock_resolve.assert_called_once_with(
+            dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
+            filename="specific_file.nc",
+        )
 
     @patch("ogdc_runner.models.recipe_config.resolve_dataone_input")
     def test_dataone_input_wildcard_question_mark(self, mock_resolve):
@@ -141,15 +127,6 @@ class TestDataOneInput:
                 "format_id": "netCDF-4",
                 "size": 2048,
                 "entity_name": "File 2",
-                "entity_description": "",
-            },
-            {
-                "identifier": "urn:uuid:file3",
-                "url": "https://test.org/file3",
-                "filename": "data10.nc",  # Two digits - shouldn't match
-                "format_id": "netCDF-4",
-                "size": 512,
-                "entity_name": "File 3",
                 "entity_description": "",
             },
         ]
@@ -221,29 +198,6 @@ class TestDataOneInput:
         # Should match despite case difference
         assert len(input_param.resolved_objects) == 1
         assert input_param.resolved_objects[0]["filename"] == "DATA.NC"
-
-    @patch("ogdc_runner.models.recipe_config.resolve_dataone_input")
-    def test_dataone_input_no_matching_files(self, mock_resolve):
-        """Test DataOneInput raises error when no files match pattern."""
-        mock_resolve.return_value = [
-            {
-                "identifier": "urn:uuid:file1",
-                "url": "https://test.org/file1",
-                "filename": "other_file.nc",
-                "format_id": "netCDF-4",
-                "size": 1024,
-                "entity_name": "File 1",
-                "entity_description": "",
-            },
-        ]
-
-        with pytest.raises(
-            ValueError, match=r"No data objects matching pattern 'nonexistent.nc'"
-        ):
-            DataOneInput(
-                dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
-                filename="nonexistent.nc",
-            )
 
     @patch("ogdc_runner.models.recipe_config.resolve_dataone_input")
     def test_dataone_input_empty_dataset(self, mock_resolve):

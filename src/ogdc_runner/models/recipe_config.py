@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from functools import cache, cached_property
 from pathlib import Path
 from typing import Any, Literal, Self, TypeAlias
@@ -98,17 +97,15 @@ class DataOneInput(InputParam):
         """Resolve DataONE dataset identifiers to data object URLs."""
 
         try:
-            data_objects = resolve_dataone_input(
+            selected_objects = resolve_dataone_input(
                 dataset_identifier=str(self.dataset_identifier),
+                filename=self.filename,
             )
 
-            if not data_objects:
+            if not selected_objects:
                 raise ValueError(
                     f"No data objects found in dataset {self.dataset_identifier}"
                 )
-
-            # Select data object(s) based on filename pattern
-            selected_objects = self._select_data_objects(data_objects)
 
             # Store all matched objects
             self.resolved_objects = selected_objects
@@ -129,54 +126,6 @@ class DataOneInput(InputParam):
             ) from e
 
         return self
-
-    def _select_data_objects(
-        self, data_objects: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        """Select data object(s) based on filename pattern.
-
-        Args:
-            data_objects: List of data objects from resolver
-
-        Returns:
-            List of selected data objects (can be multiple)
-
-        Raises:
-            ValueError: If no objects match the pattern
-        """
-        # If no filename pattern specified, use all data objects
-        if not self.filename:
-            msg = f"No filename pattern specified, using all {len(data_objects)} data objects"
-            logger.info(msg)
-            return data_objects
-
-        # Convert glob pattern to regex
-        if "*" in self.filename or "?" in self.filename:
-            pattern = self.filename.replace(".", r"\.")
-            pattern = pattern.replace("*", ".*")
-            pattern = pattern.replace("?", ".")
-            pattern = f"^{pattern}$"
-        else:
-            pattern = f"^{re.escape(self.filename)}$"
-
-        # Find matching objects
-        matches = []
-        for obj in data_objects:
-            filename = obj.get("filename", "")
-            if re.match(pattern, filename, re.IGNORECASE):
-                matches.append(obj)
-
-        if len(matches) == 0:
-            available = [obj["filename"] for obj in data_objects]
-            raise ValueError(
-                f"No data objects matching pattern '{self.filename}' found in dataset. "
-                f"Available files: {available}"
-            )
-
-        matched_names = [obj["filename"] for obj in matches]
-        msg = f"Selected {len(matches)} data object(s) matching pattern '{self.filename}': {matched_names}"
-        logger.info(msg)
-        return matches
 
 
 InputParamType: TypeAlias = DataOneInput | UrlInput

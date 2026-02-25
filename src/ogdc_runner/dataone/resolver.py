@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import logging
 import os
 from typing import Any
@@ -136,15 +137,55 @@ class DataONEResolver:
 
 def resolve_dataone_input(
     dataset_identifier: str,
+    filename: str | None = None,
 ) -> list[dict[str, Any]]:
     """Resolve a DataONE dataset to its data objects.
 
     Args:
         dataset_identifier: Dataset/package PID
-        member_node: DataONE member node URL
+        filename: Optional - filename pattern to filter objects. Supports wildcards (*, ?)
 
     Returns:
         List of data objects with URLs and metadata
     """
     resolver = DataONEResolver()
-    return resolver.resolve_dataset(dataset_identifier)
+    data_objects = resolver.resolve_dataset(dataset_identifier)
+
+    if filename:
+        data_objects = _filter_by_filename(data_objects, filename)
+
+    return data_objects
+
+
+def _filter_by_filename(
+    data_objects: list[dict[str, Any]],
+    filename_pattern: str,
+) -> list[dict[str, Any]]:
+    """Filter data objects by filename pattern.
+
+    Args:
+        data_objects: List of data objects from resolver
+        filename_pattern: Filename pattern (supports * and ? wildcards)
+
+    Returns:
+        List of data objects matching the pattern
+
+    Raises:
+        ValueError: If no objects match the pattern
+    """
+
+    matched = [
+        obj
+        for obj in data_objects
+        if fnmatch.fnmatch(obj["filename"].lower(), filename_pattern.lower())
+    ]
+
+    if not matched:
+        raise ValueError(
+            f"No data objects matching pattern '{filename_pattern}' found in dataset. "
+            f"Available files: {[obj['filename'] for obj in data_objects]}"
+        )
+
+    msg = f"Filtered {len(data_objects)} objects to {len(matched)} matching '{filename_pattern}'"
+    logger.info(msg)
+    return matched
