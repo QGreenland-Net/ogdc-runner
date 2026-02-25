@@ -38,7 +38,9 @@ class TestDataOneFetchInputTemplate:
             name="Test DataONE Recipe",
             input=RecipeInput(
                 params=[
-                    DataOneInput(value="resource_map_doi:10.18739/A29G5GD39"),
+                    DataOneInput(
+                        dataset_identifier="resource_map_doi:10.18739/A29G5GD39"
+                    ),
                 ]
             ),
             output=TemporaryRecipeOutput(),
@@ -105,7 +107,7 @@ class TestDataOneFetchInputTemplate:
             input=RecipeInput(
                 params=[
                     DataOneInput(
-                        value="resource_map_doi:10.18739/A29G5GD39",
+                        dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
                         filename="percent_gris_*.nc",
                     ),
                 ]
@@ -152,7 +154,9 @@ class TestDataOneFetchInputTemplate:
             name="Test Output Artifact",
             input=RecipeInput(
                 params=[
-                    DataOneInput(value="resource_map_doi:10.18739/A29G5GD39"),
+                    DataOneInput(
+                        dataset_identifier="resource_map_doi:10.18739/A29G5GD39"
+                    ),
                 ]
             ),
             output=TemporaryRecipeOutput(),

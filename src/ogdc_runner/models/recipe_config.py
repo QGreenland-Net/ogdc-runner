@@ -37,7 +37,8 @@ class InputParam(OgdcBaseModel):
     """Input parameter for a recipe."""
 
     type: Literal["url", "pvc_mount", "file_system", "dataone"]
-    value: AnyUrl | str
+    # NOTE: this makes it optional. Was getting errors with dataset_identifier for dataone.
+    value: AnyUrl | str | None = None
 
 
 class UrlInput(InputParam):
@@ -84,14 +85,12 @@ class DataOneInput(InputParam):
     """DataOne input parameters."""
 
     type: Literal["dataone"] = "dataone"
-    value: str
+    dataset_identifier: str
 
-    # Optional fields for DataONE inputs
-    member_node: str | None = None
     filename: str | None = None
 
     # Private fields for all matched objects with full metadata
-    _dataset_pid: str | None = None
+    dataset_pid: str | None = None
     resolved_objects: list[dict[str, Any]] = []
 
     @model_validator(mode="after")
@@ -100,30 +99,32 @@ class DataOneInput(InputParam):
 
         try:
             data_objects = resolve_dataone_input(
-                dataset_identifier=str(self.value),
+                dataset_identifier=str(self.dataset_identifier),
             )
 
             if not data_objects:
-                raise ValueError(f"No data objects found in dataset {self.value}")
+                raise ValueError(
+                    f"No data objects found in dataset {self.dataset_identifier}"
+                )
 
             # Select data object(s) based on filename pattern
             selected_objects = self._select_data_objects(data_objects)
 
             # Store all matched objects
             self.resolved_objects = selected_objects
-            self._dataset_pid = str(self.value)
+            self.dataset_pid = str(self.dataset_identifier)
 
             matched_files = [obj["filename"] for obj in selected_objects]
 
-            msg = f"Resolved {self.value} -> {len(selected_objects)} file(s): {matched_files}"
+            msg = f"Resolved {self.dataset_identifier} -> {len(selected_objects)} file(s): {matched_files}"
             logger.info(msg)
 
         except Exception as e:
-            msg = f"Failed to resolve DataONE input {self.value}: {e}"
+            msg = f"Failed to resolve DataONE input {self.dataset_identifier}: {e}"
             logger.error(msg)
             raise ValueError(
-                f"Failed to resolve DataONE package {self.value}. "
-                f"Make sure the value is a dataset package identifier (e.g., resource_map_urn:uuid:...). "
+                f"Failed to resolve DataONE package {self.dataset_identifier}. "
+                f"Make sure the dataset_identifier is a dataset package identifier (e.g., resource_map_urn:uuid:...). "
                 f"Error: {e}"
             ) from e
 

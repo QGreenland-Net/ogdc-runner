@@ -29,11 +29,11 @@ class TestDataOneInput:
         ]
 
         input_param = DataOneInput(
-            value="resource_map_doi:10.18739/A29G5GD39",
+            dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
         )
 
         assert input_param.type == "dataone"
-        assert input_param.value == "resource_map_doi:10.18739/A29G5GD39"
+        assert input_param.dataset_identifier == "resource_map_doi:10.18739/A29G5GD39"
         assert len(input_param.resolved_objects) == 1
         assert input_param.resolved_objects[0]["filename"] == "data.nc"
         mock_resolve.assert_called_once_with(
@@ -74,7 +74,7 @@ class TestDataOneInput:
         ]
 
         input_param = DataOneInput(
-            value="resource_map_doi:10.18739/A29G5GD39",
+            dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
             filename="percent_gris_*.nc",
         )
 
@@ -113,7 +113,7 @@ class TestDataOneInput:
         ]
 
         input_param = DataOneInput(
-            value="resource_map_doi:10.18739/A29G5GD39",
+            dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
             filename="specific_file.nc",
         )
 
@@ -155,7 +155,7 @@ class TestDataOneInput:
         ]
 
         input_param = DataOneInput(
-            value="resource_map_doi:10.18739/A29G5GD39",
+            dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
             filename="data?.nc",
         )
 
@@ -191,7 +191,7 @@ class TestDataOneInput:
         ]
 
         input_param = DataOneInput(
-            value="resource_map_doi:10.18739/A29G5GD39",
+            dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
             # No filename specified
         )
 
@@ -214,7 +214,7 @@ class TestDataOneInput:
         ]
 
         input_param = DataOneInput(
-            value="resource_map_doi:10.18739/A29G5GD39",
+            dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
             filename="data.nc",  # lowercase pattern
         )
 
@@ -241,7 +241,7 @@ class TestDataOneInput:
             ValueError, match=r"No data objects matching pattern 'nonexistent.nc'"
         ):
             DataOneInput(
-                value="resource_map_doi:10.18739/A29G5GD39",
+                dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
                 filename="nonexistent.nc",
             )
 
@@ -254,7 +254,7 @@ class TestDataOneInput:
             ValueError, match="No data objects found in dataset resource_map"
         ):
             DataOneInput(
-                value="resource_map_doi:10.18739/A29G5GD39",
+                dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
             )
 
     @patch("ogdc_runner.models.recipe_config.resolve_dataone_input")
@@ -264,7 +264,7 @@ class TestDataOneInput:
 
         with pytest.raises(ValueError, match="Failed to resolve DataONE package"):
             DataOneInput(
-                value="resource_map_doi:10.18739/A29G5GD39",
+                dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
             )
 
     @patch("ogdc_runner.models.recipe_config.resolve_dataone_input")
@@ -283,10 +283,10 @@ class TestDataOneInput:
         ]
 
         input_param = DataOneInput(
-            value="resource_map_doi:10.18739/A29G5GD39",
+            dataset_identifier="resource_map_doi:10.18739/A29G5GD39",
         )
 
-        assert input_param._dataset_pid == "resource_map_doi:10.18739/A29G5GD39"
+        assert input_param.dataset_identifier == "resource_map_doi:10.18739/A29G5GD39"
 
     @patch("ogdc_runner.models.recipe_config.resolve_dataone_input")
     def test_recipe_input_with_dataone(self, mock_resolve):
@@ -305,7 +305,7 @@ class TestDataOneInput:
 
         recipe_input = RecipeInput(
             params=[
-                DataOneInput(value="resource_map_doi:10.18739/A29G5GD39"),
+                DataOneInput(dataset_identifier="resource_map_doi:10.18739/A29G5GD39"),
             ]
         )
 
@@ -331,7 +331,7 @@ class TestDataOneInput:
         recipe_input = RecipeInput(
             params=[
                 UrlInput(value=AnyUrl("http://example.com/data.zip")),
-                DataOneInput(value="resource_map_doi:10.18739/A29G5GD39"),
+                DataOneInput(dataset_identifier="resource_map_doi:10.18739/A29G5GD39"),
             ]
         )
 
