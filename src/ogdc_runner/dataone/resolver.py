@@ -14,10 +14,6 @@ from d1_client.mnclient_2_0 import MemberNodeClient_2_0
 from ogdc_runner.exceptions import OgdcDataOneError, OgdcMissingEnvvar
 
 logger = logging.getLogger(__name__)
-DATAONE_NODE_URL = os.environ.get("DATAONE_NODE_URL")
-if DATAONE_NODE_URL is None:
-    msg = "Must have DATAONE_NODE_URL envvar set"
-    raise OgdcMissingEnvvar(msg)
 
 
 class DataONEResolver:
@@ -25,7 +21,14 @@ class DataONEResolver:
 
     def __init__(self) -> None:
         """Initialize resolver."""
+
+        # Set the dataone node url
+        DATAONE_NODE_URL = os.environ.get("DATAONE_NODE_URL")
+        if DATAONE_NODE_URL is None:
+            msg = "Must have DATAONE_NODE_URL envvar set"
+            raise OgdcMissingEnvvar(msg)
         self.member_node = DATAONE_NODE_URL
+
         self.client = MemberNodeClient_2_0(base_url=DATAONE_NODE_URL)
 
     def resolve_dataset(self, dataset_identifier: str) -> list[dict[str, Any]]:

@@ -30,10 +30,17 @@ class TestDataONEResolver:
         assert "http" in resolver.member_node  # Should be a URL
 
     @patch.dict("os.environ", {}, clear=True)
-    def test_resolver_missing_envvar(self):
+    def test_resolver_missing_envvar(self, monkeypatch):
         """Test that resolver raises error when DATAONE_NODE_URL is missing."""
+
+        # TODO: figure out how to remove DATAONE_NODE_URL given that we autouse
+        # the fixture in conftest.py that mocks this.
+        monkeypatch.delenv(
+            "DATAONE_NODE_URL",
+        )
         # Need to reload the module to trigger the env check
         with pytest.raises(OgdcMissingEnvvar, match="Must have DATAONE_NODE_URL"):
+            # TODO: instead of reload, init DataOneResolver object to raise error.
             importlib.reload(resolver)
 
     @patch("ogdc_runner.dataone.resolver.requests.get")

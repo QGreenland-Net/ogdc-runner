@@ -55,3 +55,14 @@ def mock_db(monkeypatch):
         "OGDC_JWT_SECRET_KEY",
         "2ae25b5398824129235724f243811d7a335a98339abe4630e4e27d25e4f144a2",
     )
+
+
+@pytest.fixture(autouse=True)
+def mock_dataone_node_url(monkeypatch):
+    # Use the production dastaone node URL for tests.
+    # NOTE/TODO: when publishing capabilities are added, we will need to be
+    # careful to set the `DATAONE_NODE_URL` to a test env.
+    monkeypatch.setenv(
+        "DATAONE_NODE_URL",
+        "https://arcticdata.io/metacat/d1/mn",
+    )
