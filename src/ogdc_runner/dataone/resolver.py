@@ -116,8 +116,6 @@ class DataONEResolver:
         filename = doc.get("fileName")
 
         if filename:
-            if isinstance(filename, list):
-                return str(filename[0])
             return str(filename)
 
         raise ValueError(f"Document missing required 'fileName' field: {doc.get('id')}")
