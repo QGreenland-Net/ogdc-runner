@@ -113,18 +113,14 @@ class DataONEResolver:
 
     def _get_filename(self, doc: dict[str, Any]) -> str:
         """Extract filename from Solr document."""
-        if filename := doc.get("fileName"):
+        filename = doc.get("fileName")
+
+        if filename:
             if isinstance(filename, list):
                 return str(filename[0])
             return str(filename)
 
-        # Fallback: derive from identifier
-        obj_id = doc.get("id")
-        if not obj_id:
-            error_msg = "DataONE object missing required 'id' field"
-            raise ValueError(error_msg)
-
-        return str(obj_id).split(":")[-1]
+        raise ValueError(f"Document missing required 'fileName' field: {doc.get('id')}")
 
     def _get_entity_name(self, doc: dict[str, Any]) -> str:
         """Extract entity name from Solr document."""
