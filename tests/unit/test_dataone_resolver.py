@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -33,15 +32,12 @@ class TestDataONEResolver:
     def test_resolver_missing_envvar(self, monkeypatch):
         """Test that resolver raises error when DATAONE_NODE_URL is missing."""
 
-        # TODO: figure out how to remove DATAONE_NODE_URL given that we autouse
-        # the fixture in conftest.py that mocks this.
         monkeypatch.delenv(
             "DATAONE_NODE_URL",
+            raising=False,
         )
-        # Need to reload the module to trigger the env check
         with pytest.raises(OgdcMissingEnvvar, match="Must have DATAONE_NODE_URL"):
-            # TODO: instead of reload, init DataOneResolver object to raise error.
-            importlib.reload(resolver)
+            resolver.DataONEResolver()
 
     @patch("ogdc_runner.dataone.resolver.requests.get")
     def test_resolve_dataset_success(self, mock_get):
@@ -60,7 +56,7 @@ class TestDataONEResolver:
                     },
                     {
                         "id": "urn:uuid:file2",
-                        "fileName": ["data2.nc"],  # Test list format
+                        "fileName": "data2.nc",
                         "title": "Data File 2",
                         "formatId": "netCDF-4",
                         "size": 2048,
