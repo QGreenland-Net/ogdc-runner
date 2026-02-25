@@ -41,7 +41,7 @@ def make_fetch_input_template(
                     )
             else:
                 raise OgdcWorkflowExecutionError(
-                    f"DataONE input has no resolved objects: {param.value}"
+                    f"DataONE input has no resolved objects: {param}"
                 )
 
     # Join all commands with && for sequential execution

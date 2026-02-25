@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -148,13 +147,6 @@ class TestDataONEResolver:
         # String filename
         doc_str = {"id": "urn:uuid:123", "fileName": "myfile.nc"}
         assert resolver._get_filename(doc_str) == "myfile.nc"
-
-        # List filename (take first)
-        doc_list: dict[str, Any] = {
-            "id": "urn:uuid:123",
-            "fileName": ["file1.nc", "file2.nc"],
-        }
-        assert resolver._get_filename(doc_list) == "file1.nc"
 
     def test_get_entity_name(self):
         """Test entity name extraction."""

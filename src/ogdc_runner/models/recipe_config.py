@@ -37,7 +37,6 @@ class InputParam(OgdcBaseModel):
 
     type: Literal["url", "pvc_mount", "file_system", "dataone"]
     # NOTE: this makes it optional. Was getting errors with dataset_identifier for dataone.
-    value: AnyUrl | str | None = None
 
 
 class UrlInput(InputParam):
@@ -48,6 +47,7 @@ class UrlInput(InputParam):
     """
 
     type: Literal["url"] = "url"
+    value: AnyUrl | str
 
     @model_validator(mode="after")
     def validate_url_accessible(self, info: ValidationInfo) -> Self:
