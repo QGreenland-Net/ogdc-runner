@@ -132,18 +132,105 @@ example.
 
 ### Visualization Workflow
 
-The `visualization` workflow takes a geospatial data file as input and produces
-3D web-tiles of the data for visualization in a web-map.
+The `visualization` workflow takes geospatial data files as input and produces
+cloud optimized tiled outputs for analysis, visualization and archival. This
+workflow is designed for large geospatial datasets that require specialized
+processing to be displayed efficiently in web-based map applications.
 
 See {class}`ogdc_runner.models.recipe_config.VizWorkflow` for details on
 configuration options.
 
-```{warning}
-This section of the documentation is incomplete!
-**TODO**: more detail / link to viz workflow documentation.
-```
+#### Overview
+
+The visualization workflow orchestrates a multi-stage pipeline that transforms
+geospatial data through several processing steps:
+
+1. **Staging**: Large vector files are sliced into smaller, tiled pieces that
+   correspond to tiles in a defined Tile Matrix Set (TMS). This step also
+   handles data standardization, deduplication, and property management.
+
+2. **Rasterization**: Vector tiles are converted to raster formats (GeoTIFFs and
+   PNGs), with statistics calculated as specified in the configuration.
+
+3. **3D Tile Creation**: Vector data is converted to Cesium 3D tiles format,
+   enabling efficient web-based visualization of large polygon datasets.
+
+The workflow produces four output formats:
+
+- **GeoPackages** (vector): High-resolution, lossless archival format
+- **GeoTIFFs** (raster): Multi-resolution raster data with calculated statistics
+- **PNG Web Tiles**: Pre-rendered raster tiles with palettes for quick
+  visualization
+- **Cesium 3D Tiles**: Vector tiles for interactive 3D visualization with
+  attribute data pop-ups
+
+#### Configuration
+
+In addition to `meta.yaml`, `visualization` workflows require a `config.json`
+file that defines:
+
+- Input data source and format
+- Tile Matrix Set (TMS) for tiling strategy
+- Statistical calculations to perform
+- Color palettes for visualization
+- Output specifications
+
+The following configuration options are specific to the `visualization` workflow
+in `meta.yaml`:
+
+##### `config_file`
+
+The path to the JSON configuration file (default: `"config.json"`).
+
+Example: `"my_custom_config.json"`
+
+##### `batch_size`
+
+The number of tiles to process in parallel (default: `250`). Increasing this
+value can improve performance on high-performance computing systems with
+sufficient resources.
+
+Example: `500`
+
+#### Core Packages
+
+The visualization workflow is powered by several specialized Python packages:
+
+- **viz-workflow**: The main orchestrator that coordinates configuration
+  management and workflow processing.
+
+- **viz-staging**: Prepares vector data by slicing large files into TMS-aligned
+  tiles, re-projecting data, handling deduplication, and managing file paths.
+
+- **viz-raster**: Converts vector tiles to raster formats (GeoTIFFs for archival
+  and PNGs for web display), with configurable statistics calculation.
+
+- **viz-3dtiles**: Wraps the py3dtiles library to create Cesium 3D tilesets,
+  building hierarchical JSON structures and reading shapefiles.
+
+#### Input Requirements
+
+The visualization workflow accepts vector geospatial files as input:
+
+- Shapefiles (.shp)
+- GeoPackages (.gpkg)
+- GeoJSON (.geojson)
+
+Raster input support (GeoTIFF) is planned for future releases.
+
+#### Use Cases
+
+The visualization workflow is best suited for:
+
+- Large geospatial vector datasets requiring multi-resolution tiling
+- Data that needs both web visualization and archival formats
+- Datasets with complex attribute information to be explored interactively
+- Applications requiring 3D visualization of polygon or point cloud data
 
 For an example of a recipe using the `visualization` workflow, we recommend
 taking a look at the
 [ogdc-recipes viz-workflow recipe](https://github.com/QGreenland-Net/ogdc-recipes/tree/main/recipes/viz-workflow)
 example.
+
+Additional detailed documentation and examples are available in the
+[Permafrost Discovery Gateway viz-info repository](https://github.com/PermafrostDiscoveryGateway/viz-info).
