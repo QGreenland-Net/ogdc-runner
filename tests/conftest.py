@@ -10,6 +10,10 @@ from ogdc_runner.service import db
 
 SHELL_RECIPE_TEST_PATH = Path(__file__).parent / "test_shell_workflow_recipe_dir"
 VIZ_RECIPE_TEST_PATH = Path(__file__).parent / "test_viz_workflow_recipe_dir"
+PARALLEL_SHELL_RECIPE_TEST_PATH = (
+    Path(__file__).parent / "test_parallel_shell_recipe_dir"
+)
+TEMP_OUTPUT_RECIPE_TEST_PATH = Path(__file__).parent / "test_temp_output_recipe_dir"
 
 
 @pytest.fixture
@@ -23,8 +27,13 @@ def test_viz_workflow_recipe_directory() -> Path:
 
 
 @pytest.fixture
+def test_parallel_shell_workflow_recipe_directory() -> Path:
+    return PARALLEL_SHELL_RECIPE_TEST_PATH
+
+
+@pytest.fixture
 def test_temp_output_recipe_directory() -> Path:
-    return Path(__file__).parent / "test_temp_output_recipe_dir"
+    return TEMP_OUTPUT_RECIPE_TEST_PATH
 
 
 @pytest.fixture

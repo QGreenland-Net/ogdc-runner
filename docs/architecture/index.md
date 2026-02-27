@@ -45,6 +45,29 @@ This component:
   docker image that translates submitted OGDC recipes into Argo Workflows for
   execution. See [OGDC Service API](./service.md) for more details.
 
+## Parallel Execution
+
+The ogdc-runner supports parallel execution of workflow tasks via Argo's DAG
+(Directed Acyclic Graph) model. When a recipe enables parallel execution, the
+runner:
+
+1. **Partitions** input data based on the configured strategy (e.g., grouping
+   files)
+2. **Creates** independent Argo tasks for each partition
+3. **Orchestrates** parallel execution with configurable maximum parallelism
+
+The {class}`ogdc_runner.parallel.ParallelExecutionOrchestrator` class manages
+this process, creating Argo Container templates and DAG tasks with proper
+dependencies and parameters. Argo handles task scheduling and resource
+allocation, distributing work across available cluster resources.
+
+Key modules:
+
+- {mod}`ogdc_runner.parallel`: Orchestration logic for parallel task creation
+- {mod}`ogdc_runner.partitioning`: Partitioning strategies for dividing work
+- {mod}`ogdc_runner.models.parallel_config`: Configuration models for parallel
+  execution
+
 ## Aspirational
 
 Original aspirational architecture diagram of the `ogdc-runner` as it relates to
