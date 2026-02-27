@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from functools import cache, cached_property
 from pathlib import Path
-from typing import Literal, Self
+from typing import Any, Literal, Self, TypeAlias
 
 import requests
 from pydantic import (
@@ -17,7 +18,10 @@ from pydantic import (
     model_validator,
 )
 
+from ogdc_runner.dataone.resolver import resolve_dataone_input
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
+
+logger = logging.getLogger(__name__)
 
 
 class OgdcBaseModel(BaseModel):
@@ -28,23 +32,26 @@ class OgdcBaseModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-# Input parameter with type and value
 class InputParam(OgdcBaseModel):
-    """Input parameter for a recipe.
+    """Input parameter for a recipe."""
+
+    type: Literal["url", "pvc_mount", "file_system", "dataone"]
+    # NOTE: this makes it optional. Was getting errors with dataset_identifier for dataone.
+
+
+class UrlInput(InputParam):
+    """Inpurt from URL.
 
     When instantiated with `context={"check_urls": True}`, URL-type parameters
     will be validated to ensure they are accessible via HTTP HEAD request.
     """
 
+    type: Literal["url"] = "url"
     value: AnyUrl | str
-    type: Literal["url", "pvc_mount", "file_system"]
 
     @model_validator(mode="after")
     def validate_url_accessible(self, info: ValidationInfo) -> Self:
         """Validate that URL-type parameters are accessible."""
-        if self.type != "url":
-            return self
-
         context = info.context or {}
         if not context.get("check_urls", False):
             return self
@@ -73,12 +80,63 @@ class InputParam(OgdcBaseModel):
         return self
 
 
+class DataOneInput(InputParam):
+    """DataOne input parameters."""
+
+    type: Literal["dataone"] = "dataone"
+    dataset_identifier: str
+
+    filename: str | None = None
+
+    # Private fields for all matched objects with full metadata
+    dataset_pid: str | None = None
+    resolved_objects: list[dict[str, Any]] = []
+
+    @model_validator(mode="after")
+    def resolve_dataone_inputs(self) -> DataOneInput:
+        """Resolve DataONE dataset identifiers to data object URLs."""
+
+        try:
+            selected_objects = resolve_dataone_input(
+                dataset_identifier=str(self.dataset_identifier),
+                filename=self.filename,
+            )
+
+            if not selected_objects:
+                raise ValueError(
+                    f"No data objects found in dataset {self.dataset_identifier}"
+                )
+
+            # Store all matched objects
+            self.resolved_objects = selected_objects
+            self.dataset_pid = str(self.dataset_identifier)
+
+            matched_files = [obj["filename"] for obj in selected_objects]
+
+            msg = f"Resolved {self.dataset_identifier} -> {len(selected_objects)} file(s): {matched_files}"
+            logger.info(msg)
+
+        except Exception as e:
+            msg = f"Failed to resolve DataONE input {self.dataset_identifier}: {e}"
+            logger.error(msg)
+            raise ValueError(
+                f"Failed to resolve DataONE package {self.dataset_identifier}. "
+                f"Make sure the dataset_identifier is a dataset package identifier (e.g., resource_map_urn:uuid:...). "
+                f"Error: {e}"
+            ) from e
+
+        return self
+
+
+InputParamType: TypeAlias = DataOneInput | UrlInput
+
+
 # Create a model for the recipe input
 class RecipeInput(OgdcBaseModel):
-    params: list[InputParam]
+    params: list[InputParamType]
 
     @field_validator("params")
-    def validate_params(cls, params: list[InputParam]) -> list[InputParam]:
+    def validate_params(cls, params: list[InputParamType]) -> list[InputParamType]:
         """Ensure there's at least one input parameter."""
         if not params:
             error_msg = "At least one input parameter is required"

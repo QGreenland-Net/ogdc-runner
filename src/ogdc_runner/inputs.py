@@ -8,7 +8,7 @@ from hera.workflows import (
 )
 
 from ogdc_runner.exceptions import OgdcWorkflowExecutionError
-from ogdc_runner.models.recipe_config import RecipeConfig
+from ogdc_runner.models.recipe_config import DataOneInput, RecipeConfig, UrlInput
 
 
 def make_fetch_input_template(
@@ -19,30 +19,30 @@ def make_fetch_input_template(
     Supports:
     - HTTP/HTTPS URLs
     - File paths (including PVC paths)
+    - DataONE datasets
     """
     # Create commands to fetch each input
     fetch_commands = []
 
     for param in recipe_config.input.params:
         # Check if the parameter is a URL
-        if param.type == "url":
+        if isinstance(param, UrlInput):
             # It's a URL, use wget
             fetch_commands.append(
                 f"wget --content-disposition -P /output_dir/ {param.value}"
             )
-        elif param.type == "file_system":
-            filename = str(param.value).split("/")[-1]
-            fetch_commands.append(f"cp {param.value} /output_dir/{filename}")
-        elif param.type == "pvc_mount":
-            # TODO: support PVC paths as input.
-            # Because it is a PVC, we expect it to be mounted to the first
-            # step's container, so no move should be necessary.
-            err_msg = "PVC mounts are not yet supported"
-            raise NotImplementedError(err_msg)
-        else:
-            raise OgdcWorkflowExecutionError(
-                f"Unsupported input type: {param.type} for parameter {param.value}"
-            )
+        elif isinstance(param, DataOneInput):
+            # DataONE input - download all resolved objects
+            if param.resolved_objects:
+                for obj in param.resolved_objects:
+                    url = obj["url"]
+                    fetch_commands.append(
+                        f"wget --content-disposition -P /output_dir/ {url}"
+                    )
+            else:
+                raise OgdcWorkflowExecutionError(
+                    f"DataONE input has no resolved objects: {param}"
+                )
 
     # Join all commands with && for sequential execution
     combined_command = " && ".join(fetch_commands)
