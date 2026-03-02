@@ -24,8 +24,7 @@ def test_submit_greenland_ice_sheet_recipe(monkeypatch):
             "submit",
             "--wait",
             "--overwrite",
-            # TODO: change to main once ogdc-recipe PR is merged
-            "github://qgreenland-net:ogdc-recipes@dataone-type/recipes/greenland-ice-sheet",
+            "github://qgreenland-net:ogdc-recipes@main/recipes/greenland-ice-sheet",
         ],
     )
 
