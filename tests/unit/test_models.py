@@ -6,11 +6,11 @@ import pytest
 from pydantic import AnyUrl, ValidationError
 
 from ogdc_runner.models.recipe_config import (
-    InputParam,
     PvcRecipeOutput,
     RecipeConfig,
     RecipeInput,
     ShellWorkflow,
+    UrlInput,
 )
 
 
@@ -18,7 +18,7 @@ def test_recipe_meta(tmpdir):
     fake_sh_file = tmpdir / "foo.sh"
     fake_sh_file.write('echo "FAKE PROCESSING"')
     recipe_input = RecipeInput(
-        params=[InputParam(value=AnyUrl("http://www.example.com"), type="url")]
+        params=[UrlInput(value=AnyUrl("http://www.example.com"))]
     )
     recipe_output = PvcRecipeOutput()
     name = "Test Recipe"
@@ -43,7 +43,7 @@ def test_recipe_meta(tmpdir):
 
 def test_recipe_meta_failure_bad_id():
     recipe_input = RecipeInput(
-        params=[InputParam(value=AnyUrl("http://www.example.com"), type="url")]
+        params=[UrlInput(value=AnyUrl("http://www.example.com"))]
     )
     recipe_output = PvcRecipeOutput()
 
