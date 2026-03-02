@@ -36,7 +36,6 @@ class InputParam(OgdcBaseModel):
     """Input parameter for a recipe."""
 
     type: Literal["url", "pvc_mount", "file_system", "dataone"]
-    # NOTE: this makes it optional. Was getting errors with dataset_identifier for dataone.
 
 
 class UrlInput(InputParam):
