@@ -62,7 +62,7 @@ def _get_output_directory(recipe_id: str, use_input_as_output: bool) -> str:
         use_input_as_output: If True, return `"/mnt/workflow/{recipe_id}/inputs"`. Otherwise `/output_dir`.
 
     Returns:
-        Output directory path
+        Output directory as a string.
     - DataONE datasets
     """
     if use_input_as_output:
