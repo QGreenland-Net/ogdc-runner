@@ -56,7 +56,7 @@ jobs:
           docker build --tag "ghcr.io/qgreenland-net/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}" .
           docker save "ghcr.io/qgreenland-net/${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}" -o docker-image.tar
       - name: "Upload image tarball as artifact"
-        uses: "actions/upload-artifact@v6"
+        uses: "actions/upload-artifact@v7"
         with:
           name: "docker-image-tar"
           path: "docker-image.tar"
@@ -75,7 +75,7 @@ jobs:
     runs-on: "ubuntu-latest"
 
     steps:
-      - uses: "actions/download-artifact@v7"
+      - uses: "actions/download-artifact@v8"
         with:
           name: "Packages"
           path: "dist"
@@ -94,7 +94,7 @@ jobs:
     needs: ["build-python", "build-docker"]
     steps:
       - name: "Download image tarball"
-        uses: "actions/download-artifact@v7"
+        uses: "actions/download-artifact@v8"
         with:
           name: "docker-image-tar"
 
