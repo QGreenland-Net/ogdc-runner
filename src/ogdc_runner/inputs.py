@@ -12,7 +12,7 @@ from hera.workflows.models import VolumeMount
 
 from ogdc_runner.argo import OGDC_WORKFLOW_PVC
 from ogdc_runner.exceptions import OgdcWorkflowExecutionError
-from ogdc_runner.models.recipe_config import RecipeConfig
+from ogdc_runner.models.recipe_config import DataOneInput, RecipeConfig, UrlInput
 
 
 def make_fetch_input_template(
@@ -63,6 +63,7 @@ def _get_output_directory(recipe_id: str, use_input_as_output: bool) -> str:
 
     Returns:
         Output directory path
+    - DataONE datasets
     """
     if use_input_as_output:
         return f"/mnt/workflow/{recipe_id}/inputs"
@@ -86,16 +87,22 @@ def _build_fetch_commands(params: list[Any], output_dir: str) -> str:
     """
     commands = []
 
-    for param in params:
-        if param.type == "url":
-            commands.append(_build_url_fetch_command(param.value, output_dir))
-        elif param.type == "pvc_mount":
-            error_msg = "PVC mount inputs are not yet supported"
-            raise NotImplementedError(error_msg)
-        else:
-            raise OgdcWorkflowExecutionError(
-                f"Unsupported input type: {param.type} for parameter {param.value}"
-            )
+    for param in recipe_config.input.params:
+        # Check if the parameter is a URL
+        if isinstance(param, UrlInput):
+           commands.append(_build_url_fetch_command(param.value, output_dir))
+        elif isinstance(param, DataOneInput):
+            # DataONE input - download all resolved objects
+            if param.resolved_objects:
+                for obj in param.resolved_objects:
+                    url = obj["url"]
+                    fetch_commands.append(
+                        f"wget --content-disposition -P /output_dir/ {url}"
+                    )
+            else:
+                raise OgdcWorkflowExecutionError(
+                    f"DataONE input has no resolved objects: {param}"
+                )
 
     return " && ".join(commands) if commands else "echo 'No input files to fetch'"
 
