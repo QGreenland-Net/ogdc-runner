@@ -24,6 +24,7 @@ def make_fetch_input_template(
     Supports:
     - HTTP/HTTPS URLs
     - File paths (including PVC paths)
+    - DataONE datasets
 
     Args:
         recipe_config: Recipe configuration containing input parameters
@@ -63,7 +64,6 @@ def _get_output_directory(recipe_id: str, use_input_as_output: bool) -> str:
 
     Returns:
         Output directory as a string.
-    - DataONE datasets
     """
     if use_input_as_output:
         return f"/mnt/workflow/{recipe_id}/inputs"
