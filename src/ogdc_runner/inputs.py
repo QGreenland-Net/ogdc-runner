@@ -90,7 +90,7 @@ def _build_fetch_commands(params: list[Any], output_dir: str) -> str:
     for param in recipe_config.input.params:
         # Check if the parameter is a URL
         if isinstance(param, UrlInput):
-           commands.append(_build_url_fetch_command(param.value, output_dir))
+            commands.append(_build_url_fetch_command(param.value, output_dir))
         elif isinstance(param, DataOneInput):
             # DataONE input - download all resolved objects
             if param.resolved_objects:
