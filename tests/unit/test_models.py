@@ -7,7 +7,6 @@ from pydantic import AnyUrl, ValidationError
 
 from ogdc_runner.models.recipe_config import (
     DataOneRecipeOutput,
-    InputParam,
     ParallelConfig,
     PvcRecipeOutput,
     RecipeConfig,
@@ -130,9 +129,9 @@ def test_recipe_config_with_parallel_workflow(tmpdir):
 
     recipe_input = RecipeInput(
         params=[
-            InputParam(value=AnyUrl("http://www.example.com/file1.txt"), type="url"),
-            InputParam(value=AnyUrl("http://www.example.com/file2.txt"), type="url"),
-            InputParam(value=AnyUrl("http://www.example.com/file3.txt"), type="url"),
+            UrlInput(value=AnyUrl("http://www.example.com/file1.txt"), type="url"),
+            UrlInput(value=AnyUrl("http://www.example.com/file2.txt"), type="url"),
+            UrlInput(value=AnyUrl("http://www.example.com/file3.txt"), type="url"),
         ]
     )
     recipe_output = DataOneRecipeOutput(dataone_id="12345")

@@ -7,10 +7,10 @@ import pytest
 from ogdc_runner.models.parallel_config import ExecutionFunction
 from ogdc_runner.models.recipe_config import (
     DataOneRecipeOutput,
-    InputParam,
     RecipeConfig,
     RecipeInput,
     ShellWorkflow,
+    UrlInput,
 )
 from ogdc_runner.workflow.shell import ShellParallelExecutionOrchestrator
 
@@ -25,7 +25,7 @@ def sample_recipe_config(tmpdir):
         name="Test Parallel Recipe",
         input=RecipeInput(
             params=[
-                InputParam(value=f"https://example.com/file{i}.txt", type="url")
+                UrlInput(value=f"https://example.com/file{i}.txt", type="url")
                 for i in range(1, 6)
             ]
         ),

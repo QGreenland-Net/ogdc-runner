@@ -7,6 +7,7 @@ a unit of work that will be executed in parallel.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 from loguru import logger
@@ -15,11 +16,15 @@ from ogdc_runner.models.parallel_config import (
     ExecutionFunction,
     FilePartition,
 )
-from ogdc_runner.models.recipe_config import InputParam, ParallelConfig
+from ogdc_runner.models.recipe_config import (
+    DataOneInput,
+    ParallelConfig,
+    UrlInput,
+)
 
 
 def create_partitions(
-    inputs: list[InputParam] | list[Path],
+    inputs: Sequence[DataOneInput | UrlInput] | Sequence[Path],
     execution_function: ExecutionFunction,
     parallel_config: ParallelConfig | None = None,
 ) -> list[FilePartition]:
@@ -53,7 +58,9 @@ def create_partitions(
     return partitions
 
 
-def _extract_file_paths(inputs: list[InputParam] | list[Path]) -> list[str]:
+def _extract_file_paths(
+    inputs: Sequence[DataOneInput | UrlInput] | Sequence[Path],
+) -> list[str]:
     """Extract file paths or URLs from inputs.
 
     Handles both InputParam objects (from recipe config) and Path objects

@@ -3,14 +3,14 @@ from __future__ import annotations
 import pytest
 
 from ogdc_runner.models.parallel_config import ExecutionFunction, FilePartition
-from ogdc_runner.models.recipe_config import InputParam, ParallelConfig
+from ogdc_runner.models.recipe_config import ParallelConfig, UrlInput
 from ogdc_runner.partitioning import create_partitions
 
 
 class TestPartitioning:
     def test_create_partitions_with_input_params(self):
         inputs = [
-            InputParam(value=f"https://example.com/file{i}.txt", type="url")
+            UrlInput(value=f"https://example.com/file{i}.txt", type="url")
             for i in range(1, 6)
         ]
         execution_func = ExecutionFunction(name="cmd-0", command="echo test")
@@ -32,7 +32,7 @@ class TestPartitioning:
 
     def test_create_partitions_without_parallel_config(self):
         inputs = [
-            InputParam(value=f"https://example.com/file{i}.txt", type="url")
+            UrlInput(value=f"https://example.com/file{i}.txt", type="url")
             for i in range(1, 3)
         ]
         execution_func = ExecutionFunction(name="cmd-0", command="echo test")
