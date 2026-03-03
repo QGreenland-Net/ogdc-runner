@@ -87,18 +87,16 @@ def _build_fetch_commands(params: list[Any], output_dir: str) -> str:
     """
     commands = []
 
-    for param in recipe_config.input.params:
+    for param in params:
         # Check if the parameter is a URL
         if isinstance(param, UrlInput):
-            commands.append(_build_url_fetch_command(param.value, output_dir))
+            commands.append(_build_url_fetch_command(param.url, output_dir))
         elif isinstance(param, DataOneInput):
             # DataONE input - download all resolved objects
             if param.resolved_objects:
                 for obj in param.resolved_objects:
                     url = obj["url"]
-                    fetch_commands.append(
-                        f"wget --content-disposition -P /output_dir/ {url}"
-                    )
+                    commands.append(f"wget --content-disposition -P /output_dir/ {url}")
             else:
                 raise OgdcWorkflowExecutionError(
                     f"DataONE input has no resolved objects: {param}"
