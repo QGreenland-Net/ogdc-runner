@@ -106,7 +106,7 @@ class DataOneInput(InputParam):
 
     # Private fields for all matched objects with full metadata
     dataset_pid: str | None = None
-    resolved_objects: list[dict[str, Any]] = []
+    resolved_objects: list[dict[str, Any]] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def resolve_dataone_inputs(self) -> DataOneInput:
@@ -237,7 +237,7 @@ class ShellWorkflow(Workflow):
     sh_file: str | Path = "recipe.sh"
     # Optional parallel execution configuration
     parallel: ParallelConfig = Field(
-        default_factory=lambda: ParallelConfig(),
+        default_factory=ParallelConfig,
         description="Configuration for parallel execution",
     )
 
@@ -309,7 +309,7 @@ class VizWorkflow(Workflow):
 
     # Optional parallel execution configuration
     parallel: ParallelConfig = Field(
-        default_factory=lambda: ParallelConfig(),
+        default_factory=ParallelConfig,
         description="Configuration for parallel execution",
     )
 
