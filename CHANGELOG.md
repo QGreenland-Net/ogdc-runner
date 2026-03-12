@@ -7,6 +7,7 @@
   storage via the `ogdc-runner get-output` CLI.
 - Add DataONE input type for fetching datasets directly from DataONE
   repositories
+- Add `parallel-shell` recipe type and related support for executing shell recipes in parallel. 
 
 # v0.2.0
 
