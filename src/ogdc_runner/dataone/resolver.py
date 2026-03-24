@@ -48,7 +48,7 @@ class DataONEResolver:
         params = {
             "q": f'resourceMap:"{dataset_identifier}" AND -formatType:METADATA',
             "fl": "id,title,formatId,size,fileName,abstract,description",
-            "rows": 100,
+            "rows": 200,
             "wt": "json",
         }
 
