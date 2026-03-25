@@ -54,6 +54,7 @@ class DataONEResolver:
                     "q": f'resourceMap:"{dataset_identifier}" AND -formatType:METADATA',
                     "fl": "id,title,formatId,size,fileName,abstract,description",
                     "rows": page_size,
+                    "start": start,
                     "wt": "json",
                 }
 
