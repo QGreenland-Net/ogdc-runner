@@ -43,30 +43,48 @@ class DataONEResolver:
         msg = f"Resolving dataset: {dataset_identifier}"
         logger.info(msg)
 
-        # Query Solr for objects in this dataset
         solr_url = f"{self.member_node}/v2/query/solr/"
-        params = {
-            "q": f'resourceMap:"{dataset_identifier}" AND -formatType:METADATA',
-            "fl": "id,title,formatId,size,fileName,abstract,description",
-            "rows": 100,
-            "wt": "json",
-        }
+        page_size = 50
+        start = 0
+        all_docs = []
 
         try:
-            response = requests.get(solr_url, params=params, timeout=30)  # type: ignore[arg-type]
-            response.raise_for_status()
-            data = response.json()
+            while True:
+                params = {
+                    "q": f'resourceMap:"{dataset_identifier}" AND -formatType:METADATA',
+                    "fl": "id,title,formatId,size,fileName,abstract,description",
+                    "rows": page_size,
+                    "start": start,
+                    "wt": "json",
+                }
 
-            docs = data.get("response", {}).get("docs", [])
+                response = requests.get(solr_url, params=params, timeout=30)  # type: ignore[arg-type]
+                response.raise_for_status()
+                data = response.json()
 
-            if not docs:
+                response_body = data.get("response", {})
+                num_found = response_body.get("numFound", 0)
+                docs = response_body.get("docs", [])
+
+                if not docs:
+                    break
+
+                all_docs.extend(docs)
+
+                # Stop if we've fetched all results
+                if len(all_docs) >= num_found:
+                    break
+
+                start += page_size
+
+            if not all_docs:
                 msg = f"No objects found for dataset {dataset_identifier}"
                 logger.warning(msg)
                 return []
 
             # Process each document
             data_objects = []
-            for doc in docs:
+            for doc in all_docs:
                 obj_id = doc.get("id")
 
                 # Build object info
@@ -79,7 +97,6 @@ class DataONEResolver:
                     "entity_name": self._get_entity_name(doc),
                     "entity_description": "",  # will be generated during publishing
                 }
-
                 data_objects.append(obj_info)
 
             msg = f"Found {len(data_objects)} data objects in dataset"
