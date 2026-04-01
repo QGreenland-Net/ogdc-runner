@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from functools import cache, cached_property
 from pathlib import Path
 from typing import Any, Literal, Self, TypeAlias
@@ -322,7 +323,13 @@ class VizWorkflow(Workflow):
     # configuration.
     config_file: str | Path | None = None
 
-    batch_size: int = 250
+    viz_image: str = Field(
+        default_factory=lambda: os.environ.get(
+            "VIZ_WORKFLOW_IMAGE",
+            "ghcr.io/permafrostdiscoverygateway/viz-workflow:latest",
+        ),
+        description="Container image for viz worker scripts. Reads VIZ_WORKFLOW_IMAGE env var by default.",
+    )
 
     # Optional parallel execution configuration
     parallel: ParallelConfig = Field(
