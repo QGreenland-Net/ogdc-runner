@@ -33,17 +33,30 @@ from ogdc_runner.partitioning import create_partitions
 
 logger = logging.getLogger(__name__)
 
-# Container image for all viz @script worker functions.
-# Override by setting the VIZ_WORKFLOW_IMAGE environment variable on the
-# ogdc-runner service. Must match the `viz_image` field in VizWorkflow.
+# Set up constants
+
+# Viz worker container image.  Override via VIZ_WORKFLOW_IMAGE env var.
 VIZ_WORKFLOW_IMAGE: str = os.environ.get(
     "VIZ_WORKFLOW_IMAGE",
     "ghcr.io/permafrostdiscoverygateway/viz-workflow:latest",
 )
 
-# ---------------------------------------------------------------------------
-# Resource profiles
-# ---------------------------------------------------------------------------
+_DEFAULT_PARTITION_SIZE = 1000
+
+_WORKFLOW_VOLUME_MOUNT = VolumeMount(
+    name=OGDC_WORKFLOW_PVC.name,
+    mount_path="/mnt/workflow",
+)
+
+# Shared kwargs applied to every viz @script decorator.
+_VIZ_SCRIPT_KWARGS: dict = dict(
+    image=VIZ_WORKFLOW_IMAGE,
+    image_pull_policy="IfNotPresent",
+    command=["python"],
+    volume_mounts=[_WORKFLOW_VOLUME_MOUNT],
+)
+
+# Resource requirements for each stage.
 _STAGE_RESOURCES = ResourceRequirements(
     requests={"cpu": "500m", "memory": "2Gi"},
     limits={"cpu": "2", "memory": "6Gi"},
@@ -65,12 +78,9 @@ _WORKER_RETRY = RetryStrategy(
     retry_policy="OnTransientError",
 )
 
-
-
 # ---------------------------------------------------------------------------
 # Stage 1 — Stage input files → max-z vector tiles
 # ---------------------------------------------------------------------------
-
 
 @script(
     name="stage-files",
@@ -79,12 +89,7 @@ _WORKER_RETRY = RetryStrategy(
         Parameter(name="recipe-id"),
         Parameter(name="partition-id"),
     ],
-    image=VIZ_WORKFLOW_IMAGE,
-    image_pull_policy="IfNotPresent",
-    command=["python"],
-    volume_mounts=[
-        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
-    ],
+    **_VIZ_SCRIPT_KWARGS,
     resources=_STAGE_RESOURCES,
     retry_strategy=_WORKER_RETRY,
 )
@@ -157,12 +162,7 @@ def stage_file_parallel() -> None:
             path="/tmp/staged_tiles_manifest.json",
         ),
     ],
-    image=VIZ_WORKFLOW_IMAGE,
-    image_pull_policy="IfNotPresent",
-    command=["python"],
-    volume_mounts=[
-        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
-    ],
+    **_VIZ_SCRIPT_KWARGS,
     resources=_DISCOVERY_RESOURCES,
 )
 def discover_staged_tiles() -> None:
@@ -233,12 +233,7 @@ def discover_staged_tiles() -> None:
             path="/tmp/parent_tiles_manifest.json",
         ),
     ],
-    image=VIZ_WORKFLOW_IMAGE,
-    image_pull_policy="IfNotPresent",
-    command=["python"],
-    volume_mounts=[
-        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
-    ],
+    **_VIZ_SCRIPT_KWARGS,
     resources=_DISCOVERY_RESOURCES,
 )
 def discover_parent_tiles() -> None:
@@ -319,12 +314,7 @@ def discover_parent_tiles() -> None:
             path="/tmp/geotiffs_manifest.json",
         ),
     ],
-    image=VIZ_WORKFLOW_IMAGE,
-    image_pull_policy="IfNotPresent",
-    command=["python"],
-    volume_mounts=[
-        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
-    ],
+    **_VIZ_SCRIPT_KWARGS,
     resources=_DISCOVERY_RESOURCES,
 )
 def discover_all_geotiffs() -> None:
@@ -393,12 +383,7 @@ def discover_all_geotiffs() -> None:
         Parameter(name="recipe-id"),
         Parameter(name="staged-tiles-manifest"),
     ],
-    image=VIZ_WORKFLOW_IMAGE,
-    image_pull_policy="IfNotPresent",
-    command=["python"],
-    volume_mounts=[
-        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
-    ],
+    **_VIZ_SCRIPT_KWARGS,
     resources=_RASTER_RESOURCES,
     retry_strategy=_WORKER_RETRY,
 )
@@ -447,12 +432,7 @@ def rasterize_max_z_parallel() -> None:
         Parameter(name="recipe-id"),
         Parameter(name="parent-tiles-manifest"),
     ],
-    image=VIZ_WORKFLOW_IMAGE,
-    image_pull_policy="IfNotPresent",
-    command=["python"],
-    volume_mounts=[
-        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
-    ],
+    **_VIZ_SCRIPT_KWARGS,
     resources=_RASTER_RESOURCES,
     retry_strategy=_WORKER_RETRY,
 )
@@ -503,12 +483,7 @@ def create_composite_z_parallel() -> None:
         Parameter(name="recipe-id"),
         Parameter(name="geotiff-manifest"),
     ],
-    image=VIZ_WORKFLOW_IMAGE,
-    image_pull_policy="IfNotPresent",
-    command=["python"],
-    volume_mounts=[
-        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
-    ],
+    **_VIZ_SCRIPT_KWARGS,
     resources=_STAGE_RESOURCES,
     retry_strategy=_WORKER_RETRY,
 )
@@ -559,12 +534,7 @@ def create_web_tile_parallel() -> None:
         Parameter(name="recipe-id"),
         Parameter(name="staged-tiles-manifest"),
     ],
-    image=VIZ_WORKFLOW_IMAGE,
-    image_pull_policy="IfNotPresent",
-    command=["python"],
-    volume_mounts=[
-        VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
-    ],
+    **_VIZ_SCRIPT_KWARGS,
     resources=_THREEDTILE_RESOURCES,
     retry_strategy=_WORKER_RETRY,
 )
@@ -658,7 +628,7 @@ def make_and_submit_viz_workflow(
 
     parallel_cfg = recipe_config.workflow.parallel  # type: ignore[union-attr]
     parallelism: int | None = (
-        parallel_cfg.max_parallelism or MAX_PARALLEL_LIMIT
+        (parallel_cfg.max_parallelism or MAX_PARALLEL_LIMIT)
         if parallel_cfg.enabled
         else None
     )
@@ -682,8 +652,7 @@ def make_and_submit_viz_workflow(
     ) as w:
         config_content = recipe_config.workflow.get_config_file_json()  # type: ignore[union-attr]
 
-        # Resolve partition size; recipe-level setting overrides default of 1000.
-        partition_size: int = parallel_cfg.partition_size or 1000
+        partition_size: int = parallel_cfg.partition_size or _DEFAULT_PARTITION_SIZE
 
         # Parse workflow config for z-range and feature flags.
         workflow_config: dict = json.loads(config_content)
@@ -804,9 +773,7 @@ EOF"""
             final_composite_task: Task | None = None
             if enable_raster_parents:
                 prev_task: Task | None = (
-                    rasterize_task
-                    or staged_tiles_discovery_task
-                    or None
+                    rasterize_task or staged_tiles_discovery_task
                 )
 
                 for z in composite_z_levels:
