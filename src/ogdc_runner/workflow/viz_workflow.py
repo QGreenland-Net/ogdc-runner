@@ -724,44 +724,164 @@ EOF"""
             ],
         )
 
-        # Set up the DAG
         with DAG(name="main"):
-            # Step1: Stage the viz-config.json file
-            # This is the configuration file for the visualization workflow
-            # It also creates necessary directories required for the workflow
-            # to run successfully
-            stage_config_task = Task(
-                name="stage-viz-config",
-                template=stage_config_file_template,
+            config_task = Task(
+                name="setup-config",
+                template=setup_template,
             )
 
-            # Step 2: Batching step
-            batch_task = batch_process(
-                arguments={
-                    "input_url": input_url,
-                    "recipe_id": recipe_config.id,
-                    "num_features": recipe_config.workflow.batch_size,
-                },
-            )
+            # Track tail(s) of the in-flight pipeline for dependency chaining.
+            current_deps: list = [config_task]
 
-            # Step 3: Tiling step
-            # This step processes each chunk of vector data in parallel
-            # using the tiling_process script defined above
-            stage_task = tiling_process(
-                arguments={
-                    "chunk-filepath": "{{item}}",
-                    "recipe_id": recipe_config.id,
-                },
-                with_param=batch_task.get_result_as("result"),
-            )
+            # ============================================================
+            # STAGE 1 — Stage input files at max-z   (with_param fan-out)
+            # ============================================================
+            if enable_stager:
+                # Compute partitions at submission time and serialise as
+                # JSON array-of-arrays for Argo withParam.
+                #
+                # NOTE: For datasets with > ~10 000 input files the manifest
+                # will grow large in the workflow spec.  A future hardening
+                # step will write manifests to the PVC during setup and pass
+                # only partition indices via withParam.
+                partitions = create_partitions(
+                    inputs=recipe_config.input.params,
+                    execution_function=ExecutionFunction(
+                        name="stage-files", function=stage_file_parallel
+                    ),
+                    parallel_config=parallel_cfg,
+                )
+                stage_partitions_json = json.dumps([p.files for p in partitions])
+                logger.info(
+                    "stage1 partitions=%d total_files=%d",
+                    len(partitions),
+                    sum(len(p.files) for p in partitions),
+                )
 
-            # Define the workflow structure
-            # tiling depends on both download and batch tasks
-            [  # type: ignore[operator]
-                stage_config_task,
-                batch_task,
-            ] >> stage_task
+                stage_task = stage_file_parallel(
+                    arguments={
+                        "recipe-id": recipe_config.id,
+                        "partition-manifest": "{{item}}",
+                        "partition-id": "{{loop.index}}",
+                    },
+                    with_param=stage_partitions_json,
+                )
+                for dep in current_deps:
+                    dep >> stage_task
+                current_deps = [stage_task]
 
-    # Submit the workflow
-    workflow_name = submit_workflow(w, wait=wait)
+            # ============================================================
+            # Discovery — enumerate staged tiles (shared by Stage 2 + 5)
+            # ============================================================
+            staged_tiles_discovery_task: Task | None = None
+            if enable_raster or enable_3dtiles:
+                staged_tiles_discovery_task = discover_staged_tiles(
+                    arguments={
+                        "recipe-id": recipe_config.id,
+                        "partition-size": str(partition_size),
+                    }
+                )
+                for dep in current_deps:
+                    dep >> staged_tiles_discovery_task
+
+            # ============================================================
+            # STAGE 2 — Rasterise at max-z   (discovery → with_param)
+            # ============================================================
+            rasterize_task: Task | None = None
+            if enable_raster and staged_tiles_discovery_task is not None:
+                rasterize_task = rasterize_max_z_parallel(
+                    arguments={
+                        "recipe-id": recipe_config.id,
+                        "staged-tiles-manifest": "{{item}}",
+                    },
+                    with_param=staged_tiles_discovery_task.get_result_as("result"),
+                )
+                staged_tiles_discovery_task >> rasterize_task
+
+            # ============================================================
+            # STAGE 3 — Composite tiles  (sequential z, with_param tiles)
+            # ============================================================
+            final_composite_task: Task | None = None
+            if enable_raster_parents:
+                prev_task: Task | None = (
+                    rasterize_task
+                    or staged_tiles_discovery_task
+                    or None
+                )
+
+                for z in composite_z_levels:
+                    discover_parents_task = discover_parent_tiles(
+                        name=f"discover-parents-z-{z}",
+                        arguments={
+                            "recipe-id": recipe_config.id,
+                            "z-level": str(z),
+                            "partition-size": str(partition_size),
+                        },
+                    )
+                    create_composites_task = create_composite_z_parallel(
+                        name=f"create-composites-z-{z}",
+                        arguments={
+                            "recipe-id": recipe_config.id,
+                            "parent-tiles-manifest": "{{item}}",
+                        },
+                        with_param=discover_parents_task.get_result_as("result"),
+                    )
+
+                    if prev_task is not None:
+                        prev_task >> discover_parents_task
+                    else:
+                        for dep in current_deps:
+                            dep >> discover_parents_task
+                        current_deps = []  # consumed on first z iteration only
+
+                    discover_parents_task >> create_composites_task
+                    prev_task = create_composites_task
+
+                final_composite_task = prev_task
+
+            # ============================================================
+            # Discovery 3 + STAGE 4 — Web tiles  (discovery → with_param)
+            # ============================================================
+            if enable_web_tiles:
+                discover_geotiffs_task = discover_all_geotiffs(
+                    arguments={
+                        "recipe-id": recipe_config.id,
+                        "partition-size": str(partition_size),
+                    }
+                )
+
+                raster_anchor: Task | None = (
+                    final_composite_task
+                    or rasterize_task
+                    or staged_tiles_discovery_task
+                )
+                if raster_anchor is not None:
+                    raster_anchor >> discover_geotiffs_task
+                else:
+                    for dep in current_deps:
+                        dep >> discover_geotiffs_task
+
+                web_tile_task = create_web_tile_parallel(
+                    arguments={
+                        "recipe-id": recipe_config.id,
+                        "geotiff-manifest": "{{item}}",
+                    },
+                    with_param=discover_geotiffs_task.get_result_as("result"),
+                )
+                discover_geotiffs_task >> web_tile_task
+
+            # ============================================================
+            # STAGE 5 — 3D tiles, reuses Stage-1 discovery (with_param)
+            # ============================================================
+            if enable_3dtiles and staged_tiles_discovery_task is not None:
+                threedtile_task = create_3dtile_parallel(
+                    arguments={
+                        "recipe-id": recipe_config.id,
+                        "staged-tiles-manifest": "{{item}}",
+                    },
+                    with_param=staged_tiles_discovery_task.get_result_as("result"),
+                )
+                staged_tiles_discovery_task >> threedtile_task
+
+    workflow_name: str = submit_workflow(w, wait=wait)
     return workflow_name
