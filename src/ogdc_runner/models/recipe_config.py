@@ -29,7 +29,10 @@ class ParallelConfig(OgdcBaseModel):
     Attributes:
         enabled: Whether parallel execution is enabled
         partition_strategy: Strategy for dividing work ("files" or "file_chunks")
-        partition_size: Number of partitions or items per chunk, depending on strategy
+        partition_size: Number of files per partition; None means use the
+            orchestrator default (typically 1 000)
+        max_parallelism: Maximum number of concurrent Argo pods across all
+            parallel stages; None means no cap beyond the cluster default
     """
 
     enabled: bool = Field(
@@ -45,8 +48,22 @@ class ParallelConfig(OgdcBaseModel):
     )
     partition_size: int | None = Field(
         default=None,
-        description="Size parameter for the chosen partitioning strategy",
+        description="Number of files per partition. Must be >= 1 when set.",
     )
+    max_parallelism: int | None = Field(
+        default=None,
+        description=(
+            "Maximum number of concurrent Argo pods for this workflow. "
+            "Must be >= 1 when set."
+        ),
+    )
+
+    @field_validator("partition_size", "max_parallelism")
+    @classmethod
+    def must_be_positive(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError("must be >= 1")
+        return v
 
 
 class InputParam(OgdcBaseModel):

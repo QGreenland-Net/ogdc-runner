@@ -14,6 +14,7 @@ from ogdc_runner.models.recipe_config import (
     ShellWorkflow,
     UrlInput,
 )
+from ogdc_runner.models.parallel_config import ExecutionFunction, FilePartition
 
 
 def test_recipe_meta(tmpdir):
@@ -69,6 +70,7 @@ def test_parallel_config_default():
     assert config.enabled is False
     assert config.partition_strategy == "files"
     assert config.partition_size is None
+    assert config.max_parallelism is None
 
 
 def test_parallel_config_custom():
@@ -77,11 +79,95 @@ def test_parallel_config_custom():
         enabled=True,
         partition_strategy="files",
         partition_size=5,
+        max_parallelism=100,
     )
 
     assert config.enabled is True
     assert config.partition_strategy == "files"
     assert config.partition_size == 5
+    assert config.max_parallelism == 100
+
+
+@pytest.mark.parametrize("field", ["partition_size", "max_parallelism"])
+@pytest.mark.parametrize("bad_value", [0, -1, -100])
+def test_parallel_config_rejects_non_positive(field, bad_value):
+    """partition_size and max_parallelism must be >= 1 when provided."""
+    with pytest.raises(ValidationError):
+        ParallelConfig(**{field: bad_value})
+
+
+@pytest.mark.parametrize("field", ["partition_size", "max_parallelism"])
+def test_parallel_config_accepts_none(field):
+    """partition_size and max_parallelism may be omitted (None = use default)."""
+    config = ParallelConfig(**{field: None})
+    assert getattr(config, field) is None
+
+
+# ---------------------------------------------------------------------------
+# ExecutionFunction
+# ---------------------------------------------------------------------------
+
+
+def test_execution_function_command_only():
+    ef = ExecutionFunction(name="run-stage", command="bash recipe.sh")
+    assert ef.command == "bash recipe.sh"
+    assert ef.function is None
+
+
+def test_execution_function_callable_only():
+    fn = lambda: None  # noqa: E731
+    ef = ExecutionFunction(name="run-stage", function=fn)
+    assert ef.function is fn
+    assert ef.command is None
+
+
+def test_execution_function_neither_raises():
+    with pytest.raises(Exception, match="Must specify exactly one of"):
+        ExecutionFunction(name="run-stage")
+
+
+def test_execution_function_both_raises():
+    with pytest.raises(Exception, match="Can only specify one of"):
+        ExecutionFunction(name="run-stage", command="echo hi", function=lambda: None)
+
+
+def test_execution_function_extra_field_forbidden():
+    with pytest.raises(ValidationError):
+        ExecutionFunction(name="run-stage", command="echo hi", unknown="x")
+
+
+# ---------------------------------------------------------------------------
+# FilePartition
+# ---------------------------------------------------------------------------
+
+
+def test_file_partition_basic():
+    fp = FilePartition(
+        partition_id=0,
+        files=["gs://bucket/a.fgb", "gs://bucket/b.fgb"],
+        execution_function="stage-files",
+    )
+    assert fp.partition_id == 0
+    assert len(fp.files) == 2
+    assert fp.execution_function == "stage-files"
+    assert fp.metadata == {}
+
+
+def test_file_partition_with_metadata():
+    fp = FilePartition(
+        partition_id=3,
+        files=["a.fgb"],
+        execution_function="stage-files",
+        metadata={"num_files": 1, "region": "arctic"},
+    )
+    assert fp.metadata["num_files"] == 1
+    assert fp.metadata["region"] == "arctic"
+
+
+def test_file_partition_empty_files():
+    """Empty file list is structurally valid (orchestrator decides whether to skip)."""
+    fp = FilePartition(partition_id=0, files=[], execution_function="stage-files")
+    assert fp.files == []
 
 
 def test_shell_workflow_with_parallel_config(tmpdir):
