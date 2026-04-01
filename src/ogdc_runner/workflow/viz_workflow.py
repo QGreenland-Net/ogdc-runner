@@ -146,7 +146,7 @@ def stage_file_parallel() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Discovery 1 — enumerate staged FGB tiles → rasterise + 3D-tile fan-out
+# Discovery 1 — enumerate staged GeoPackage tiles → rasterise + 3D-tile fan-out
 # ---------------------------------------------------------------------------
 
 
@@ -166,7 +166,7 @@ def stage_file_parallel() -> None:
     resources=_DISCOVERY_RESOURCES,
 )
 def discover_staged_tiles() -> None:
-    """Discover staged FGB tiles at max z-level and emit chunked partition manifests.
+    """Discover staged GeoPackage tiles at max z-level and emit chunked partition manifests.
 
     Uses os.scandir (lazy, no full-buffer glob) to avoid OOM on large dirs.
     Outputs a JSON array-of-arrays to stdout for Argo withParam fan-out.
@@ -197,7 +197,7 @@ def discover_staged_tiles() -> None:
     staged_files = [
         e.path
         for e in os.scandir(staged_dir)
-        if e.is_file() and e.name.endswith(".fgb")
+        if e.is_file() and e.name.endswith(".gpkg")
     ]
 
     log.info("max_z=%d staged_files=%d", max_z, len(staged_files))
@@ -373,7 +373,7 @@ def discover_all_geotiffs() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Stage 2 — Rasterise staged FGB tiles → GeoTIFF at max z-level
+# Stage 2 — Rasterise staged GeoPackage tiles → GeoTIFF at max z-level
 # ---------------------------------------------------------------------------
 
 
@@ -388,7 +388,7 @@ def discover_all_geotiffs() -> None:
     retry_strategy=_WORKER_RETRY,
 )
 def rasterize_max_z_parallel() -> None:
-    """Rasterise a partition of staged FGB vector files to GeoTIFF at max z-level."""
+    """Rasterise a partition of staged GeoPackage vector files to GeoTIFF at max z-level."""
     import json
     import logging
     import sys
@@ -524,7 +524,7 @@ def create_web_tile_parallel() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Stage 5 — Convert staged FGB vectors → Cesium 3D tiles (B3DM/GLB)
+# Stage 5 — Convert staged GeoPackage vectors → Cesium 3D tiles (B3DM/GLB)
 # ---------------------------------------------------------------------------
 
 
@@ -539,7 +539,7 @@ def create_web_tile_parallel() -> None:
     retry_strategy=_WORKER_RETRY,
 )
 def create_3dtile_parallel() -> None:
-    """Convert staged FGB vector tiles to Cesium 3D tiles (B3DM/GLB)."""
+    """Convert staged GeoPackage vector tiles to Cesium 3D tiles (B3DM/GLB)."""
     import json
     import logging
     import sys
@@ -585,8 +585,8 @@ def make_and_submit_viz_workflow(
 
     Implements a 5-stage parallel pipeline with strict z-level ordering:
 
-    Stage 1  — Stage input files → max-z FGB vector tiles      (with_param fan-out)
-    Stage 2  — Rasterise max-z FGB tiles → GeoTIFFs            (discovery → with_param)
+    Stage 1  — Stage input files → max-z GeoPackage tiles      (with_param fan-out)
+    Stage 2  — Rasterise max-z GeoPackage tiles → GeoTIFFs     (discovery → with_param)
     Stage 3  — Build composite parent tiles from max-z-1→min-z (sequential z, with_param tiles)
     Stage 4  — Convert GeoTIFFs → PNG web tiles                (discovery → with_param)
     Stage 5  — Convert staged vectors → Cesium 3D tiles        (discovery reuse → with_param)
