@@ -1,0 +1,19 @@
+name: "Test parallel shell workflow"
+input:
+  params:
+    - value: "https://demo.arcticdata.io/tiles/3dtt/QGnet/processing/ib/input/ice_basins_filled.gpkg"
+      type: "url"
+    - value: "https://demo.arcticdata.io/tiles/3dtt/QGnet/processing/lb/input/land_basins_filled.gpkg"
+      type: "url"
+    - value: "https://demo.arcticdata.io/tiles/3dtt/QGnet/processing/sl100/input/nunagis_salt_or_saline_lake_100m_zones.gpkg"
+      type: "url"
+    - value: "https://demo.arcticdata.io/tiles/3dtt/QGnet/processing/np/input/nunagis_national_park.gpkg"
+      type: "url"
+    - value: "https://demo.arcticdata.io/tiles/3dtt/QGnet/processing/goose/input/nunagis_goose_protected_areas.gpkg"
+      type: "url"
+workflow:
+  type: "shell"
+  parallel:
+    enabled: true
+    partition_strategy: "files"
+    partition_size: 2

@@ -7,6 +7,9 @@ from typing import Any
 import pytest
 from hera.workflows import Container
 
+from ogdc_runner.argo import OgdcWorkflow
+from ogdc_runner.recipe import get_recipe_config
+
 
 # Patch sys.modules to allow re-importing the argo module after env changes
 def reload_argo_module(_: object) -> Any:
@@ -25,7 +28,7 @@ def reload_argo_module(_: object) -> Any:
 
 env_test_settings = [
     # when ENVIRONMENT=local, the `ogdc-runner` image should be used
-    ("local", "ogdc-runner:ogdc_runner_image_tag_test", "Never"),
+    ("local", "ogdc-runner:ogdc_runner_image_tag_test", "IfNotPresent"),
     # when ENVIRONMENT=production, the `ogdc-runner` image hosted on ghcr should be used
     (
         "production",
@@ -71,7 +74,7 @@ def test__configure_argo_settings_dev(monkeypatch):
 
     argo = reload_argo_module(monkeypatch)
     assert argo.global_config.image == "ogdc-runner:latest"
-    assert Container().image_pull_policy == "Never"
+    assert Container().image_pull_policy == "IfNotPresent"
     assert argo.global_config.namespace == "qgnet"
     assert argo.global_config.service_account_name == "argo-workflow"
 
@@ -94,6 +97,10 @@ def test__configure_argo_settings_prod(monkeypatch):
 def test_ARGO_MANAGER_config_access(monkeypatch):
     """Test that ArgoManager config can be accessed and has correct properties."""
     monkeypatch.setenv("ENVIRONMENT", "local")
+    monkeypatch.setenv(
+        "ARGO_WORKFLOWS_SERVICE_URL",
+        "http://qgnet-ogdc-argo-workflows-server.qgnet.svc.cluster.local:2746",
+    )
     argo = reload_argo_module(monkeypatch)
 
     # Test that we can access the manager and its config
@@ -102,10 +109,13 @@ def test_ARGO_MANAGER_config_access(monkeypatch):
 
     assert config.namespace == "qgnet"
     assert config.service_account_name == "argo-workflow"
-    assert config.workflows_service_url == "http://localhost:2746"
+    assert (
+        config.workflows_service_url
+        == "http://qgnet-ogdc-argo-workflows-server.qgnet.svc.cluster.local:2746"
+    )
     assert config.runner_image == "ogdc-runner"
     assert config.runner_image_tag == "latest"
-    assert config.image_pull_policy == "Never"
+    assert config.image_pull_policy == "IfNotPresent"
 
 
 def test_ARGO_MANAGER_update_image(monkeypatch):
@@ -120,3 +130,51 @@ def test_ARGO_MANAGER_update_image(monkeypatch):
 
     assert argo.global_config.image == "test-image:test-tag"
     assert Container().image_pull_policy == "Always"
+
+
+def test_OgdcWorfklow_no_archive(test_shell_workflow_recipe_directory):
+    recipe_config = get_recipe_config(
+        test_shell_workflow_recipe_directory, check_urls=False
+    )
+    workflow_name = "test"
+
+    with OgdcWorkflow(
+        recipe_config=recipe_config,
+        name=workflow_name,
+        archive_workflow=False,
+    ) as w:
+        assert w.generate_name == f"{recipe_config.id}-{workflow_name}-"
+        assert w.labels
+        assert "ogdc/persist-workflow-in-archive" in w.labels
+        assert w.labels["ogdc/persist-workflow-in-archive"] == "false"
+
+
+def test_OgdcWorfklow_with_archive(test_shell_workflow_recipe_directory):
+    recipe_config = get_recipe_config(
+        test_shell_workflow_recipe_directory, check_urls=False
+    )
+    workflow_name = "test"
+
+    with OgdcWorkflow(
+        recipe_config=recipe_config,
+        name=workflow_name,
+        archive_workflow=True,
+    ) as w:
+        assert w.labels
+        assert w.labels["ogdc/persist-workflow-in-archive"] == "true"
+
+
+def test_OgdcWorfklow_with_temp_output(test_temp_output_recipe_directory):
+    recipe_config = get_recipe_config(
+        test_temp_output_recipe_directory, check_urls=False
+    )
+    workflow_name = "test"
+
+    with OgdcWorkflow(
+        recipe_config=recipe_config,
+        name=workflow_name,
+        archive_workflow=False,
+    ) as w:
+        # Expect 7 days for recipes with temporary output type.
+        assert w.ttl_strategy
+        assert w.ttl_strategy.seconds_after_success == 60 * 60 * 24 * 7

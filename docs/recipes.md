@@ -39,9 +39,8 @@ Example: `"Water measurements from seal tag data"`
 #### `workflow`
 
 Section containing configuration on what type of workflow this recipe uses, and
-any workflow-specific configuration options. See
-[Workflow types](#workflow-types) below for more information about different
-workflow types.
+any workflow-specific configuration options. See {ref}`workflow-types` below for
+more information about different workflow types.
 
 See the {class}`ogdc_runner.models.recipe_config.Workflow` class for details.
 
@@ -50,13 +49,87 @@ See the {class}`ogdc_runner.models.recipe_config.Workflow` class for details.
 The input data source. See the
 {class}`ogdc_runner.models.recipe_config.RecipeInput` class for details.
 
-#### `output`
+#### URL Inputs
 
-```{warning}
-Although `dataone_id` is a documented output type, it is currently **unused**. As of this  writing, outputs are stored on the `qgnet-ogdc-workflow-pvc`, under a directory named after the `recipe_id`. This is an evolving part of the API, and we expect new output types to be supported soon.
+Provide a direct URL to your data:
+
+```yaml
+input:
+  params:
+    - type: "url"
+      value: "https://example.com/data.zip"
 ```
 
+#### DataONE Inputs
+
+If your data is in a DataONE repository, you can fetch it using the dataset
+identifier:
+
+```yaml
+input:
+  params:
+    - type: "dataone"
+      value: "resource_map_doi:10.18739/A29G5GD39"
+```
+
+Need specific files from the dataset? Use wildcard patterns:
+
+```yaml
+input:
+  params:
+    - type: "dataone"
+      value: "resource_map_doi:10.18739/A29G5GD39"
+      filename: "*.nc" # Fetch only NetCDF files
+```
+
+Wildcard patterns work like you'd expect:
+
+- `*` matches anything (e.g., `data_*.nc` gets `data_1.nc`, `data_2.nc`, etc.)
+- `?` matches one character (e.g., `data_?.nc` gets `data_1.nc` but not
+  `data_10.nc`)
+
+Check out the
+[seal-tags](https://github.com/QGreenland-Net/ogdc-recipes/tree/main/recipes/seal-tags)
+and
+[greenland-ice-sheet](https://github.com/QGreenland-Net/ogdc-recipes/tree/main/recipes/greenland-ice-sheet)
+recipes to see DataONE inputs in practice.
+
+#### `output`
+
+{class}`ogdc_runner.models.recipe_config.RecipeOutput` is the base class
+representing configuration for OGDC recipe outputs. Child classes define the
+output-type specific configuration required to publish final outputs of a
+recipe.
+
+##### PVC Output
+
+If no configuration is supplied, this is the default. Recipe outputs will be
+stored on the `qgnet-ogdc-workflow-pvc` PVC in kubernetes under a directory
+named after the `recipe_id`.
+
+See {class}`ogdc_runner.models.recipe_config.PvcRecipeOutput` for details.
+
+##### Temporary output
+
+When the output type is set to `temporary`, recipe outputs will be stored
+temporarily (for 7 days). After successful workflow completion, users can
+retrieve this output as a .zip file via the `ogdc-runner get-output` command.
+
+See {class}`ogdc_runner.models.recipe_config.TemporaryRecipeOutput` for details.
+
+##### DataONE output
+
+```{warning}
+Although `dataone_id` is a documented output type, it is currently
+**unused**.
+```
+
+See {class}`ogdc_runner.models.recipe_config.DataOneRecipeOutput` for details.
+
+<!-- prettier-ignore-start -->
+(workflow-types)=
 ## Workflow types
+<!-- prettier-ignore-end -->
 
 There are multiple types of OGDC workflow. Which an author should use depends on
 the data processing use-case.
@@ -206,3 +279,70 @@ example.
 
 Additional detailed documentation and examples are available in the
 [Permafrost Discovery Gateway viz-info repository](https://github.com/PermafrostDiscoveryGateway/viz-info).
+
+## Parallel Execution
+
+Currently only `shell` workflows support parallel execution for processing
+multiple input files concurrently. Parallel execution distributes work across
+multiple Argo workflow tasks, enabling efficient processing of large datasets.
+
+### Configuration
+
+Parallel execution is configured via the `parallel` field within the workflow
+configuration. See {class}`ogdc_runner.models.recipe_config.ParallelConfig` for
+complete configuration options.
+
+```yaml
+workflow:
+  type: "shell"
+  parallel:
+    enabled: true
+    partition_strategy: "files"
+    partition_size: 2
+```
+
+#### `enabled`
+
+Boolean flag to enable parallel execution. When `false` (default), workflow
+executes sequentially.
+
+#### `partition_strategy`
+
+Currently supports `"files"` strategy, which groups input files into partitions
+for parallel processing.
+
+#### `partition_size`
+
+Number of files per partition. The orchestrator divides input files into chunks
+of this size, creating one parallel task per partition. For example, with 5
+input files and `partition_size: 2`, three partitions are created: two with 2
+files and one with 1 file.
+
+```{note}
+Partitions may have different numbers of files. If the total number of input
+files doesn't divide evenly by `partition_size`, the last partition will contain
+the remainder. For instance, 7 files with `partition_size: 3` creates partitions
+of [3, 3, 1] files.
+```
+
+### Execution Model
+
+Parallel execution uses Argo's DAG (Directed Acyclic Graph) to create
+independent tasks that can run concurrently. The maximum parallelism is
+controlled at the workflow level, allowing Argo to automatically schedule tasks
+as cluster resources become available.
+
+Each parallel task:
+
+- Receives a partition of input files via workflow parameters
+- Executes the same command independently for **each file** in its partition
+- Writes outputs to isolated directories (one per partition)
+- Runs in a separate container with its own resource allocation
+
+```{important}
+**File-level execution**: Each command in the recipe is executed once per file
+in the partition. The runner sets environment variables (`$INPUT_FILE` and
+`$OUTPUT_FILE`) for each file, and your command processes them one at a time
+within the partition. You don't need to handle the partition splitting - the
+orchestrator does this automatically.
+```

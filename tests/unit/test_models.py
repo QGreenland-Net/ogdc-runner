@@ -1,22 +1,29 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from pydantic import AnyUrl, ValidationError
 
+from ogdc_runner.models.parallel_config import ExecutionFunction, FilePartition
 from ogdc_runner.models.recipe_config import (
-    InputParam,
+    DataOneRecipeOutput,
+    ParallelConfig,
+    PvcRecipeOutput,
     RecipeConfig,
     RecipeInput,
-    RecipeOutput,
     ShellWorkflow,
+    UrlInput,
 )
 
 
-def test_recipe_meta():
+def test_recipe_meta(tmpdir):
+    fake_sh_file = tmpdir / "foo.sh"
+    fake_sh_file.write('echo "FAKE PROCESSING"')
     recipe_input = RecipeInput(
-        params=[InputParam(value=AnyUrl("http://www.example.com"), type="url")]
+        params=[UrlInput(value=AnyUrl("http://www.example.com"))]
     )
-    recipe_output = RecipeOutput(dataone_id="12345")
+    recipe_output = PvcRecipeOutput()
     name = "Test Recipe"
     recipe_id = "test-recipe"
 
@@ -24,8 +31,11 @@ def test_recipe_meta():
         name=name,
         input=recipe_input,
         output=recipe_output,
-        workflow=ShellWorkflow(),
-        recipe_directory="/foo/",
+        workflow=ShellWorkflow.model_validate(
+            {"sh_file": Path(fake_sh_file).name},
+            context={"recipe_directory": Path(tmpdir)},
+        ),
+        recipe_directory=Path(tmpdir),
     )
 
     assert recipe_meta.name == name
@@ -36,9 +46,9 @@ def test_recipe_meta():
 
 def test_recipe_meta_failure_bad_id():
     recipe_input = RecipeInput(
-        params=[InputParam(value=AnyUrl("http://www.example.com"), type="url")]
+        params=[UrlInput(value=AnyUrl("http://www.example.com"))]
     )
-    recipe_output = RecipeOutput(dataone_id="12345")
+    recipe_output = PvcRecipeOutput()
 
     # This name should raise a validation error, as `*` is not allowed.
     name = "Test Recipe*"
@@ -49,5 +59,118 @@ def test_recipe_meta_failure_bad_id():
             input=recipe_input,
             output=recipe_output,
             workflow=ShellWorkflow(),
-            recipe_directory="/foo/",
+            recipe_directory=Path("/foo/"),
         )
+
+
+def test_parallel_config_defaults():
+    config = ParallelConfig()
+    assert config.enabled is False
+    assert config.partition_size is None
+    assert config.max_parallelism is None
+
+
+def test_parallel_config_max_parallelism():
+    config = ParallelConfig(enabled=True, partition_size=500, max_parallelism=200)
+    assert config.partition_size == 500
+    assert config.max_parallelism == 200
+
+
+@pytest.mark.parametrize("field", ["partition_size", "max_parallelism"])
+def test_parallel_config_rejects_non_positive(field):
+    with pytest.raises(ValidationError):
+        ParallelConfig(**{field: 0})
+
+
+def test_execution_function_requires_exactly_one_of_command_or_function():
+    with pytest.raises(Exception, match="Must specify exactly one of"):
+        ExecutionFunction(name="run-stage")
+    with pytest.raises(Exception, match="Can only specify one of"):
+        ExecutionFunction(name="run-stage", command="echo hi", function=lambda: None)
+
+
+def test_file_partition_basic():
+    fp = FilePartition(
+        partition_id=0,
+        files=["gs://bucket/a.fgb", "gs://bucket/b.fgb"],
+        execution_function="stage-files",
+    )
+    assert fp.partition_id == 0
+    assert len(fp.files) == 2
+    assert fp.metadata == {}
+
+
+def test_shell_workflow_with_parallel_config(tmpdir):
+    """Test ShellWorkflow with parallel configuration."""
+    fake_sh_file = tmpdir / "recipe.sh"
+    fake_sh_file.write('echo "Processing"')
+
+    workflow = ShellWorkflow.model_validate(
+        {
+            "sh_file": fake_sh_file.basename,
+            "parallel": {
+                "enabled": True,
+                "partition_strategy": "files",
+                "partition_size": 3,
+            },
+        },
+        context={"recipe_directory": tmpdir},
+    )
+
+    assert workflow.parallel.enabled is True
+    assert workflow.parallel.partition_strategy == "files"
+    assert workflow.parallel.partition_size == 3
+
+
+def test_shell_workflow_without_parallel_config(tmpdir):
+    """Test ShellWorkflow without parallel configuration uses defaults."""
+    fake_sh_file = tmpdir / "recipe.sh"
+    fake_sh_file.write('echo "Processing"')
+
+    workflow = ShellWorkflow.model_validate(
+        {"sh_file": fake_sh_file.basename},
+        context={"recipe_directory": tmpdir},
+    )
+
+    # Should have default parallel config
+    assert workflow.parallel.enabled is False
+    assert workflow.parallel.partition_strategy == "files"
+    assert workflow.parallel.partition_size is None
+
+
+def test_recipe_config_with_parallel_workflow(tmpdir):
+    """Test RecipeConfig with parallel workflow configuration."""
+    fake_sh_file = tmpdir / "recipe.sh"
+    fake_sh_file.write('echo "Processing"')
+
+    recipe_input = RecipeInput(
+        params=[
+            UrlInput(value=AnyUrl("http://www.example.com/file1.txt"), type="url"),
+            UrlInput(value=AnyUrl("http://www.example.com/file2.txt"), type="url"),
+            UrlInput(value=AnyUrl("http://www.example.com/file3.txt"), type="url"),
+        ]
+    )
+    recipe_output = DataOneRecipeOutput(dataone_id="12345")
+
+    recipe_directory = Path(tmpdir)
+    recipe_config = RecipeConfig(
+        name="Parallel Test Recipe",
+        input=recipe_input,
+        output=recipe_output,
+        workflow=ShellWorkflow.model_validate(
+            {
+                "sh_file": fake_sh_file.basename,
+                "parallel": {
+                    "enabled": True,
+                    "partition_strategy": "files",
+                    "partition_size": 2,
+                },
+            },
+            context={"recipe_directory": recipe_directory},
+        ),
+        recipe_directory=recipe_directory,
+    )
+
+    assert recipe_config.workflow.parallel.enabled is True
+    assert recipe_config.workflow.parallel.partition_size == 2
+    assert len(recipe_config.input.params) == 3

@@ -1,18 +1,160 @@
 from __future__ import annotations
 
+import datetime as dt
+import os
+import subprocess
 import sys
+import time
+from collections.abc import Callable
+from pathlib import Path
+from urllib.parse import urlparse
 
 import click
+import requests
+import urllib3
 from pydantic import ValidationError
 
-from ogdc_runner.api import submit_ogdc_recipe
-from ogdc_runner.argo import get_workflow_status
-from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.exceptions import (
+    OgdcMissingEnvvar,
+    OgdcServiceApiError,
+    OgdcWorkflowExecutionError,
+)
+from ogdc_runner.recipe import (
+    get_recipe_config,
+    stage_ogdc_recipe,
+    validate_all_recipes_in_repo,
+)
+
+# Default the OGDC API URL based on the environment, falling back to the prod
+# URL.
+env = os.environ.get("ENVIRONMENT")
+verify_ssl = True
+if env == "local":
+    default_url = "https://localhost:7443/ogdc/api"
+    verify_ssl = False
+    # Disable urllib3 insecure connection warnings for local development.
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+elif env == "dev":
+    default_url = "https://api.test.dataone.org/ogdc/api"
+else:
+    default_url = "https://api.dataone.org/ogdc/api"
+OGDC_API_URL = os.environ.get("OGDC_API_URL", default_url)
+
+SESSION = requests.Session()
+SESSION.verify = verify_ssl
 
 
 @click.group
 def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
+
+
+def _get_api_token_factory() -> Callable[[], str]:
+    """Helper function that creates a callable that returns an OGDC API token.
+
+    This is a closure (see e.g., https://realpython.com/python-closure/) - it
+    allows caching a requested access token based on its expiration datetime.
+    """
+    token_data: None | dict[str, str] = None
+
+    def _get_api_token() -> str:
+        """Get an OGDC API token using envvar-provided username/password.
+
+        `OGDC_API_USERNAME` and `OGDC_API_PASSWORD` must be set or an
+        `OgdcMissingEnvvar` exception will be raised.
+
+        The resulting access token can be used to authenticate with OGDC API
+        endpoitns.
+        """
+        nonlocal token_data
+
+        # Check if the token is valid.
+        if token_data is not None:
+            token_expiration_utc = dt.datetime.fromisoformat(
+                token_data["utc_expiration"]
+            )
+            # Use a 1 minute buffer to account for time between check and the
+            # next request.
+            current_utc = dt.datetime.now(dt.UTC) + dt.timedelta(minutes=1)
+            if token_expiration_utc > current_utc:
+                # Return the existing token - it is still valid.
+                return token_data["access_token"]
+
+        username = os.environ.get("OGDC_API_USERNAME")
+        password = os.environ.get("OGDC_API_PASSWORD")
+        if not username or not password:
+            err = "OGDC_API_USERNAME and OGDC_API_PASSWORD must be set."
+            raise OgdcMissingEnvvar(err)
+
+        response = SESSION.post(
+            f"{OGDC_API_URL}/token",
+            data={
+                "username": username,
+                "password": password,
+            },
+        )
+
+        response.raise_for_status()
+
+        token_data = response.json()
+        if not isinstance(token_data, dict) or not isinstance(
+            token_data.get("access_token"), str
+        ):
+            err_msg = "Failed to get valid access token from OGDC API."
+            raise OgdcServiceApiError(err_msg)
+
+        return token_data["access_token"]
+
+    return _get_api_token
+
+
+get_api_token = _get_api_token_factory()
+
+
+def _check_ogdc_api_error(response: requests.Response) -> None:
+    """Raise an `OgdcServiceApiError` if the response is not OK."""
+    if not response.ok:
+        try:
+            detail = response.json()["detail"]
+        except Exception:
+            detail = "No error details."
+        err_msg = (
+            f"API Error with status code {response.status_code}: {response.reason}."
+            f"\nAPI Error details: {detail}"
+        )
+        raise OgdcServiceApiError(err_msg)
+
+
+def _get_workflow_status(workflow_name: str) -> str:
+    """Get the given workflow's status as a string."""
+    response = SESSION.get(
+        url=f"{OGDC_API_URL}/status/{workflow_name}",
+        headers={"Authorization": f"Bearer {get_api_token()}"},
+    )
+
+    _check_ogdc_api_error(response)
+
+    status = response.json()["status"]
+
+    return str(status)
+
+
+def _wait_for_workflow_completion(workflow_name: str) -> None:
+    """Wait for the given workflow to complete."""
+    while True:
+        status = _get_workflow_status(workflow_name)
+        if status:
+            print(
+                f"Workflow status for {workflow_name} ({dt.datetime.now():%Y-%m-%d@%H:%M:%S}): {status}"
+            )
+            # Terminal states
+            if status == "Failed":
+                raise OgdcWorkflowExecutionError(
+                    f"Workflow with name {workflow_name} failed."
+                )
+            if status == "Succeeded":
+                return
+        time.sleep(5)
 
 
 @cli.command
@@ -38,10 +180,26 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     """
     Submit a recipe to OGDC for execution.
 
-    RECIPE-PATH: Path to the recipe file. Use either a local path (e.g., '/ogdc-recipes/recipes/seal-tags')
-    or an fsspec-compatible GitHub string (e.g., 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
+    RECIPE-PATH: Path to the recipe directory. Use an fsspec-compatible string
+    representing a remote and publicly accessible recipe directory (e.g., for
+    GitHub, 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
     """
-    submit_ogdc_recipe(recipe_dir=recipe_path, wait=wait, overwrite=overwrite)
+    response = SESSION.post(
+        url=f"{OGDC_API_URL}/submit",
+        json={
+            "recipe_path": recipe_path,
+            "overwrite": overwrite,
+        },
+        headers={"Authorization": f"Bearer {get_api_token()}"},
+    )
+
+    _check_ogdc_api_error(response)
+    print(response.json()["message"])
+
+    if wait:
+        workflow_name = response.json()["recipe_workflow_name"]
+        print("Waiting for completion...")
+        _wait_for_workflow_completion(workflow_name)
 
 
 @cli.command
@@ -52,7 +210,7 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
 )
 def check_workflow_status(workflow_name: str) -> None:
     """Check an argo workflow's status."""
-    status = get_workflow_status(workflow_name)
+    status = _get_workflow_status(workflow_name)
     print(f"Workflow {workflow_name} has status {status}.")
 
 
@@ -65,10 +223,112 @@ def check_workflow_status(workflow_name: str) -> None:
 )
 def validate_recipe(recipe_path: str) -> None:
     """Validate an OGDC recipe directory."""
+    with stage_ogdc_recipe(recipe_path) as recipe_dir:
+        try:
+            get_recipe_config(recipe_dir)
+            print(f"Recipe {recipe_path} is valid.")
+        except ValidationError as err:
+            print(f"Recipe {recipe_path} is invalid.")
+            print(err)
+            sys.exit(1)
+
+
+@cli.command
+@click.argument(
+    "recipes_location",
+    required=False,
+    default="https://github.com/qgreenland-net/ogdc-recipes.git",
+    metavar="RECIPES-LOCATION",
+    type=str,
+)
+@click.option(
+    "--ref",
+    default="main",
+    help="Git reference branch or tag to validate",
+    type=str,
+)
+def validate_all_recipes(recipes_location: str, ref: str) -> None:
+    """Validate all OGDC recipes in a git repository.
+
+    RECIPES-LOCATION: Git repository URL (default: https://github.com/qgreenland-net/ogdc-recipes.git)
+
+    Examples:
+      ogdc-runner validate-all-recipes
+      ogdc-runner validate-all-recipes --ref develop
+      ogdc-runner validate-all-recipes https://github.com/myorg/ogdc-recipes.git --ref feature-branch
+    """
     try:
-        get_recipe_config(recipe_path)
-        print(f"Recipe {recipe_path} is valid.")
-    except ValidationError as err:
-        print(f"Recipe {recipe_path} is invalid.")
-        print(err)
+        validate_all_recipes_in_repo(recipes_location, ref)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to clone repository: {e}\n{e.stderr}")
         sys.exit(1)
+
+
+@cli.command
+@click.argument(
+    "username",
+    required=True,
+    metavar="USERNAME",
+    type=str,
+)
+@click.argument(
+    "password",
+    required=True,
+    metavar="PASSWORD",
+    type=str,
+)
+def create_user(username: str, password: str) -> None:
+    """Create a new OGDC user. This operation is only supported for the admin user."""
+    response = SESSION.post(
+        url=f"{OGDC_API_URL}/create_user",
+        data={
+            "username": username,
+            "password": password,
+        },
+        headers={"Authorization": f"Bearer {get_api_token()}"},
+    )
+
+    _check_ogdc_api_error(response)
+    print(response.json()["message"])
+
+
+def _download_output_for_workflow(workflow_name: str, output_dir: Path) -> None:
+    response = SESSION.get(
+        url=f"{OGDC_API_URL}/output/{workflow_name}",
+        headers={"Authorization": f"Bearer {get_api_token()}"},
+    )
+
+    _check_ogdc_api_error(response)
+    data_url = response.json()["data_url"]
+
+    data_filename = Path(urlparse(data_url).path).name
+    assert data_filename.endswith(".zip")
+
+    # Download the data for the user to the given directory.
+    output_filepath = output_dir / data_filename
+    with SESSION.get(data_url, stream=True) as response:
+        response.raise_for_status()
+        with output_filepath.open("wb") as f:
+            for chunk in response.iter_content():
+                f.write(chunk)
+
+    print(f"Wrote {output_filepath}")
+
+
+@cli.command
+@click.argument(
+    "workflow_name",
+    required=True,
+    type=str,
+)
+@click.option(
+    "--output-dir",
+    default=Path("./"),
+    help="Output directory to place the workflow output.",
+    type=click.Path(
+        writable=True, file_okay=False, dir_okay=True, resolve_path=True, path_type=Path
+    ),
+)
+def get_output(workflow_name: str, output_dir: Path) -> None:
+    """Get the temporary output for the given workflow."""
+    _download_output_for_workflow(workflow_name, output_dir)

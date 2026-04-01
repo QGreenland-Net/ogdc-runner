@@ -1,38 +1,177 @@
 from __future__ import annotations
 
-from functools import cached_property
-from typing import Literal
+import json
+import logging
+import os
+from functools import cache, cached_property
+from pathlib import Path
+from typing import Any, Literal, Self, TypeAlias
 
+import requests
 from pydantic import (
     AnyUrl,
-    BaseModel,
-    ConfigDict,
     Field,
+    ValidationInfo,
     computed_field,
     field_validator,
+    model_validator,
 )
 
+from ogdc_runner.dataone.resolver import resolve_dataone_input
+from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
+from ogdc_runner.models.base import OgdcBaseModel
 
-class OgdcBaseModel(BaseModel):
-    """Base pydantic model for the ogdc-runner."""
-
-    # Disallow "extra" config that we do not expect. We want users to know if
-    # they've made a mistake and added something that has no effect.
-    model_config = ConfigDict(extra="forbid")
+logger = logging.getLogger(__name__)
 
 
-# Input parameter with type and value
+class ParallelConfig(OgdcBaseModel):
+    """Configuration for parallel execution behavior.
+
+    Attributes:
+        enabled: Whether parallel execution is enabled
+        partition_strategy: Strategy for dividing work ("files" or "file_chunks")
+        partition_size: Number of files per partition; None means use the
+            orchestrator default (typically 1 000)
+        max_parallelism: Maximum number of concurrent Argo pods across all
+            parallel stages; None means no cap beyond the cluster default
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable parallel execution for this workflow",
+    )
+
+    # Partitioning strategy for parallel execution
+    # "files": One or more files per partition based on partition_size
+    partition_strategy: Literal["files"] = Field(
+        default="files",
+        description="Strategy for partitioning work across parallel tasks",
+    )
+    partition_size: int | None = Field(
+        default=None,
+        description="Number of files per partition. Must be >= 1 when set.",
+    )
+    max_parallelism: int | None = Field(
+        default=None,
+        description=(
+            "Maximum number of concurrent Argo pods for this workflow. "
+            "Must be >= 1 when set."
+        ),
+    )
+
+    @field_validator("partition_size", "max_parallelism")
+    @classmethod
+    def must_be_positive(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            msg = "must be >= 1"
+            raise ValueError(msg)
+        return v
+
+
 class InputParam(OgdcBaseModel):
+    """Input parameter for a recipe."""
+
+    type: Literal["url", "pvc_mount", "file_system", "dataone"]
+
+
+class UrlInput(InputParam):
+    """Inpurt from URL.
+
+    When instantiated with `context={"check_urls": True}`, URL-type parameters
+    will be validated to ensure they are accessible via HTTP HEAD request.
+    """
+
+    type: Literal["url"] = "url"
     value: AnyUrl | str
-    type: Literal["url", "pvc_mount", "file_system"]
+
+    @model_validator(mode="after")
+    def validate_url_accessible(self, info: ValidationInfo) -> Self:
+        """Validate that URL-type parameters are accessible."""
+        context = info.context or {}
+        if not context.get("check_urls", False):
+            return self
+
+        url = str(self.value)
+        timeout = context.get("url_timeout", 30)
+
+        try:
+            response = requests.head(url, timeout=timeout, allow_redirects=True)
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            raise ValueError(
+                f"URL validation failed for {url}: HTTP {e.response.status_code}"
+            ) from e
+        except requests.exceptions.ConnectionError as e:
+            raise ValueError(
+                f"URL validation failed for {url}: Connection failed"
+            ) from e
+        except requests.exceptions.Timeout as e:
+            raise ValueError(
+                f"URL validation failed for {url}: Timeout after {timeout}s"
+            ) from e
+        except Exception as e:
+            raise ValueError(f"URL validation failed for {url}: {e}") from e
+
+        return self
+
+
+class DataOneInput(InputParam):
+    """DataOne input parameters."""
+
+    type: Literal["dataone"] = "dataone"
+    dataset_identifier: str
+
+    filename: str | None = None
+
+    # Private fields for all matched objects with full metadata
+    dataset_pid: str | None = None
+    resolved_objects: list[dict[str, Any]] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def resolve_dataone_inputs(self) -> DataOneInput:
+        """Resolve DataONE dataset identifiers to data object URLs."""
+
+        try:
+            selected_objects = resolve_dataone_input(
+                dataset_identifier=str(self.dataset_identifier),
+                filename=self.filename,
+            )
+
+            if not selected_objects:
+                raise ValueError(
+                    f"No data objects found in dataset {self.dataset_identifier}"
+                )
+
+            # Store all matched objects
+            self.resolved_objects = selected_objects
+            self.dataset_pid = str(self.dataset_identifier)
+
+            matched_files = [obj["filename"] for obj in selected_objects]
+
+            msg = f"Resolved {self.dataset_identifier} -> {len(selected_objects)} file(s): {matched_files}"
+            logger.info(msg)
+
+        except Exception as e:
+            msg = f"Failed to resolve DataONE input {self.dataset_identifier}: {e}"
+            logger.error(msg)
+            raise ValueError(
+                f"Failed to resolve DataONE package {self.dataset_identifier}. "
+                f"Make sure the dataset_identifier is a dataset package identifier (e.g., resource_map_urn:uuid:...). "
+                f"Error: {e}"
+            ) from e
+
+        return self
+
+
+InputParamType: TypeAlias = DataOneInput | UrlInput
 
 
 # Create a model for the recipe input
 class RecipeInput(OgdcBaseModel):
-    params: list[InputParam]
+    params: list[InputParamType]
 
     @field_validator("params")
-    def validate_params(cls, params: list[InputParam]) -> list[InputParam]:
+    def validate_params(cls, params: list[InputParamType]) -> list[InputParamType]:
         """Ensure there's at least one input parameter."""
         if not params:
             error_msg = "At least one input parameter is required"
@@ -41,26 +180,203 @@ class RecipeInput(OgdcBaseModel):
 
 
 class RecipeOutput(OgdcBaseModel):
+    """Base model for recipe output configuration."""
+
+    type: Literal["dataone", "temporary", "pvc"]
+
+
+class DataOneRecipeOutput(RecipeOutput):
+    """DataONE output configuration.
+
+    Recipe outputs will be published to a DataONE dataset.
+    """
+
+    type: Literal["dataone"] = "dataone"
     dataone_id: str = "TODO"
+
+
+class TemporaryRecipeOutput(RecipeOutput):
+    """Temporary output configuration.
+
+    Recipe outputs will be stored temporarily in a user-accessible location.
+    """
+
+    type: Literal["temporary"] = "temporary"
+
+
+class PvcRecipeOutput(RecipeOutput):
+    """PVC output configuration.
+
+    Recipe outputs will be stored on a specified PVC in kubernetes.
+    """
+
+    type: Literal["pvc"] = "pvc"
 
 
 class Workflow(OgdcBaseModel):
     type: Literal["shell", "visualization"]
 
 
+def _validate_filename_with_directory(
+    filename: str,
+    info: ValidationInfo,
+) -> Path:
+    """Validate that the given filename is a file that exists in the `info.context["recipe_directory"]`."""
+    if not isinstance(info.context, dict) or "recipe_directory" not in info.context:
+        err_str = "`recipe_directory` is required context."
+        raise ValueError(err_str)
+
+    recipe_directory = Path(info.context["recipe_directory"])
+
+    config_filepath = recipe_directory / filename
+
+    if not config_filepath.exists():
+        raise FileNotFoundError(
+            f"The file {filename} is not present in the recipe directory"
+        )
+
+    return config_filepath
+
+
 class ShellWorkflow(Workflow):
+    """Model representing the shell workflow configuration.
+
+    Requires that the `recipe_directory` context be set when instantiating
+    the class. E.g.,:
+
+        workflow = ShellWorkflow.model_validate(
+            {"sh_file": "recipe.sh"},
+            context={"recipe_directory": Path("/path/to/recipe_directory")},
+        ),
+
+    """
+
     type: Literal["shell"] = "shell"
     # the name of the `.sh` file containing the list of commands to run.
-    sh_file: str = "recipe.sh"
+    sh_file: str | Path = "recipe.sh"
+    # Optional parallel execution configuration
+    parallel: ParallelConfig = Field(
+        default_factory=ParallelConfig,
+        description="Configuration for parallel execution",
+    )
+
+    @model_validator(mode="after")
+    def sh_file_path(
+        self,
+        info: ValidationInfo,
+    ) -> Self:
+        """Model-level validator that constructs a full path to `sh_file`."""
+        if isinstance(self.sh_file, Path):
+            return self
+
+        filepath = _validate_filename_with_directory(self.sh_file, info)
+
+        self.sh_file = filepath
+
+        return self
+
+    def get_commands_from_sh_file(self) -> list[str]:
+        """Returns a list of commands run from the workflow `sh_file`."""
+        if not isinstance(self.sh_file, Path):
+            raise ValueError(
+                "`sh_file` must be a fully qualified `Path`."
+                f" Got: {self.sh_file} (type: {type(self.sh_file)})."
+            )
+
+        lines = self.sh_file.read_text().split("\n")
+        commands = [line for line in lines if line and not line.startswith("#")]
+
+        return commands
+
+
+@cache
+def _read_config_json(config_filepath: Path) -> str:
+    """Validate that the config filepath has valid json."""
+    config_text = config_filepath.read_text()
+
+    try:
+        json.loads(config_text)
+    except json.JSONDecodeError as e:
+        raise OgdcInvalidRecipeConfig(
+            f"Failed to read json from {config_filepath}"
+        ) from e
+
+    return config_text
 
 
 class VizWorkflow(Workflow):
+    """Model representing the visualization workflow configuration.
+
+    Requires that the `recipe_directory` context be set when instantiating
+    the class. E.g.,:
+
+        workflow = VizWorkflow.model_validate(
+            {"config_file": "config.json"},
+            context={"recipe_directory": Path("/path/to/recipe_directory")},
+        ),
+
+    """
+
     type: Literal["visualization"] = "visualization"
-    # the name of the viz workflow json configuration file
 
-    config_file: str = "config.json"
+    # the name of the viz workflow json configuration file. By default, this is
+    # `None`, which means that the viz workflow will use its default
+    # configuration.
+    config_file: str | Path | None = None
 
-    batch_size: int = 250
+    viz_image: str = Field(
+        default_factory=lambda: os.environ.get(
+            "VIZ_WORKFLOW_IMAGE",
+            "ghcr.io/permafrostdiscoverygateway/viz-workflow:latest",
+        ),
+        description="Container image for viz worker scripts. Reads VIZ_WORKFLOW_IMAGE env var by default.",
+    )
+
+    # Optional parallel execution configuration
+    parallel: ParallelConfig = Field(
+        default_factory=ParallelConfig,
+        description="Configuration for parallel execution",
+    )
+
+    @model_validator(mode="after")
+    def config_file_path(
+        self,
+        info: ValidationInfo,
+    ) -> Self:
+        """Model-level validator that constructs a full path to `sh_file`."""
+        if self.config_file is None or isinstance(self.config_file, Path):
+            return self
+
+        config_filepath = _validate_filename_with_directory(self.config_file, info)
+
+        # Verify that the file can be read and returns valid json.
+        _read_config_json(config_filepath)
+
+        self.config_file = config_filepath
+
+        return self
+
+    def get_config_file_json(self) -> str:
+        """Get the viz workflow config as json.
+
+        If passed a JSON file, read the file content and return. Otherwise, an empty
+        configuration will be returned (`"{}"`).
+
+        This configuration is used by the pdgworkflow for visualization workflows.
+        When an empty config ({}) is returned, WorkflowManager will use its default behavior.
+
+        For documentation on available configuration options, see:
+        - ConfigManager documentation: https://github.com/PermafrostDiscoveryGateway/viz-workflow/blob/feature-wf-k8s/pdgworkflow/ConfigManager.py
+        - Example config: https://github.com/QGreenland-Net/ogdc-recipes/blob/main/recipes/viz-workflow/config.json
+
+        Returns:
+            The content of the config.json file as a string, or empty JSON if file doesn't exist.
+            An empty config ({}) will cause ConfigManager to use default behavior.
+        """
+        if isinstance(self.config_file, Path):
+            return _read_config_json(self.config_file)
+
+        return "{}"
 
 
 class RecipeMeta(OgdcBaseModel):
@@ -75,12 +391,8 @@ class RecipeMeta(OgdcBaseModel):
     workflow: ShellWorkflow | VizWorkflow
 
     input: RecipeInput
-    output: RecipeOutput = RecipeOutput()
-
-    # Optional Docker image (supports both local and hosted images)
-    # Examples: "my-local-image", "ghcr.io/owner/image:latest"
-    image: str | None = Field(
-        default=None, description="Docker image with optional tag"
+    output: DataOneRecipeOutput | TemporaryRecipeOutput | PvcRecipeOutput = (
+        PvcRecipeOutput()
     )
 
 
@@ -91,9 +403,9 @@ class RecipeConfig(RecipeMeta):
     that is generated dynamically at runtime (e.g., `recipe_directory`).
     """
 
-    # ffspec-compatible recipe directory string.
+    # Path to recipe directory on disk
     # This is where the rest of the config was set from.
-    recipe_directory: str
+    recipe_directory: Path
 
     @computed_field  # type: ignore[misc]
     @cached_property

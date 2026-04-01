@@ -1,3 +1,15 @@
+# v0.3.0
+
+- Create service interface for ogdc-runner.
+- Refactor URL validation to use Pydantic model validators.
+- Add recipe ID truncation to avoid Kubernetes name length limits.
+- Add `temporary` output type and support retrieval of those outputs from s3
+  storage via the `ogdc-runner get-output` CLI.
+- Add DataONE input type for fetching datasets directly from DataONE
+  repositories
+- Add `parallel-shell` recipe type and related support for executing shell
+  recipes in parallel.
+
 # v0.2.0
 
 - Add support for both `local` (via rancher-desktop) and `dev` environments
@@ -8,6 +20,12 @@
 - Bugfix: allow viz workflow recipes to use an `id` other than `viz-workflow`.
 - `meta.yaml`: Add `workflow` config that defines workflow-specifc configuration
   options (e.g., `shell` workflows have the `sh_file` config option).
+- Resolve bug that prevented viz-workflow `config.json` file from being used if
+  the `ogdc-runner` was passed a remote (GitHub) recipe directory (#101).
+- Move validation of all recipe configuration (including sidecar files like
+  `sh_file` for `ShellWorkflow` and `config_file` for `VizWorkflow` to Pydantic
+  models. This requires that some models (`Shell` and `Viz`-`Workflow`) be
+  provided the `recipe_directory` context on instantiation.
 
 # v0.1.0
 
