@@ -63,7 +63,8 @@ class ParallelConfig(OgdcBaseModel):
     @classmethod
     def must_be_positive(cls, v: int | None) -> int | None:
         if v is not None and v < 1:
-            raise ValueError("must be >= 1")
+            msg = "must be >= 1"
+            raise ValueError(msg)
         return v
 
 
