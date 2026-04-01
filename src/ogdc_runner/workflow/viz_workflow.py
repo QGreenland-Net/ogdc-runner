@@ -49,12 +49,12 @@ _WORKFLOW_VOLUME_MOUNT = VolumeMount(
 )
 
 # Shared kwargs applied to every viz @script decorator.
-_VIZ_SCRIPT_KWARGS: dict = dict(
-    image=VIZ_WORKFLOW_IMAGE,
-    image_pull_policy="IfNotPresent",
-    command=["python"],
-    volume_mounts=[_WORKFLOW_VOLUME_MOUNT],
-)
+_VIZ_SCRIPT_KWARGS: dict = {
+    "image": VIZ_WORKFLOW_IMAGE,
+    "image_pull_policy": "IfNotPresent",
+    "command": ["python"],
+    "volume_mounts": [_WORKFLOW_VOLUME_MOUNT],
+}
 
 # Resource requirements for each stage.
 _STAGE_RESOURCES = ResourceRequirements(
