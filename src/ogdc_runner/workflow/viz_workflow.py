@@ -101,7 +101,9 @@ def stage_file_parallel() -> None:
     """
     import json
     import logging
+    import os
     import sys
+    import urllib.request
     from pathlib import Path
 
     logging.basicConfig(
@@ -114,6 +116,7 @@ def stage_file_parallel() -> None:
     from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
+    os.chdir(str(config_path.parent))
     config = json.loads(config_path.read_text())
 
     partition_manifest: str = "{{inputs.parameters.partition-manifest}}"
@@ -123,22 +126,36 @@ def stage_file_parallel() -> None:
     log.info("partition=%s files=%d starting staging", partition_id, len(input_files))
 
     workflow = WorkflowManager(config)
+    dir_input = workflow.config.get("dir_input")
+    os.makedirs(dir_input, exist_ok=True)
 
     for idx, input_file in enumerate(input_files):
+        # Download to dir_input if URL; otherwise use the path as-is.
+        if input_file.startswith("http://") or input_file.startswith("https://"):
+            filename = os.path.basename(input_file.split("?")[0])
+            local_path = os.path.join(dir_input, filename)
+            log.info(
+                "partition=%s [%d/%d] downloading %s -> %s",
+                partition_id, idx + 1, len(input_files), input_file, local_path,
+            )
+            urllib.request.urlretrieve(input_file, local_path)
+        else:
+            local_path = input_file
+
         log.info(
             "partition=%s [%d/%d] staging %s",
-            partition_id, idx + 1, len(input_files), input_file,
+            partition_id, idx + 1, len(input_files), local_path,
         )
         try:
-            workflow.stage(input_file)
+            workflow.stage(local_path)
             log.info(
                 "partition=%s [%d/%d] done %s",
-                partition_id, idx + 1, len(input_files), input_file,
+                partition_id, idx + 1, len(input_files), local_path,
             )
         except Exception as e:
             log.error(
                 "partition=%s [%d/%d] FAILED %s error=%s",
-                partition_id, idx + 1, len(input_files), input_file, e,
+                partition_id, idx + 1, len(input_files), local_path, e,
             )
             sys.exit(1)
 
@@ -168,7 +185,6 @@ def stage_file_parallel() -> None:
 def discover_staged_tiles() -> None:
     """Discover staged GeoPackage tiles at max z-level and emit chunked partition manifests.
 
-    Uses os.scandir (lazy, no full-buffer glob) to avoid OOM on large dirs.
     Outputs a JSON array-of-arrays to stdout for Argo withParam fan-out.
     """
     import json
@@ -187,18 +203,14 @@ def discover_staged_tiles() -> None:
     from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
+    os.chdir(str(config_path.parent))
     config = json.loads(config_path.read_text())
     partition_size = int("{{inputs.parameters.partition-size}}")
 
     workflow = WorkflowManager(config)
     max_z = workflow.config.get_max_z()
 
-    staged_dir = workflow.config.get_dir("staged", z=max_z)
-    staged_files = [
-        e.path
-        for e in os.scandir(staged_dir)
-        if e.is_file() and e.name.endswith(".gpkg")
-    ]
+    staged_files = workflow.tiles.get_filenames_from_dir("staged", z=max_z)
 
     log.info("max_z=%d staged_files=%d", max_z, len(staged_files))
 
@@ -258,6 +270,7 @@ def discover_parent_tiles() -> None:
     from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
+    os.chdir(str(config_path.parent))
     config = json.loads(config_path.read_text())
     z_level = int("{{inputs.parameters.z-level}}")
     partition_size = int("{{inputs.parameters.partition-size}}")
@@ -265,23 +278,24 @@ def discover_parent_tiles() -> None:
     workflow = WorkflowManager(config)
     child_z = z_level + 1
 
-    child_dir = workflow.config.get_dir("geotiff", z=child_z)
-    child_tiles = [
-        e.path
-        for e in os.scandir(child_dir)
-        if e.is_file() and e.name.endswith(".tif")
-    ]
+    child_tiles = workflow.tiles.get_filenames_from_dir("geotiff", z=child_z)
 
     log.info("z=%d child_z=%d child_tiles=%d", z_level, child_z, len(child_tiles))
 
-    parent_tiles: set = set()
+    # get_parent_tile returns a morecantile.Tile object; collect unique parents
+    # then convert each back to a geotiff file path via path_from_tile.
+    parent_tile_objects: set = set()
     for child_path in child_tiles:
-        parent_path = workflow.tiles.get_parent_tile(child_path)
-        if parent_path:
-            parent_tiles.add(parent_path)
+        parent_tile = workflow.tiles.get_parent_tile(child_path)
+        if parent_tile is not None:
+            parent_tile_objects.add(parent_tile)
 
     parent_tiles_list = [
-        {"z": z_level, "path": p} for p in sorted(parent_tiles)
+        {
+            "z": z_level,
+            "path": workflow.tiles.path_from_tile(t, base_dir="geotiff"),
+        }
+        for t in sorted(parent_tile_objects)
     ]
     log.info("z=%d parent_tiles=%d", z_level, len(parent_tiles_list))
 
@@ -320,8 +334,8 @@ def discover_parent_tiles() -> None:
 def discover_all_geotiffs() -> None:
     """Discover all GeoTIFF files across every z-level for web-tile fan-out.
 
-    Uses os.scandir for lazy directory walk.  Each partition entry is a dict
-    ``{"z": int, "path": str}`` so the worker receives the correct z-level.
+    Each partition entry is a dict ``{"z": int, "path": str}`` so the worker
+    receives the correct z-level.
     """
     import json
     import logging
@@ -339,24 +353,16 @@ def discover_all_geotiffs() -> None:
     from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
+    os.chdir(str(config_path.parent))
     config = json.loads(config_path.read_text())
     partition_size = int("{{inputs.parameters.partition-size}}")
 
     workflow = WorkflowManager(config)
 
-    geotiff_dir = workflow.config.get_dir("geotiff")
     geotiff_entries: list = []
-    # Walk one level: geotiff_dir/<z>/<tile>.tif  (lazy, no recursion)
-    for z_entry in os.scandir(geotiff_dir):
-        if not z_entry.is_dir():
-            continue
-        try:
-            z_level = int(z_entry.name)
-        except ValueError:
-            continue
-        for tile_entry in os.scandir(z_entry.path):
-            if tile_entry.is_file() and tile_entry.name.endswith(".tif"):
-                geotiff_entries.append({"z": z_level, "path": tile_entry.path})
+    for path in workflow.tiles.get_filenames_from_dir("geotiff"):
+        tile = workflow.tiles.dict_from_path(path)
+        geotiff_entries.append({"z": int(tile["z"]), "path": path})
 
     log.info("geotiff_files=%d", len(geotiff_entries))
 
@@ -391,6 +397,7 @@ def rasterize_max_z_parallel() -> None:
     """Rasterise a partition of staged GeoPackage vector files to GeoTIFF at max z-level."""
     import json
     import logging
+    import os
     import sys
     from pathlib import Path
 
@@ -404,6 +411,7 @@ def rasterize_max_z_parallel() -> None:
     from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
+    os.chdir(str(config_path.parent))
     config = json.loads(config_path.read_text())
 
     workflow = WorkflowManager(config)
@@ -440,6 +448,7 @@ def create_composite_z_parallel() -> None:
     """Create composite (parent) raster tiles from child GeoTIFFs at z+1."""
     import json
     import logging
+    import os
     import sys
     from pathlib import Path
 
@@ -453,9 +462,12 @@ def create_composite_z_parallel() -> None:
     from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
+    os.chdir(str(config_path.parent))
     config = json.loads(config_path.read_text())
 
     workflow = WorkflowManager(config)
+    # raster_tiler is None after __init__; initialize it explicitly.
+    raster_tiler = workflow.init_raster_tiler()
 
     manifest: list = json.loads("{{inputs.parameters.parent-tiles-manifest}}")
     log.info("composite tiles=%d", len(manifest))
@@ -465,7 +477,8 @@ def create_composite_z_parallel() -> None:
         parent_path: str = item["path"]
         log.info("z=%d creating composite %s", z_level, parent_path)
         try:
-            workflow.raster_tiler.create_parent_tile(parent_path, z_level)
+            parent_tile = workflow.tiles.tile_from_path(parent_path)
+            raster_tiler.parent_geotiff_from_children(parent_tile)
             log.info("z=%d done %s", z_level, parent_path)
         except Exception as e:
             log.error("z=%d FAILED %s error=%s", z_level, parent_path, e)
@@ -491,6 +504,7 @@ def create_web_tile_parallel() -> None:
     """Convert GeoTIFFs to PNG web tiles."""
     import json
     import logging
+    import os
     import sys
     from pathlib import Path
 
@@ -504,9 +518,12 @@ def create_web_tile_parallel() -> None:
     from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
+    os.chdir(str(config_path.parent))
     config = json.loads(config_path.read_text())
 
     workflow = WorkflowManager(config)
+    # raster_tiler is None after __init__; initialize it explicitly.
+    raster_tiler = workflow.init_raster_tiler()
 
     manifest: list = json.loads("{{inputs.parameters.geotiff-manifest}}")
     log.info("web tiles items=%d", len(manifest))
@@ -516,7 +533,7 @@ def create_web_tile_parallel() -> None:
         geotiff_path: str = item["path"]
         log.info("creating web tile z=%d %s", z_level, geotiff_path)
         try:
-            workflow.raster_tiler.geotiff_to_webtile(geotiff_path, z_level)
+            raster_tiler.webtile_from_geotiff(geotiff_path)
             log.info("done z=%d %s", z_level, geotiff_path)
         except Exception as e:
             log.error("FAILED z=%d %s error=%s", z_level, geotiff_path, e)
@@ -542,6 +559,7 @@ def create_3dtile_parallel() -> None:
     """Convert staged GeoPackage vector tiles to Cesium 3D tiles (B3DM/GLB)."""
     import json
     import logging
+    import os
     import sys
     from pathlib import Path
 
@@ -555,6 +573,7 @@ def create_3dtile_parallel() -> None:
     from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
+    os.chdir(str(config_path.parent))
     config = json.loads(config_path.read_text())
 
     workflow = WorkflowManager(config)
@@ -670,18 +689,24 @@ def make_and_submit_viz_workflow(
 
         # ----------------------------------------------------------------
         # Setup container — write config.json and create output directories
+        # Directories are derived from the config so they always match,
+        # regardless of what dir_* values the recipe sets.
         # ----------------------------------------------------------------
+        _base = f"/mnt/workflow/{recipe_config.id}"
+        _dirs: set[str] = {f"{_base}/output/3dtiles"}  # always needed
+        for _k, _v in workflow_config.items():
+            if _k.startswith("dir_") and _v and isinstance(_v, str):
+                _dirs.add(f"{_base}/{_v.rstrip('/')}")
+        _mkdir_cmds = " && \\\n".join(f"mkdir -p {d}" for d in sorted(_dirs))
+
         setup_template = Container(
             name="stage-viz-config",
             image="alpine:latest",
             command=["sh", "-c"],
             args=[
-                f"""mkdir -p /mnt/workflow/{recipe_config.id}/input && \
-mkdir -p /mnt/workflow/{recipe_config.id}/output/staged && \
-mkdir -p /mnt/workflow/{recipe_config.id}/output/geotiff && \
-mkdir -p /mnt/workflow/{recipe_config.id}/output/3dtiles && \
-mkdir -p /mnt/workflow/{recipe_config.id}/output/web_tiles && \
-cat > /mnt/workflow/{recipe_config.id}/config.json << 'EOF'
+                f"""mkdir -p {_base} && \
+{_mkdir_cmds} && \
+cat > {_base}/config.json << 'EOF'
 {config_content}
 EOF"""
             ],
@@ -720,7 +745,9 @@ EOF"""
                     ),
                     parallel_config=parallel_cfg,
                 )
-                stage_partitions_json = json.dumps([p.files for p in partitions])
+                stage_partitions_json = json.dumps(
+                    [{"index": i, "files": p.files} for i, p in enumerate(partitions)]
+                )
                 logger.info(
                     "stage1 partitions=%d total_files=%d",
                     len(partitions),
@@ -730,8 +757,8 @@ EOF"""
                 stage_task = stage_file_parallel(
                     arguments={
                         "recipe-id": recipe_config.id,
-                        "partition-manifest": "{{item}}",
-                        "partition-id": "{{loop.index}}",
+                        "partition-manifest": "{{item.files}}",
+                        "partition-id": "{{item.index}}",
                     },
                     with_param=stage_partitions_json,
                 )
