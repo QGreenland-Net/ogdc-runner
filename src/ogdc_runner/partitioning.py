@@ -19,12 +19,13 @@ from ogdc_runner.models.parallel_config import (
 from ogdc_runner.models.recipe_config import (
     DataOneInput,
     ParallelConfig,
+    PvcMountInput,
     UrlInput,
 )
 
 
 def create_partitions(
-    inputs: Sequence[DataOneInput | UrlInput] | Sequence[Path],
+    inputs: Sequence[DataOneInput | UrlInput | PvcMountInput] | Sequence[Path],
     execution_function: ExecutionFunction,
     parallel_config: ParallelConfig | None = None,
 ) -> list[FilePartition]:
@@ -59,12 +60,15 @@ def create_partitions(
 
 
 def _extract_file_paths(
-    inputs: Sequence[DataOneInput | UrlInput] | Sequence[Path],
+    inputs: Sequence[DataOneInput | UrlInput | PvcMountInput] | Sequence[Path],
 ) -> list[str]:
     """Extract file paths or URLs from inputs.
 
     Handles both InputParam objects (from recipe config) and Path objects
     (from dynamic discovery), converting them to string paths.
+
+    PVC inputs are skipped — file enumeration happens at workflow runtime via
+    an in-workflow listing step, so there is nothing to extract here.
 
     Args:
         inputs: List of input parameters or Path objects
@@ -78,6 +82,10 @@ def _extract_file_paths(
     # Type-based dispatch: Path objects vs InputParam objects
     if isinstance(inputs[0], Path):
         return [str(p) for p in inputs]
+
+    # PVC inputs have no URL/path value to enumerate at submission time
+    if all(isinstance(p, PvcMountInput) for p in inputs):
+        return []
 
     # InputParam objects have a value attribute
     return [str(param.value) for param in inputs if hasattr(param, "value")]

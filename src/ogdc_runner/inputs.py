@@ -49,10 +49,7 @@ def make_fetch_input_template(
         volume_mounts.append(
             VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow/")
         )
-    # Input PVCs must be readable from the fetch step regardless of `use_pvc`:
-    # - Sequential path: the fetch step is a no-op that only prints a message,
-    #   but keeping mounts consistent avoids surprises.
-    # - Parallel/PVC path: the fetch step needs read access too.
+    # Always mount input PVCs so the fetch step can access them.
     volume_mounts.extend(get_input_pvc_volume_mounts(recipe_config))
 
     return Container(
@@ -111,9 +108,7 @@ def _build_fetch_commands(params: list[Any], output_dir: str) -> str:
                     f"DataONE input has no resolved objects: {param}"
                 )
         elif isinstance(param, PvcMountInput):
-            # PVC inputs are mounted directly into every workflow container —
-            # there is nothing to download. Emit a marker echo so the fetch step
-            # has a real command to run and its output artifact is non-empty.
+            # PVC inputs are already mounted — emit a marker for the fetch step.
             commands.append(
                 f"echo 'pvc input mounted at {param.full_path}'"
             )
