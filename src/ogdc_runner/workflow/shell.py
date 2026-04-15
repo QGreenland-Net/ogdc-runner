@@ -18,6 +18,8 @@ from loguru import logger
 from ogdc_runner.argo import (
     OGDC_WORKFLOW_PVC,
     OgdcWorkflow,
+    get_input_pvc_volume_mounts,
+    get_input_pvc_volumes,
     submit_workflow,
 )
 from ogdc_runner.constants import MAX_PARALLEL_LIMIT
@@ -176,6 +178,7 @@ class ShellParallelExecutionOrchestrator(ParallelExecutionOrchestrator):
 def make_cmd_template(
     name: str,
     command: str,
+    extra_volume_mounts: list[VolumeMount] | None = None,
 ) -> Container:
     """
     Creates a command template with an optional custom image.
@@ -183,6 +186,9 @@ def make_cmd_template(
     Args:
         name: Name of the template
         command: Shell command to execute
+        extra_volume_mounts: Additional volume mounts to attach (e.g., read-only
+            input PVC mounts). These are additive to the standard artifact-based
+            `/input_dir` / `/output_dir` handoff.
 
     Returns:
         Container template
@@ -193,6 +199,7 @@ def make_cmd_template(
         args=[f"mkdir -p /output_dir/ && {command}"],
         inputs=[Artifact(name="input-dir", path="/input_dir/")],
         outputs=[Artifact(name="output-dir", path="/output_dir/")],
+        volume_mounts=extra_volume_mounts or None,
     )
 
 
@@ -285,8 +292,13 @@ def _create_sequential_workflow(
     fetch_template = make_fetch_input_template(recipe_config, use_pvc=False)
     publish_template = make_publish_template(recipe_config=recipe_config)
 
+    input_pvc_mounts = get_input_pvc_volume_mounts(recipe_config)
     cmd_templates = [
-        make_cmd_template(name=f"run-cmd-{idx}", command=command)
+        make_cmd_template(
+            name=f"run-cmd-{idx}",
+            command=command,
+            extra_volume_mounts=input_pvc_mounts or None,
+        )
         for idx, command in enumerate(commands)
     ]
 
@@ -324,12 +336,18 @@ def make_and_submit_shell_workflow(
     commands = recipe_config.workflow.get_commands_from_sh_file()  # type: ignore[union-attr]
     parallel_config = recipe_config.workflow.parallel
 
+    # `_apply_global_config` sets `volumes=[OGDC_WORKFLOW_PVC]` as a class default
+    # on Workflow. Passing `volumes=` as a kwarg here overrides that default, so we
+    # must always include OGDC_WORKFLOW_PVC alongside any user input PVC volumes.
+    workflow_volumes = [OGDC_WORKFLOW_PVC, *get_input_pvc_volumes(recipe_config)]
+
     with OgdcWorkflow(
         name="shell",
         recipe_config=recipe_config,
         archive_workflow=True,
         entrypoint="main",
         parallelism=MAX_PARALLEL_LIMIT if parallel_config.enabled else None,
+        volumes=workflow_volumes,
     ) as w:
         if parallel_config.enabled:
             _create_parallel_workflow(recipe_config, commands)

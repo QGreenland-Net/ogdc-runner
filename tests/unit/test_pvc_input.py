@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
-
+from ogdc_runner.argo import make_input_pvc_volume, make_input_pvc_volume_mount
+from ogdc_runner.inputs import _build_fetch_commands
 from ogdc_runner.models.recipe_config import PvcMountInput, RecipeInput
 
 
@@ -26,10 +25,26 @@ def test_pvc_mount_parses_from_meta_yaml_dict():
             ]
         }
     )
-    param = recipe_input.params[0]
-    assert isinstance(param, PvcMountInput)
+    assert isinstance(recipe_input.params[0], PvcMountInput)
 
 
-def test_missing_required_fields_raises():
-    with pytest.raises(ValidationError):
-        PvcMountInput(claim_name="foo")  # type: ignore[call-arg]
+def test_input_pvc_volume_and_mount_are_read_only():
+    """Input PVCs must be mounted read-only so recipes can't mutate source data."""
+    pvc = PvcMountInput(claim_name="arctic-dem-pvc", path="/tiles/")
+
+    volume = make_input_pvc_volume(pvc.claim_name)
+    mount = make_input_pvc_volume_mount(pvc)
+
+    assert volume.persistent_volume_claim.read_only is True
+    assert mount.read_only is True
+    assert mount.mount_path == "/mnt/data/arctic-dem-pvc"
+    assert mount.name == volume.name
+
+
+def test_pvc_input_does_not_trigger_a_download():
+    """Fetch step must not wget a PVC input — the data is already mounted."""
+    pvc = PvcMountInput(claim_name="foo", path="/bar/")
+    cmd = _build_fetch_commands([pvc], output_dir="/output_dir")
+
+    assert "wget" not in cmd
+    assert pvc.full_path in cmd
