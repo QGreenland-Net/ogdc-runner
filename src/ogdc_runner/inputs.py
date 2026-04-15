@@ -10,9 +10,14 @@ from hera.workflows import (
 )
 from hera.workflows.models import VolumeMount
 
-from ogdc_runner.argo import OGDC_WORKFLOW_PVC
+from ogdc_runner.argo import OGDC_WORKFLOW_PVC, get_input_pvc_volume_mounts
 from ogdc_runner.exceptions import OgdcWorkflowExecutionError
-from ogdc_runner.models.recipe_config import DataOneInput, RecipeConfig, UrlInput
+from ogdc_runner.models.recipe_config import (
+    DataOneInput,
+    PvcMountInput,
+    RecipeConfig,
+    UrlInput,
+)
 
 
 def make_fetch_input_template(
@@ -35,10 +40,20 @@ def make_fetch_input_template(
 
     Raises:
         OgdcWorkflowExecutionError: If unsupported input type is encountered
-        NotImplementedError: If PVC mount input type is used (not yet supported)
     """
     output_dir = _get_output_directory(recipe_config.id, use_pvc)
     fetch_commands = _build_fetch_commands(recipe_config.input.params, output_dir)
+
+    volume_mounts: list[VolumeMount] = []
+    if use_pvc:
+        volume_mounts.append(
+            VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow/")
+        )
+    # Input PVCs must be readable from the fetch step regardless of `use_pvc`:
+    # - Sequential path: the fetch step is a no-op that only prints a message,
+    #   but keeping mounts consistent avoids surprises.
+    # - Parallel/PVC path: the fetch step needs read access too.
+    volume_mounts.extend(get_input_pvc_volume_mounts(recipe_config))
 
     return Container(
         name=f"{recipe_config.id}-fetch-template-",
@@ -47,11 +62,7 @@ def make_fetch_input_template(
         outputs=[Artifact(name="output-dir", path="/output_dir/")]
         if not use_pvc
         else None,
-        volume_mounts=[
-            VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow/")
-        ]
-        if use_pvc
-        else None,
+        volume_mounts=volume_mounts or None,
     )
 
 
@@ -83,12 +94,10 @@ def _build_fetch_commands(params: list[Any], output_dir: str) -> str:
 
     Raises:
         OgdcWorkflowExecutionError: If unsupported input type encountered
-        NotImplementedError: If PVC mount type used
     """
     commands = []
 
     for param in params:
-        # Check if the parameter is a URL
         if isinstance(param, UrlInput):
             commands.append(_build_url_fetch_command(str(param.value), output_dir))
         elif isinstance(param, DataOneInput):
@@ -101,6 +110,13 @@ def _build_fetch_commands(params: list[Any], output_dir: str) -> str:
                 raise OgdcWorkflowExecutionError(
                     f"DataONE input has no resolved objects: {param}"
                 )
+        elif isinstance(param, PvcMountInput):
+            # PVC inputs are mounted directly into every workflow container —
+            # there is nothing to download. Emit a marker echo so the fetch step
+            # has a real command to run and its output artifact is non-empty.
+            commands.append(
+                f"echo 'pvc input mounted at {param.full_path}'"
+            )
 
     return " && ".join(commands) if commands else "echo 'No input files to fetch'"
 
