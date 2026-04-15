@@ -82,6 +82,7 @@ _WORKER_RETRY = RetryStrategy(
 # Stage 1 — Stage input files → max-z vector tiles
 # ---------------------------------------------------------------------------
 
+
 @script(
     name="stage-files",
     inputs=[
@@ -127,18 +128,28 @@ def stage_file_parallel() -> None:
     for idx, input_file in enumerate(input_files):
         log.info(
             "partition=%s [%d/%d] staging %s",
-            partition_id, idx + 1, len(input_files), input_file,
+            partition_id,
+            idx + 1,
+            len(input_files),
+            input_file,
         )
         try:
             workflow.stage(input_file)
             log.info(
                 "partition=%s [%d/%d] done %s",
-                partition_id, idx + 1, len(input_files), input_file,
+                partition_id,
+                idx + 1,
+                len(input_files),
+                input_file,
             )
         except Exception as e:
             log.error(
                 "partition=%s [%d/%d] FAILED %s error=%s",
-                partition_id, idx + 1, len(input_files), input_file, e,
+                partition_id,
+                idx + 1,
+                len(input_files),
+                input_file,
+                e,
             )
             sys.exit(1)
 
@@ -267,9 +278,7 @@ def discover_parent_tiles() -> None:
 
     child_dir = workflow.config.get_dir("geotiff", z=child_z)
     child_tiles = [
-        e.path
-        for e in os.scandir(child_dir)
-        if e.is_file() and e.name.endswith(".tif")
+        e.path for e in os.scandir(child_dir) if e.is_file() and e.name.endswith(".tif")
     ]
 
     log.info("z=%d child_z=%d child_tiles=%d", z_level, child_z, len(child_tiles))
@@ -280,9 +289,7 @@ def discover_parent_tiles() -> None:
         if parent_path:
             parent_tiles.add(parent_path)
 
-    parent_tiles_list = [
-        {"z": z_level, "path": p} for p in sorted(parent_tiles)
-    ]
+    parent_tiles_list = [{"z": z_level, "path": p} for p in sorted(parent_tiles)]
     log.info("z=%d parent_tiles=%d", z_level, len(parent_tiles_list))
 
     partitions = [
@@ -772,9 +779,7 @@ EOF"""
             # ============================================================
             final_composite_task: Task | None = None
             if enable_raster_parents:
-                prev_task: Task | None = (
-                    rasterize_task or staged_tiles_discovery_task
-                )
+                prev_task: Task | None = rasterize_task or staged_tiles_discovery_task
 
                 for z in composite_z_levels:
                     discover_parents_task = discover_parent_tiles(

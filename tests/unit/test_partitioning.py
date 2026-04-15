@@ -12,7 +12,9 @@ _EF = ExecutionFunction(name="stage-files", command="bash recipe.sh")
 
 
 def _url_inputs(n: int) -> list[UrlInput]:
-    return [UrlInput(value=f"https://example.com/file{i}.fgb", type="url") for i in range(n)]
+    return [
+        UrlInput(value=f"https://example.com/file{i}.fgb", type="url") for i in range(n)
+    ]
 
 
 def _dataone_input(urls: list[str]) -> DataOneInput:
@@ -28,7 +30,9 @@ def _dataone_input(urls: list[str]) -> DataOneInput:
 
 def test_partitions_split_correctly():
     """5 files with partition_size=2 → [2, 2, 1]."""
-    partitions = create_partitions(_url_inputs(5), _EF, ParallelConfig(partition_size=2))
+    partitions = create_partitions(
+        _url_inputs(5), _EF, ParallelConfig(partition_size=2)
+    )
     assert [len(p.files) for p in partitions] == [2, 2, 1]
 
 
@@ -42,7 +46,9 @@ def test_default_partition_size_is_1000():
 def test_dataone_urls_are_extracted():
     """DataOneInput resolved_objects[*]['url'] are used as file paths."""
     urls = [f"https://cn.dataone.org/f{i}.fgb" for i in range(4)]
-    partitions = create_partitions([_dataone_input(urls)], _EF, ParallelConfig(partition_size=2))
+    partitions = create_partitions(
+        [_dataone_input(urls)], _EF, ParallelConfig(partition_size=2)
+    )
     assert len(partitions) == 2
     assert partitions[0].files == urls[:2]
 
