@@ -109,9 +109,7 @@ def _build_fetch_commands(params: list[Any], output_dir: str) -> str:
                 )
         elif isinstance(param, PvcMountInput):
             # PVC inputs are already mounted — emit a marker for the fetch step.
-            commands.append(
-                f"echo 'pvc input mounted at {param.full_path}'"
-            )
+            commands.append(f"echo 'pvc input mounted at {param.full_path}'")
 
     return " && ".join(commands) if commands else "echo 'No input files to fetch'"
 

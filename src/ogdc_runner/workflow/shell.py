@@ -221,19 +221,21 @@ def _make_pvc_listing_template(
     full_path = pvc_input.full_path
     glob = pvc_input.glob
 
-    listing_cmd = "\n".join([
-        "set -eu",
-        f"find '{full_path}' -maxdepth 1 -name '{glob}' -type f | sort > /tmp/files.txt",
-        f"test -s /tmp/files.txt || {{ echo 'No files found matching {glob} in {full_path}' >&2; exit 1; }}",
-        "python3 - << 'PYEOF'",
-        "import json",
-        "files = [line.rstrip() for line in open('/tmp/files.txt') if line.strip()]",
-        f"ps = {partition_size}",
-        "parts = [{'partition_id': i, 'files': files[j:j+ps]} for i, j in enumerate(range(0, len(files), ps))]",
-        "json.dump(parts, open('/tmp/partitions.json', 'w'))",
-        "import sys; sys.stderr.write('Generated ' + str(len(parts)) + ' partitions\\n')",
-        "PYEOF",
-    ])
+    listing_cmd = "\n".join(
+        [
+            "set -eu",
+            f"find '{full_path}' -maxdepth 1 -name '{glob}' -type f | sort > /tmp/files.txt",
+            f"test -s /tmp/files.txt || {{ echo 'No files found matching {glob} in {full_path}' >&2; exit 1; }}",
+            "python3 - << 'PYEOF'",
+            "import json",
+            "files = [line.rstrip() for line in open('/tmp/files.txt') if line.strip()]",
+            f"ps = {partition_size}",
+            "parts = [{'partition_id': i, 'files': files[j:j+ps]} for i, j in enumerate(range(0, len(files), ps))]",
+            "json.dump(parts, open('/tmp/partitions.json', 'w'))",
+            "import sys; sys.stderr.write('Generated ' + str(len(parts)) + ' partitions\\n')",
+            "PYEOF",
+        ]
+    )
 
     return Container(
         name="list-pvc-files",
@@ -309,9 +311,7 @@ def _create_pvc_parallel_workflow(
         recipe_config: Recipe configuration
         commands: List of shell commands to execute per partition
     """
-    pvc_inputs = [
-        p for p in recipe_config.input.params if isinstance(p, PvcMountInput)
-    ]
+    pvc_inputs = [p for p in recipe_config.input.params if isinstance(p, PvcMountInput)]
     pvc_input = pvc_inputs[0]  # Single PVC input; mixed inputs are out of scope
 
     parallel_config = recipe_config.workflow.parallel
@@ -367,9 +367,7 @@ def _create_parallel_workflow(
         recipe_config: Recipe configuration
         commands: List of shell commands to execute in parallel
     """
-    pvc_inputs = [
-        p for p in recipe_config.input.params if isinstance(p, PvcMountInput)
-    ]
+    pvc_inputs = [p for p in recipe_config.input.params if isinstance(p, PvcMountInput)]
     if pvc_inputs:
         _create_pvc_parallel_workflow(recipe_config, commands)
         return

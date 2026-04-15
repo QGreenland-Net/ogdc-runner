@@ -81,9 +81,7 @@ def make_input_pvc_volume_mount(pvc_input: PvcMountInput) -> models.VolumeMount:
 
 
 def _get_pvc_inputs(recipe_config: RecipeConfig) -> list[PvcMountInput]:
-    return [
-        p for p in recipe_config.input.params if isinstance(p, PvcMountInput)
-    ]
+    return [p for p in recipe_config.input.params if isinstance(p, PvcMountInput)]
 
 
 def get_input_pvc_volumes(recipe_config: RecipeConfig) -> list[models.Volume]:

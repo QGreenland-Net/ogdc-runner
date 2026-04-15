@@ -84,4 +84,3 @@ def test_pvc_listing_template():
     assert raw_outputs is not None
     assert not isinstance(raw_outputs, (str, bytes))
     assert any(o.name == "partitions" for o in raw_outputs)  # type: ignore[union-attr]
-

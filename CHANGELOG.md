@@ -1,5 +1,8 @@
 # v0.4.0
-- Add `pvc_mount` input type for referencing pre-staged data on PersistentVolumeClaims (PVCs). Supports both sequential and parallel workflows.
+
+- Add `pvc_mount` input type for referencing pre-staged data on
+  PersistentVolumeClaims (PVCs). Supports both sequential and parallel
+  workflows.
 
 # v0.3.0
 

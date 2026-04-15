@@ -300,14 +300,14 @@ orchestrator does this automatically.
 ### PVC Parallel Execution
 
 When using `pvc_mount` inputs with parallel execution, the runner cannot
-enumerate input files at submit time because it does not mount the PVC.
-Instead, partitioning happens **inside the cluster at workflow runtime**:
+enumerate input files at submit time because it does not mount the PVC. Instead,
+partitioning happens **inside the cluster at workflow runtime**:
 
-1. The runner builds a workflow containing a `list-pvc-files` container step
-   and submits it to Argo — no file listing occurs on the runner itself.
+1. The runner builds a workflow containing a `list-pvc-files` container step and
+   submits it to Argo — no file listing occurs on the runner itself.
 2. At runtime, `list-pvc-files` runs on a pod that mounts the input PVC,
-   enumerates files matching the `glob` pattern, and groups them into
-   partitions of `partition_size`. It outputs JSON:
+   enumerates files matching the `glob` pattern, and groups them into partitions
+   of `partition_size`. It outputs JSON:
    `[{"partition_id": 0, "files": ["/mnt/data/.../a.tif", ...]}, ...]`
 3. Argo reads that JSON via `with_param` and spawns one parallel task per
    partition — the same fan-out pattern used by the visualization workflow.
