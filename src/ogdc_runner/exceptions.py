@@ -59,3 +59,9 @@ class OgdcDataOneError(OgdcRunnerException):
     """Exception raised when DataONE operations fail."""
 
     pass
+
+
+class OgdcConfigurationError(OgdcRunnerException):
+    """Exception raised for infrastructure/configuration errors (e.g., missing PVC)."""
+
+    pass

@@ -4,7 +4,7 @@ import json
 import logging
 from functools import cache, cached_property
 from pathlib import Path
-from typing import Any, Literal, Self, TypeAlias
+from typing import Annotated, Any, Literal, Self, TypeAlias
 
 import requests
 from pydantic import (
@@ -144,7 +144,36 @@ class DataOneInput(InputParam):
         return self
 
 
-InputParamType: TypeAlias = DataOneInput | UrlInput
+class PvcMountInput(InputParam):
+    """Input from a Kubernetes PersistentVolumeClaim mount.
+
+    The specified PVC is mounted read-only at `/mnt/data/{claim_name}/` in
+    workflow containers. Files under `path` (relative to the PVC root) are
+    available for recipe commands to read directly.
+    """
+
+    type: Literal["pvc_mount"] = "pvc_mount"
+    claim_name: str
+    path: str
+    glob: str = "*"
+
+    @property
+    def mount_path(self) -> str:
+        return f"/mnt/data/{self.claim_name}"
+
+    @property
+    def full_path(self) -> str:
+        # Normalize to avoid double-slashes when `path` starts/ends with `/`.
+        stripped = self.path.strip("/")
+        if not stripped:
+            return self.mount_path
+        return f"{self.mount_path}/{stripped}"
+
+
+InputParamType: TypeAlias = Annotated[
+    DataOneInput | UrlInput | PvcMountInput,
+    Field(discriminator="type"),
+]
 
 
 # Create a model for the recipe input
