@@ -82,6 +82,7 @@ _WORKER_RETRY = RetryStrategy(
 # Stage 1 — Stage input files → max-z vector tiles
 # ---------------------------------------------------------------------------
 
+
 @script(
     name="stage-files",
     inputs=[
@@ -136,7 +137,11 @@ def stage_file_parallel() -> None:
             local_path = os.path.join(dir_input, filename)
             log.info(
                 "partition=%s [%d/%d] downloading %s -> %s",
-                partition_id, idx + 1, len(input_files), input_file, local_path,
+                partition_id,
+                idx + 1,
+                len(input_files),
+                input_file,
+                local_path,
             )
             urllib.request.urlretrieve(input_file, local_path)
         else:
@@ -144,18 +149,28 @@ def stage_file_parallel() -> None:
 
         log.info(
             "partition=%s [%d/%d] staging %s",
-            partition_id, idx + 1, len(input_files), local_path,
+            partition_id,
+            idx + 1,
+            len(input_files),
+            local_path,
         )
         try:
             workflow.stage(local_path)
             log.info(
                 "partition=%s [%d/%d] done %s",
-                partition_id, idx + 1, len(input_files), local_path,
+                partition_id,
+                idx + 1,
+                len(input_files),
+                local_path,
             )
         except Exception as e:
             log.error(
                 "partition=%s [%d/%d] FAILED %s error=%s",
-                partition_id, idx + 1, len(input_files), local_path, e,
+                partition_id,
+                idx + 1,
+                len(input_files),
+                local_path,
+                e,
             )
             sys.exit(1)
 
@@ -799,9 +814,7 @@ EOF"""
             # ============================================================
             final_composite_task: Task | None = None
             if enable_raster_parents:
-                prev_task: Task | None = (
-                    rasterize_task or staged_tiles_discovery_task
-                )
+                prev_task: Task | None = rasterize_task or staged_tiles_discovery_task
 
                 for z in composite_z_levels:
                     discover_parents_task = discover_parent_tiles(
