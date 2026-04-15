@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from functools import cache, cached_property
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self, TypeAlias
@@ -156,6 +157,27 @@ class PvcMountInput(InputParam):
     claim_name: str
     path: str
     glob: str = "*"
+
+    @field_validator("claim_name")
+    @classmethod
+    def validate_claim_name(cls, v: str) -> str:
+        # K8s volume names are capped at 63 chars; "input-pvc-" prefix is 10.
+        max_len = 53
+        if len(v) > max_len:
+            msg = f"claim_name too long ({len(v)} > {max_len})"
+            raise ValueError(msg)
+        if not re.match(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", v):
+            msg = f"claim_name must be a valid K8s DNS label: {v!r}"
+            raise ValueError(msg)
+        return v
+
+    @field_validator("glob")
+    @classmethod
+    def validate_glob(cls, v: str) -> str:
+        if "'" in v:
+            msg = "glob must not contain single quotes"
+            raise ValueError(msg)
+        return v
 
     @property
     def mount_path(self) -> str:

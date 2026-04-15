@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from ogdc_runner.argo import make_input_pvc_volume, make_input_pvc_volume_mount
 from ogdc_runner.inputs import _build_fetch_commands
 from ogdc_runner.models.recipe_config import PvcMountInput, RecipeInput
@@ -20,6 +23,16 @@ def test_pvc_mount_parses_from_dict():
         {"params": [{"type": "pvc_mount", "claim_name": "test-pvc", "path": "/data/"}]}
     )
     assert isinstance(recipe_input.params[0], PvcMountInput)
+
+
+def test_claim_name_rejects_invalid_k8s_names():
+    """claim_name must be a valid K8s DNS label."""
+    with pytest.raises(ValidationError, match="DNS label"):
+        PvcMountInput(claim_name="UPPER_CASE", path="/data/")
+    with pytest.raises(ValidationError, match="too long"):
+        PvcMountInput(claim_name="a" * 54, path="/data/")
+    with pytest.raises(ValidationError, match="DNS label"):
+        PvcMountInput(claim_name="-leading-dash", path="/data/")
 
 
 def test_input_pvc_volume_and_mount_are_read_only():
