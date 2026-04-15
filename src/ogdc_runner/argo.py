@@ -16,7 +16,7 @@ from hera.workflows import (
 from loguru import logger
 
 from ogdc_runner.exceptions import OgdcWorkflowExecutionError
-from ogdc_runner.models.recipe_config import RecipeConfig
+from ogdc_runner.models.recipe_config import PvcMountInput, RecipeConfig
 
 # Kubernetes names must be no more than 63 characters.
 # Argo appends a 5-character random suffix to generate_name, so we reserve space for it.
@@ -53,6 +53,66 @@ OGDC_WORKFLOW_PVC = models.Volume(
         claim_name="cephfs-qgnet-ogdc-workflow-pvc",
     ),
 )
+
+
+def _input_pvc_volume_name(claim_name: str) -> str:
+    """Deterministic, k8s-safe volume name for an input PVC."""
+    return f"input-pvc-{claim_name}"
+
+
+def make_input_pvc_volume(claim_name: str) -> models.Volume:
+    """Build an Argo Volume referencing a user-provided input PVC."""
+    return models.Volume(
+        name=_input_pvc_volume_name(claim_name),
+        persistent_volume_claim=models.PersistentVolumeClaimVolumeSource(
+            claim_name=claim_name,
+            read_only=True,
+        ),
+    )
+
+
+def make_input_pvc_volume_mount(pvc_input: PvcMountInput) -> models.VolumeMount:
+    """Build a read-only VolumeMount for an input PVC at `/mnt/data/{claim_name}`."""
+    return models.VolumeMount(
+        name=_input_pvc_volume_name(pvc_input.claim_name),
+        mount_path=pvc_input.mount_path,
+        read_only=True,
+    )
+
+
+def _get_pvc_inputs(recipe_config: RecipeConfig) -> list[PvcMountInput]:
+    return [
+        p for p in recipe_config.input.params if isinstance(p, PvcMountInput)
+    ]
+
+
+def get_input_pvc_volumes(recipe_config: RecipeConfig) -> list[models.Volume]:
+    """Return Argo Volumes for every PVC input referenced by the recipe.
+
+    Deduplicates by claim_name so the same PVC referenced twice yields one volume.
+    """
+    seen: set[str] = set()
+    volumes: list[models.Volume] = []
+    for pvc in _get_pvc_inputs(recipe_config):
+        if pvc.claim_name in seen:
+            continue
+        seen.add(pvc.claim_name)
+        volumes.append(make_input_pvc_volume(pvc.claim_name))
+    return volumes
+
+
+def get_input_pvc_volume_mounts(
+    recipe_config: RecipeConfig,
+) -> list[models.VolumeMount]:
+    """Return read-only VolumeMounts for every PVC input referenced by the recipe."""
+    seen: set[str] = set()
+    mounts: list[models.VolumeMount] = []
+    for pvc in _get_pvc_inputs(recipe_config):
+        if pvc.claim_name in seen:
+            continue
+        seen.add(pvc.claim_name)
+        mounts.append(make_input_pvc_volume_mount(pvc))
+    return mounts
 
 
 class ArgoConfig:
