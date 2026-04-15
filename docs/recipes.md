@@ -94,6 +94,40 @@ and
 [greenland-ice-sheet](https://github.com/QGreenland-Net/ogdc-recipes/tree/main/recipes/greenland-ice-sheet)
 recipes to see DataONE inputs in practice.
 
+#### PVC Mount Inputs
+
+If your dataset is pre-staged on a Kubernetes PersistentVolumeClaim (PVC), you
+can reference it directly. The PVC is mounted read-only into all workflow
+containers at `/mnt/data/{claim_name}/`:
+
+```yaml
+input:
+  params:
+    - type: pvc_mount
+      claim_name: arctic-dem-pvc
+      path: /tiles/v3/
+      glob: "*.tif"
+```
+
+- **`claim_name`** (required): Name of the PVC in the cluster namespace.
+- **`path`** (required): Subpath within the PVC containing the input files.
+- **`glob`** (optional, default `"*"`): Glob pattern for file selection. Used by
+  parallel workflows to enumerate files at runtime.
+
+Recipe scripts read files from the mounted path. For the example above, files
+are accessible at `/mnt/data/arctic-dem-pvc/tiles/v3/*.tif`.
+
+```{note}
+PVC mount inputs skip the download step entirely. The fetch step emits a
+no-op marker instead.
+```
+
+PVC inputs support parallel execution. When `parallel.enabled` is `true`, the
+workflow enumerates files matching the glob pattern at runtime and distributes
+them across partitions automatically. See {ref}`parallel-execution` below.
+
+See {class}`ogdc_runner.models.recipe_config.PvcMountInput` for details.
+
 #### `output`
 
 {class}`ogdc_runner.models.recipe_config.RecipeOutput` is the base class
@@ -193,7 +227,10 @@ taking a look at the
 [ogdc-recipes viz-workflow recipe](https://github.com/QGreenland-Net/ogdc-recipes/tree/main/recipes/viz-workflow)
 example.
 
+<!-- prettier-ignore-start -->
+(parallel-execution)=
 ## Parallel Execution
+<!-- prettier-ignore-end -->
 
 Currently only `shell` workflows support parallel execution for processing
 multiple input files concurrently. Parallel execution distributes work across
@@ -258,4 +295,45 @@ in the partition. The runner sets environment variables (`$INPUT_FILE` and
 `$OUTPUT_FILE`) for each file, and your command processes them one at a time
 within the partition. You don't need to handle the partition splitting - the
 orchestrator does this automatically.
+```
+
+### PVC Parallel Execution
+
+When using `pvc_mount` inputs with parallel execution, the runner cannot
+enumerate input files at submit time because it does not mount the PVC.
+Instead, partitioning happens **inside the cluster at workflow runtime**:
+
+1. The runner builds a workflow containing a `list-pvc-files` container step
+   and submits it to Argo — no file listing occurs on the runner itself.
+2. At runtime, `list-pvc-files` runs on a pod that mounts the input PVC,
+   enumerates files matching the `glob` pattern, and groups them into
+   partitions of `partition_size`. It outputs JSON:
+   `[{"partition_id": 0, "files": ["/mnt/data/.../a.tif", ...]}, ...]`
+3. Argo reads that JSON via `with_param` and spawns one parallel task per
+   partition — the same fan-out pattern used by the visualization workflow.
+
+```yaml
+input:
+  params:
+    - type: pvc_mount
+      claim_name: arctic-dem-pvc
+      path: /tiles/v3/
+      glob: "*.tif"
+workflow:
+  type: shell
+  parallel:
+    enabled: true
+    partition_strategy: files
+    partition_size: 4
+```
+
+At `CMD_INDEX=0`, `$INPUT_FILE` is set to the full PVC path (e.g.,
+`/mnt/data/arctic-dem-pvc/tiles/v3/tile_001.tif`). For subsequent commands,
+`$INPUT_FILE` reads from the previous command's output directory as normal.
+
+```{note}
+For URL inputs, the runner knows every URL at submit time and creates
+partitions before the workflow is submitted. For PVC inputs, the runner has
+no access to the PVC filesystem, so the listing step inside the workflow
+handles discovery and partitioning.
 ```
