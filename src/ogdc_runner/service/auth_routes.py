@@ -6,8 +6,10 @@ import datetime as dt
 from typing import Annotated
 
 import pydantic
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, FastAPI
 from fastapi.security import OAuth2PasswordRequestForm
+
+import shutil
 
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
@@ -32,36 +34,36 @@ class SubmitRecipeResponse(pydantic.BaseModel):
     message: str
     recipe_workflow_name: str | None
 
-
 @router.post("/submit")
 def submit(
     submit_recipe_request: SubmitRecipeRequest,
-    # Ensure submissions require an authenticated user.
-    # _current_user: auth.AuthenticatedUserDependency,
+    background_tasks: BackgroundTasks, # Add this parameter
 ) -> SubmitRecipeResponse:
-    """Submit a recipe to OGDC for execution.
-
-    Requires a valid auth token.
-    """
+    """Submit a recipe to OGDC for execution."""
     try:
-        with stage_ogdc_recipe(submit_recipe_request.recipe_path) as recipe_dir:
-            recipe_workflow_name = submit_ogdc_recipe(
-                recipe_dir=recipe_dir,
-                # Submitting a recipe should never wait - the api should be
-                # responsive and async.
-                wait=False,
-                overwrite=submit_recipe_request.overwrite,
-            )
-            return SubmitRecipeResponse(
-                message=f"Successfully submitted recipe with {recipe_workflow_name=}",
-                recipe_workflow_name=recipe_workflow_name,
-            )
+        recipe_dir = stage_ogdc_recipe(submit_recipe_request.recipe_path)
+            
+        # use background_tasks to run the submission logic
+        background_tasks.add_task(
+            submit_ogdc_recipe,
+            recipe_dir=recipe_dir,
+            wait=False,
+            overwrite=submit_recipe_request.overwrite,
+        )
+
+        # schedule the cleanup to run after the submission
+        background_tasks.add_task(shutil.rmtree, recipe_dir)
+            
+        # return a generic success message immediately
+        return SubmitRecipeResponse(
+            message="Recipe submission accepted.",
+            recipe_workflow_name="pending", 
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to submit recipe with error: {e}.",
+            detail=f"Failed to initiate submission: {e}.",
         ) from e
-
 
 class StatusResponse(pydantic.BaseModel):
     recipe_workflow_name: str

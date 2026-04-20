@@ -17,19 +17,18 @@ from ogdc_runner.exceptions import OgdcInvalidRecipeConfig, OgdcInvalidRecipeDir
 from ogdc_runner.models.recipe_config import RecipeConfig
 
 
-@contextmanager
 def stage_ogdc_recipe(recipe_location: str):  # type: ignore[no-untyped-def]
     """Stages the recipe directory."""
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_path = Path(temp_dir)
+    temp_dir = tempfile.mkdtemp()
+    temp_path = Path(temp_dir)
 
-        recipe_fs, recipe_fs_path = fsspec.core.url_to_fs(recipe_location)
-
-        recipe_fs.get([recipe_fs_path], str(temp_path), recursive=True)
-        logger.success(f"staged recipe directory from {recipe_location} to {temp_dir}")
-
-        yield temp_path
+    recipe_fs, recipe_fs_path = fsspec.core.url_to_fs(recipe_location)
+    recipe_fs.get([recipe_fs_path], str(temp_path), recursive=True)
+    
+    logger.success(f"staged recipe directory from {recipe_location} to {temp_dir}")
+    
+    return temp_path
 
 
 @contextmanager
