@@ -311,6 +311,7 @@ def _create_sequential_workflow(
 def make_and_submit_shell_workflow(
     recipe_config: RecipeConfig,
     wait: bool,
+    submission_id: str
 ) -> str:
     """Create and submit an argo workflow based on a shell recipe.
 
@@ -326,10 +327,11 @@ def make_and_submit_shell_workflow(
 
     with OgdcWorkflow(
         name="shell",
+        submission_id=submission_id,
         recipe_config=recipe_config,
         archive_workflow=True,
         entrypoint="main",
-        parallelism=MAX_PARALLEL_LIMIT if parallel_config.enabled else None,
+        parallelism=MAX_PARALLEL_LIMIT if parallel_config.enabled else None
     ) as w:
         if parallel_config.enabled:
             _create_parallel_workflow(recipe_config, commands)

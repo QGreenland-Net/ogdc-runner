@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, FastAPI
 from fastapi.security import OAuth2PasswordRequestForm
 
 import shutil
+import uuid
 
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
@@ -32,23 +33,25 @@ class SubmitRecipeRequest(pydantic.BaseModel):
 
 class SubmitRecipeResponse(pydantic.BaseModel):
     message: str
-    recipe_workflow_name: str | None
+    recipe_submission_id: str | None
 
 @router.post("/submit")
 def submit(
     submit_recipe_request: SubmitRecipeRequest,
-    background_tasks: BackgroundTasks, # Add this parameter
+    background_tasks: BackgroundTasks,
 ) -> SubmitRecipeResponse:
     """Submit a recipe to OGDC for execution."""
     try:
         recipe_dir = stage_ogdc_recipe(submit_recipe_request.recipe_path)
-            
+
+        submission_id = str(uuid.uuid4())    
         # use background_tasks to run the submission logic
         background_tasks.add_task(
             submit_ogdc_recipe,
             recipe_dir=recipe_dir,
             wait=False,
             overwrite=submit_recipe_request.overwrite,
+            submission_id=submission_id
         )
 
         # schedule the cleanup to run after the submission
@@ -57,7 +60,7 @@ def submit(
         # return a generic success message immediately
         return SubmitRecipeResponse(
             message="Recipe submission accepted.",
-            recipe_workflow_name="pending", 
+            recipe_submission_id=submission_id
         )
     except Exception as e:
         raise HTTPException(
@@ -66,17 +69,17 @@ def submit(
         ) from e
 
 class StatusResponse(pydantic.BaseModel):
-    recipe_workflow_name: str
+    identifier: str
     status: str | None
     timestamp: dt.datetime = pydantic.Field(default_factory=dt.datetime.now)
 
 
-@router.get("/status/{recipe_workflow_name}")
-def status(recipe_workflow_name: str) -> StatusResponse:
+@router.get("/status/{identifier}")
+def status(identifier: str) -> StatusResponse:
     """Check an argo workflow's status."""
-    status = get_workflow_status(recipe_workflow_name)
+    status = get_workflow_status(identifier)
     return StatusResponse(
-        recipe_workflow_name=recipe_workflow_name,
+        identifier=identifier,
         status=status,
     )
 

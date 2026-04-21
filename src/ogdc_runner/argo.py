@@ -233,13 +233,28 @@ ARGO_MANAGER: ArgoManager = ArgoManager()
 ARGO_WORKFLOW_SERVICE: WorkflowsService = ARGO_MANAGER.workflow_service
 
 
-def get_workflow_status(workflow_name: str) -> str | None:
+def get_workflow_status(identifier: str) -> str | None:
     """Return the given workflow's status (e.g., `'Succeeded'`)"""
-    workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=workflow_name)
+   # try fetching by name first (cheapest operation)
+    try:
+        workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=identifier)
+        return workflow.status.phase
+    except Exception:
+        workflows = None 
+        
+        try:
+            workflows = ARGO_WORKFLOW_SERVICE.list_workflows(
+                label_selector=f"submission_id={identifier}"
+            )
+        except Exception as e:
+            print(f"Argo API communication failed: {e}")
+            return None
 
-    status: str | None = workflow.status.phase  # type: ignore[union-attr]
+        # Now 'workflows' is guaranteed to exist (either as None or the response)
+        if workflows and workflows.items and len(workflows.items) > 0:
+            return workflows.items[0].status.phase
 
-    return status
+    return None
 
 
 def wait_for_workflow_completion(workflow_name: str) -> None:
@@ -283,7 +298,8 @@ def OgdcWorkflow(
     *,
     recipe_config: RecipeConfig,
     name: str,
-    archive_workflow: bool,
+    submission_id: str | None = None,
+    archive_workflow: bool = False,
     **kwargs: Any,
 ) -> Generator[Workflow, None, None]:
     """Contexts manager that yields an argo workflow with configuration driven by `recipe_config`.
@@ -316,6 +332,9 @@ def OgdcWorkflow(
         **kwargs.pop("labels", {}),
         "ogdc/persist-workflow-in-archive": "true" if archive_workflow else "false",
     }
+
+    if submission_id:
+        labels["submission_id"] = submission_id
 
     workflow_kwargs = {
         # user kwargs first. This ensures that configurations set by this

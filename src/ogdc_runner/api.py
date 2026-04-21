@@ -16,6 +16,7 @@ def submit_ogdc_recipe(
     recipe_dir: Path,
     wait: bool,
     overwrite: bool,
+    submission_id: str
 ) -> str:
     """Submit an OGDC recipe for processing via argo workflows.
 
@@ -42,12 +43,14 @@ def submit_ogdc_recipe(
         return make_and_submit_viz_workflow(
             recipe_config=recipe_config,
             wait=wait,
+            submission_id=submission_id
         )
 
     # We currently expect all recipes to be "shell"
     shell_recipe_workflow_name = make_and_submit_shell_workflow(
         recipe_config=recipe_config,
         wait=wait,
+        submission_id=submission_id
     )
 
     return shell_recipe_workflow_name

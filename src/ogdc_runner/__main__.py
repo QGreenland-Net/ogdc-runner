@@ -125,10 +125,10 @@ def _check_ogdc_api_error(response: requests.Response) -> None:
         raise OgdcServiceApiError(err_msg)
 
 
-def _get_workflow_status(workflow_name: str) -> str:
+def _get_workflow_status(identifier: str) -> str:
     """Get the given workflow's status as a string."""
     response = SESSION.get(
-        url=f"{OGDC_API_URL}/status/{workflow_name}",
+        url=f"{OGDC_API_URL}/status/{identifier}",
         headers={"Authorization": f"Bearer {get_api_token()}"},
     )
 
@@ -139,18 +139,18 @@ def _get_workflow_status(workflow_name: str) -> str:
     return str(status)
 
 
-def _wait_for_workflow_completion(workflow_name: str) -> None:
+def _wait_for_workflow_completion(submission_id: str) -> None:
     """Wait for the given workflow to complete."""
     while True:
-        status = _get_workflow_status(workflow_name)
+        status = _get_workflow_status(submission_id)
         if status:
             print(
-                f"Workflow status for {workflow_name} ({dt.datetime.now():%Y-%m-%d@%H:%M:%S}): {status}"
+                f"Workflow status for {submission_id} ({dt.datetime.now():%Y-%m-%d@%H:%M:%S}): {status}"
             )
             # Terminal states
             if status == "Failed":
                 raise OgdcWorkflowExecutionError(
-                    f"Workflow with name {workflow_name} failed."
+                    f"Workflow with id {submission_id} failed."
                 )
             if status == "Succeeded":
                 return
@@ -197,9 +197,9 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     print(response.json()["message"])
 
     if wait:
-        workflow_name = response.json()["recipe_workflow_name"]
+        submission_id = response.json()["recipe_submission_id"]
         print("Waiting for completion...")
-        _wait_for_workflow_completion(workflow_name)
+        _wait_for_workflow_completion(submission_id)
 
 
 @cli.command

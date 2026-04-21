@@ -122,6 +122,7 @@ def tiling_process() -> None:
 def make_and_submit_viz_workflow(
     recipe_config: RecipeConfig,
     wait: bool,
+    submission_id: str
 ) -> str:
     """Create and submit an Argo workflow for parallel processing of geospatial data.
 
@@ -160,6 +161,7 @@ def make_and_submit_viz_workflow(
 
     with OgdcWorkflow(
         name="visualization",
+        submission_id=submission_id,
         recipe_config=recipe_config,
         archive_workflow=True,
         entrypoint="main",
