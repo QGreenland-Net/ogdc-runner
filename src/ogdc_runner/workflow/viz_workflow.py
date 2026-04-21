@@ -121,7 +121,6 @@ def tiling_process() -> None:
 
 def make_and_submit_viz_workflow(
     recipe_config: RecipeConfig,
-    wait: bool,
     submission_id: str
 ) -> str:
     """Create and submit an Argo workflow for parallel processing of geospatial data.
@@ -238,5 +237,5 @@ EOF"""
             ] >> stage_task
 
     # Submit the workflow
-    workflow_name = submit_workflow(w, wait=wait)
+    workflow_name = submit_workflow(w)
     return workflow_name

@@ -14,7 +14,6 @@ from ogdc_runner.workflow.viz_workflow import make_and_submit_viz_workflow
 def submit_ogdc_recipe(
     *,
     recipe_dir: Path,
-    wait: bool,
     overwrite: bool,
     submission_id: str
 ) -> str:
@@ -42,14 +41,12 @@ def submit_ogdc_recipe(
     if recipe_config.workflow.type == "visualization":
         return make_and_submit_viz_workflow(
             recipe_config=recipe_config,
-            wait=wait,
             submission_id=submission_id
         )
 
     # We currently expect all recipes to be "shell"
     shell_recipe_workflow_name = make_and_submit_shell_workflow(
         recipe_config=recipe_config,
-        wait=wait,
         submission_id=submission_id
     )
 

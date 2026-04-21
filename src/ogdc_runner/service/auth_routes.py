@@ -49,7 +49,6 @@ def submit(
         background_tasks.add_task(
             submit_ogdc_recipe,
             recipe_dir=recipe_dir,
-            wait=False,
             overwrite=submit_recipe_request.overwrite,
             submission_id=submission_id
         )
