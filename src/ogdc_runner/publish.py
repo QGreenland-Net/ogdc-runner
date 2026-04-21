@@ -149,7 +149,7 @@ def remove_existing_published_data(
         with Steps(name="steps"):
             overwrite_template()
 
-    submit_workflow(workflow=w, wait=True)
+    submit_workflow(workflow=w)
 
 
 def check_for_existing_pvc_published_data(
@@ -196,7 +196,7 @@ def check_for_existing_pvc_published_data(
             check_dir_template()
 
     # wait for the workflow to complete.
-    workflow_name = submit_workflow(workflow=w, wait=True)
+    workflow_name = submit_workflow(workflow=w)
 
     # If overwrite is not True, we need to check the result of the
     # `check-already-published` step to see if the data have been published or
