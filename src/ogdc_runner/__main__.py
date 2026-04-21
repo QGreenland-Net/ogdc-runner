@@ -139,21 +139,44 @@ def _get_workflow_status(identifier: str) -> str:
     return str(status)
 
 
-def _wait_for_workflow_completion(submission_id: str) -> None:
-    """Wait for the given workflow to complete."""
+def _wait_for_workflow_completion(
+    identifier: str, 
+    timeout_seconds: int = 1800,  # 30 minute default
+    error_threshold: int = 5      # max consecutive API errors
+) -> None:
+    """Wait for the given workflow to complete with safety timeouts."""
+    start_time = time.time()
+    consecutive_errors = 0
+    
+    print(f"Monitoring workflow: {identifier}")
+
     while True:
-        status = _get_workflow_status(submission_id)
-        if status:
-            print(
-                f"Workflow status for {submission_id} ({dt.datetime.now():%Y-%m-%d@%H:%M:%S}): {status}"
+        # global timeout
+        if time.time() - start_time > timeout_seconds:
+            raise TimeoutError(f"Monitor for {identifier} timed out after {timeout_seconds}s.")
+
+        try:
+            status = _get_workflow_status(identifier)
+            consecutive_errors = 0 # reset on success
+        except Exception as e:
+            consecutive_errors += 1
+            if consecutive_errors >= error_threshold:
+                raise OgdcServiceApiError(f"API failed {error_threshold} times: {e}")
+            time.sleep(5)
+            continue
+
+        timestamp = f"{dt.datetime.now():%Y-%m-%d@%H:%M:%S}"
+        display_status = status if status else "Initializing..."
+        print(f"[{timestamp}] ID: {identifier} | Status: {display_status}")
+
+        if status == "Succeeded":
+            print("Workflow completed successfully.")
+            return
+        
+        if status in ("Failed", "Error"):
+            raise OgdcWorkflowExecutionError(
+                f"Workflow {identifier} terminated with status: {status}"
             )
-            # Terminal states
-            if status == "Failed":
-                raise OgdcWorkflowExecutionError(
-                    f"Workflow with id {submission_id} failed."
-                )
-            if status == "Succeeded":
-                return
         time.sleep(5)
 
 
@@ -197,9 +220,9 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     print(response.json()["message"])
 
     if wait:
-        submission_id = response.json()["recipe_submission_id"]
+        identifier = response.json()["recipe_identifier"]
         print("Waiting for completion...")
-        _wait_for_workflow_completion(submission_id)
+        _wait_for_workflow_completion(identifier)
 
 
 @cli.command
