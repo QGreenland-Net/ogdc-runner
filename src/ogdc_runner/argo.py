@@ -244,7 +244,7 @@ def get_workflow_status(identifier: str) -> str | None:
         
         try:
             workflows = ARGO_WORKFLOW_SERVICE.list_workflows(
-                label_selector=f"submission_id={identifier}"
+                label_selector=f"identifier={identifier}"
             )
         except Exception as e:
             print(f"Argo API communication failed: {e}")
@@ -280,7 +280,7 @@ def OgdcWorkflow(
     *,
     recipe_config: RecipeConfig,
     name: str,
-    submission_id: str | None = None,
+    identifier: str | None = None,
     archive_workflow: bool = False,
     **kwargs: Any,
 ) -> Generator[Workflow, None, None]:
@@ -315,8 +315,8 @@ def OgdcWorkflow(
         "ogdc/persist-workflow-in-archive": "true" if archive_workflow else "false",
     }
 
-    if submission_id:
-        labels["submission_id"] = submission_id
+    if identifier:
+        labels["identifier"] = identifier
 
     workflow_kwargs = {
         # user kwargs first. This ensures that configurations set by this

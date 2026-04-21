@@ -310,7 +310,7 @@ def _create_sequential_workflow(
 
 def make_and_submit_shell_workflow(
     recipe_config: RecipeConfig,
-    submission_id: str
+    identifier: str
 ) -> str:
     """Create and submit an argo workflow based on a shell recipe.
 
@@ -326,7 +326,7 @@ def make_and_submit_shell_workflow(
 
     with OgdcWorkflow(
         name="shell",
-        submission_id=submission_id,
+        identifier=identifier,
         recipe_config=recipe_config,
         archive_workflow=True,
         entrypoint="main",

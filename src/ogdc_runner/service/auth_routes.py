@@ -33,7 +33,7 @@ class SubmitRecipeRequest(pydantic.BaseModel):
 
 class SubmitRecipeResponse(pydantic.BaseModel):
     message: str
-    recipe_submission_id: str | None
+    recipe_identifier: str | None
 
 @router.post("/submit")
 def submit(
@@ -44,13 +44,13 @@ def submit(
     try:
         recipe_dir = stage_ogdc_recipe(submit_recipe_request.recipe_path)
 
-        submission_id = str(uuid.uuid4())    
+        identifier = str(uuid.uuid4())    
         # use background_tasks to run the submission logic
         background_tasks.add_task(
             submit_ogdc_recipe,
             recipe_dir=recipe_dir,
             overwrite=submit_recipe_request.overwrite,
-            submission_id=submission_id
+            identifier=identifier
         )
 
         # schedule the cleanup to run after the submission
@@ -59,7 +59,7 @@ def submit(
         # return a generic success message immediately
         return SubmitRecipeResponse(
             message="Recipe submission accepted.",
-            recipe_submission_id=submission_id
+            recipe_identifier=identifier
         )
     except Exception as e:
         raise HTTPException(
