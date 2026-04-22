@@ -50,7 +50,9 @@ def make_generate_name(*, recipe_id: str, suffix: str = "") -> str:
 OGDC_WORKFLOW_PVC = models.Volume(
     name="workflow-volume",
     persistent_volume_claim=models.PersistentVolumeClaimVolumeSource(
-        claim_name="cephfs-qgnet-ogdc-workflow-pvc",
+        claim_name=os.environ.get(
+            "OGDC_WORKFLOW_PVC_NAME", "cephfs-qgnet-ogdc-workflow-pvc"
+        ),
     ),
 )
 
