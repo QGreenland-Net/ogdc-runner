@@ -19,12 +19,23 @@ from ogdc_runner.exceptions import OgdcMissingEnvvar
 def get_engine() -> sqlalchemy.engine.base.Engine:
     db_user = os.environ.get("OGDC_DB_USERNAME")
     db_pass = os.environ.get("OGDC_DB_PASSWORD")
-    if not db_user or not db_pass:
-        err_msg = "`OGDC_DB_USERNAME` and `OGDC_DB_PASSWORD` must be set."
+    db_host = os.environ.get("OGDC_DB_HOST")
+    if not db_user or not db_pass or not db_host:
+        err_msg = (
+            "`OGDC_DB_USERNAME`, `OGDC_DB_PASSWORD`, and `OGDC_DB_HOST` must be set."
+        )
         raise OgdcMissingEnvvar(err_msg)
 
+    db_name = os.environ.get("OGDC_DB_NAME", "ogdc")
+
     engine = create_engine(
-        f"postgresql://{db_user}:{db_pass}@ogdc-db-cnpg-rw/ogdc",
+        sqlalchemy.engine.URL.create(
+            drivername="postgresql",
+            username=db_user,
+            password=db_pass,
+            host=db_host,
+            database=db_name,
+        ),
     )
 
     return engine
