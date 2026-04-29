@@ -12,10 +12,10 @@ Before getting to the actual API design, key resources and parameters are identi
     - examples: shell, visualization
 - **input**: data source to be passed to the executable 
 - **input-type**: a class of input
-    - examples: dataone, local, url
+    - examples: dataone, pvc, url, hashstore
 - **output**: file(s) resulting from an executed workflow
 - **output-type**: type of output storage
-    - examples: temporary, local, dataone
+    - examples: temporary, pvc, dataone
 
 ## API Endpoints
 
