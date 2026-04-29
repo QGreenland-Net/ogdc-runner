@@ -27,9 +27,10 @@ Before getting to the actual API design, key resources and parameters are identi
     - **Response:** `message` (str), `recipe_workflow_name` (str)
 - **`GET /workflows`**
     - **Description:** Retrieves a list of workflows submitted by the user.
+    - **Request Body:** limit, offset
 - **`GET /workflows/{recipe_workflow_name}`**
     - **Description:** Retrieves the current status and high-level details of a specific workflow. (Replaces `/status`)
-    - **Response:** `recipe_workflow_name` (str), `status` (str), `timestamp`, `recipe` (dict)
+    - **Response:** `recipe_workflow_name` (str), `status` (str), `timestamp`, `config/recipe`
 - **`DELETE /workflows/{recipe_workflow_name}`**
     - **Description:** Cleanly cancels a pending or running workflow.
 - **`GET /workflows/{recipe_workflow_name}/recipe`**
@@ -42,10 +43,12 @@ Before getting to the actual API design, key resources and parameters are identi
 
 * **`GET /recipes`**
     - **Description:** Retrieves a list of all available geospatial processing recipes.
+    - **Request Body:** limit, offset
 * **`GET /recipes/{recipe_name}`**
     - **Description:** Retrieves the metadata, schema, and requirements for a specific recipe.
 * **`GET /recipes/{recipe_name}/workflows`**
     - **Description:** Retrieves a history of workflows that have been executed using this specific recipe.
+    - **Request Body:** limit, offset
 
 ### 3. System
 
