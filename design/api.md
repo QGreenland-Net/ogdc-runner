@@ -7,15 +7,9 @@ This document is to outline the API design for version 1.0.0 of `ogdc-workflows`
 Before getting to the actual API design, key resources and parameters are identified and defined, whether they become endpoints or not. These defnitions can also be used to refine the `meta.yaml` schema.
 
 - **workflow**: a schedulable job that is specified by a specific recipe
-- **recipe**: a specific configuration and parameterization of a recipe-type, desined to be executed as a workflow
-- **recipe-type**: a class of recipes that invokes an executable
-    - examples: shell, visualization
-- **input**: data source to be passed to the executable 
-- **input-type**: a class of input
-    - examples: dataone, pvc, url, hashstore
-- **output**: file(s) resulting from an executed workflow
-- **output-type**: type of output storage
-    - examples: temporary, pvc, dataone
+- **recipe**: a specific configuration and parameterization of one or more executable templates, desined to be executed as a workflow
+- **template**: a re-usable, standalone definition of a task, including configuration, executable, inputs, and outputs
+    - **template-type**: one of shell, visualization, or future templates we might add and support with `ogdc-runner` as needed
 
 ## API Endpoints
 
@@ -65,3 +59,46 @@ Before getting to the actual API design, key resources and parameters are identi
     - **Description** OIDC authorization callback endpoint.
 - **`POST /refresh`**
     - **Description** Re-validate the user session and return a new access token using the refresh token.
+
+## Recipe Configuration
+
+With the above in mind, it would be beneficial to also be consistent within the recipe schema.  
+
+Example for recipe-type `shell`
+
+```
+name: "Greenland Ice Sheet sea-level contribution"
+version: 1.0.0
+
+recipe:
+  type: "shell"
+  command: "bash -c 'for nc_file in /input_dir/*.nc; do base_name=$(basename "$nc_file" .nc); echo "Processing $nc_file..."; gdal_translate -of GTiff -co COMPRESS=LZW "$nc_file" "/output_dir/${base_name}_epsg3413.tif"; done && echo "Complete! Created $(ls /output_dir/*.tif 2>/dev/null | wc -l) files"'"
+
+inputs:
+  datasets:
+    - type: "dataone"
+      dataset_identifier: "resource_map_doi:10.18739/A29G5GD39"
+      filename: "percent_gris_*.nc" 
+
+output:
+  type: "temporary"
+```
+
+Example for recipe-type `visualization`
+
+```
+name: "ADC Visualization workflow"
+
+recipe:
+  type: "visualization"
+
+input:
+  datasets:
+    - type: "url" 
+      value: "https://demo.arcticdata.io/tiles/OGDC/QGnet/viz-workflow/ice_basins.gpkg"
+  parameters:
+    config_file: "config.json"
+
+output:
+  type: "local"
+```
