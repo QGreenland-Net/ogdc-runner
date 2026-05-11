@@ -101,7 +101,7 @@ def _publish_template_for_dataone(
 ) -> Container:
     """Creates a container template that will zip final output data and store
     the output as an artifact in dataone."""
-    err = "TODO!"
+    err = "Publishing recipe outputs to DataONE is not implemented."
     raise NotImplementedError(err)
 
 

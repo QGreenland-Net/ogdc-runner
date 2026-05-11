@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any
+from typing import Any, cast
 
 from hera.workflows import (
     DAG,
@@ -15,11 +15,11 @@ from hera.workflows import (
 )
 from hera.workflows.models import (
     ResourceRequirements,
-    RetryStrategy,
     VolumeMount,
 )
 
 from ogdc_runner.argo import (
+    ARGO_MANAGER,
     OGDC_WORKFLOW_PVC,
     OgdcWorkflow,
     submit_workflow,
@@ -34,15 +34,23 @@ from ogdc_runner.partitioning import create_partitions
 
 logger = logging.getLogger(__name__)
 
-# Set up constants
-
 # Viz worker container image.  Override via VIZ_WORKFLOW_IMAGE env var.
 VIZ_WORKFLOW_IMAGE: str = os.environ.get(
     "VIZ_WORKFLOW_IMAGE",
     "ghcr.io/permafrostdiscoverygateway/viz-workflow:latest",
 )
+VIZ_WORKFLOW_IMAGE_PULL_POLICY: str = os.environ.get(
+    "VIZ_WORKFLOW_IMAGE_PULL_POLICY",
+    "IfNotPresent",
+)
+VIZ_WORKFLOW_SETUP_IMAGE: str = os.environ.get(
+    "VIZ_WORKFLOW_SETUP_IMAGE",
+    ARGO_MANAGER.config.full_image_path,
+)
 
-_DEFAULT_PARTITION_SIZE = 1000
+_DEFAULT_PARTITION_SIZE = int(
+    os.environ.get("VIZ_WORKFLOW_DEFAULT_PARTITION_SIZE", "1000")
+)
 
 _WORKFLOW_VOLUME_MOUNT = VolumeMount(
     name=OGDC_WORKFLOW_PVC.name,
@@ -50,34 +58,74 @@ _WORKFLOW_VOLUME_MOUNT = VolumeMount(
 )
 
 # Shared kwargs applied to every viz @script decorator.
-_VIZ_SCRIPT_KWARGS: dict = {
+_VIZ_SCRIPT_KWARGS: dict[str, Any] = {
     "image": VIZ_WORKFLOW_IMAGE,
-    "image_pull_policy": "IfNotPresent",
+    "image_pull_policy": VIZ_WORKFLOW_IMAGE_PULL_POLICY,
     "command": ["python"],
     "volume_mounts": [_WORKFLOW_VOLUME_MOUNT],
 }
 
+
+_DEFAULT_VIZ_WORKFLOW_RESOURCES: dict[str, dict[str, dict[str, str]]] = {
+    "stage": {
+        "requests": {"cpu": "500m", "memory": "2Gi"},
+        "limits": {"cpu": "2", "memory": "6Gi"},
+    },
+    "raster": {
+        "requests": {"cpu": "1", "memory": "4Gi"},
+        "limits": {"cpu": "4", "memory": "12Gi"},
+    },
+    "threedtile": {
+        "requests": {"cpu": "2", "memory": "4Gi"},
+        "limits": {"cpu": "4", "memory": "8Gi"},
+    },
+    "discovery": {
+        "requests": {"cpu": "250m", "memory": "512Mi"},
+        "limits": {"cpu": "500m", "memory": "1Gi"},
+    },
+}
+
+
+def _viz_resource_requirements(resource_name: str) -> ResourceRequirements:
+    """Load a viz resource profile from VIZ_WORKFLOW_RESOURCES."""
+    raw_resources = os.environ.get("VIZ_WORKFLOW_RESOURCES", "{}")
+    try:
+        resource_overrides = json.loads(raw_resources)
+    except json.JSONDecodeError as e:
+        err_msg = "VIZ_WORKFLOW_RESOURCES must be a JSON object"
+        raise OgdcInvalidRecipeConfig(err_msg) from e
+
+    if not isinstance(resource_overrides, dict):
+        err_msg = "VIZ_WORKFLOW_RESOURCES must be a JSON object"
+        raise OgdcInvalidRecipeConfig(err_msg)
+
+    defaults = _DEFAULT_VIZ_WORKFLOW_RESOURCES[resource_name]
+    overrides = resource_overrides.get(resource_name, {})
+    if not isinstance(overrides, dict):
+        raise OgdcInvalidRecipeConfig(
+            f"VIZ_WORKFLOW_RESOURCES.{resource_name} must be a JSON object"
+        )
+    requests = overrides.get("requests", {})
+    limits = overrides.get("limits", {})
+    if not isinstance(requests, dict) or not isinstance(limits, dict):
+        raise OgdcInvalidRecipeConfig(
+            f"VIZ_WORKFLOW_RESOURCES.{resource_name}.requests and "
+            f"VIZ_WORKFLOW_RESOURCES.{resource_name}.limits must be JSON objects"
+        )
+
+    merged_requests = cast(dict[str, Any], {**defaults["requests"], **requests})
+    merged_limits = cast(dict[str, Any], {**defaults["limits"], **limits})
+    return ResourceRequirements(
+        requests=merged_requests,
+        limits=merged_limits,
+    )
+
+
 # Resource requirements for each stage.
-_STAGE_RESOURCES = ResourceRequirements(
-    requests={"cpu": "500m", "memory": "2Gi"},
-    limits={"cpu": "2", "memory": "6Gi"},
-)
-_RASTER_RESOURCES = ResourceRequirements(
-    requests={"cpu": "1", "memory": "4Gi"},
-    limits={"cpu": "4", "memory": "12Gi"},
-)
-_THREEDTILE_RESOURCES = ResourceRequirements(
-    requests={"cpu": "2", "memory": "4Gi"},
-    limits={"cpu": "4", "memory": "8Gi"},
-)
-_DISCOVERY_RESOURCES = ResourceRequirements(
-    requests={"cpu": "250m", "memory": "512Mi"},
-    limits={"cpu": "500m", "memory": "1Gi"},
-)
-_WORKER_RETRY = RetryStrategy(
-    limit=3,
-    retry_policy="OnTransientError",
-)
+_STAGE_RESOURCES = _viz_resource_requirements("stage")
+_RASTER_RESOURCES = _viz_resource_requirements("raster")
+_THREEDTILE_RESOURCES = _viz_resource_requirements("threedtile")
+_DISCOVERY_RESOURCES = _viz_resource_requirements("discovery")
 
 # ---------------------------------------------------------------------------
 # Stage 1 — Stage input files → max-z vector tiles
@@ -93,7 +141,6 @@ _WORKER_RETRY = RetryStrategy(
     ],
     **_VIZ_SCRIPT_KWARGS,
     resources=_STAGE_RESOURCES,
-    retry_strategy=_WORKER_RETRY,
 )
 def stage_file_parallel() -> None:
     """Stage input files into vector tiles at max z-level.
@@ -407,7 +454,6 @@ def discover_all_geotiffs() -> None:
     ],
     **_VIZ_SCRIPT_KWARGS,
     resources=_RASTER_RESOURCES,
-    retry_strategy=_WORKER_RETRY,
 )
 def rasterize_max_z_parallel() -> None:
     """Rasterise a partition of staged GeoPackage vector files to GeoTIFF at max z-level."""
@@ -458,7 +504,6 @@ def rasterize_max_z_parallel() -> None:
     ],
     **_VIZ_SCRIPT_KWARGS,
     resources=_RASTER_RESOURCES,
-    retry_strategy=_WORKER_RETRY,
 )
 def create_composite_z_parallel() -> None:
     """Create composite (parent) raster tiles from child GeoTIFFs at z+1."""
@@ -514,7 +559,6 @@ def create_composite_z_parallel() -> None:
     ],
     **_VIZ_SCRIPT_KWARGS,
     resources=_STAGE_RESOURCES,
-    retry_strategy=_WORKER_RETRY,
 )
 def create_web_tile_parallel() -> None:
     """Convert GeoTIFFs to PNG web tiles."""
@@ -569,7 +613,6 @@ def create_web_tile_parallel() -> None:
     ],
     **_VIZ_SCRIPT_KWARGS,
     resources=_THREEDTILE_RESOURCES,
-    retry_strategy=_WORKER_RETRY,
 )
 def create_3dtile_parallel() -> None:
     """Convert staged GeoPackage vector tiles to Cesium 3D tiles (B3DM/GLB)."""
@@ -620,7 +663,6 @@ def create_3dtile_parallel() -> None:
     ],
     **_VIZ_SCRIPT_KWARGS,
     resources=_RASTER_RESOURCES,
-    retry_strategy=_WORKER_RETRY,
 )
 def run_viz_serial() -> None:
     """Run the enabled visualization stages sequentially in one pod."""
@@ -630,7 +672,6 @@ def run_viz_serial() -> None:
     import sys
     import urllib.request
     from pathlib import Path
-    from typing import Any
 
     logging.basicConfig(
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -1008,7 +1049,7 @@ def make_and_submit_viz_workflow(
 
         setup_template = Container(
             name="stage-viz-config",
-            image="alpine:latest",
+            image=VIZ_WORKFLOW_SETUP_IMAGE,
             command=["sh", "-c"],
             args=[
                 f"""mkdir -p {_base} && \

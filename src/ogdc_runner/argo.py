@@ -24,6 +24,11 @@ KUBERNETES_NAME_MAX_LENGTH = 63
 ARGO_GENERATED_SUFFIX_LENGTH = 5
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    """Parse a Helm-rendered boolean environment variable."""
+    return os.environ.get(name, str(default)).lower() == "true"
+
+
 def make_generate_name(*, recipe_id: str, suffix: str = "") -> str:
     """Create a workflow generate_name, truncating recipe_id if necessary.
 
@@ -68,6 +73,7 @@ class ArgoConfig:
         runner_image: str,
         runner_image_tag: str,
         image_pull_policy: str,
+        workflow_retry_strategy: models.RetryStrategy | None,
     ):
         self.namespace = namespace
         self.service_account_name = service_account_name
@@ -75,6 +81,7 @@ class ArgoConfig:
         self.runner_image = runner_image
         self.runner_image_tag = runner_image_tag
         self.image_pull_policy = image_pull_policy
+        self.workflow_retry_strategy = workflow_retry_strategy
 
     @property
     def full_image_path(self) -> str:
@@ -119,6 +126,19 @@ class ArgoManager:
         )
         logger.info(f"Using ARGO_WORKFLOWS_SERVICE_URL={workflows_service_url}")
 
+        workflow_retry_strategy = None
+        if _env_bool("ARGO_WORKFLOW_RETRY_ENABLED", True):
+            retry_limit = int(os.environ.get("ARGO_WORKFLOW_RETRY_LIMIT", "3"))
+            if retry_limit < 0:
+                err_msg = "ARGO_WORKFLOW_RETRY_LIMIT must be >= 0"
+                raise ValueError(err_msg)
+            workflow_retry_strategy = models.RetryStrategy(
+                limit=models.IntOrString(root=retry_limit),
+                retry_policy=os.environ.get(
+                    "ARGO_WORKFLOW_RETRY_POLICY", "OnTransientError"
+                ),
+            )
+
         return ArgoConfig(
             namespace=os.environ.get("ARGO_NAMESPACE", "qgnet"),
             service_account_name=os.environ.get(
@@ -128,6 +148,7 @@ class ArgoManager:
             runner_image=runner_image,
             runner_image_tag=runner_image_tag,
             image_pull_policy=image_pull_policy,
+            workflow_retry_strategy=workflow_retry_strategy,
         )
 
     def _setup_workflow_service(self) -> WorkflowsService:
@@ -339,6 +360,12 @@ def OgdcWorkflow(
             seconds_after_success=60 * 60 * 24 * 7,
         )
         workflow_kwargs["ttl_strategy"] = ttl_strategy
+
+    if (
+        ARGO_MANAGER.config.workflow_retry_strategy is not None
+        and "retry_strategy" not in workflow_kwargs
+    ):
+        workflow_kwargs["retry_strategy"] = ARGO_MANAGER.config.workflow_retry_strategy
 
     with Workflow(
         **workflow_kwargs,
