@@ -689,72 +689,8 @@ def run_viz_serial() -> None:
 
     workflow = WorkflowManager(config)
 
-    enable_stager: bool = config.get("enable_stager", True)
-    enable_raster: bool = config.get("enable_raster", True)
-    enable_raster_parents: bool = config.get("enable_raster_parents", True)
-    enable_web_tiles: bool = config.get("enable_web_tiles", True)
-    enable_3dtiles: bool = config.get("enable_3dtiles", True)
-
     try:
-        if enable_stager:
-            dir_input = workflow.config.get("dir_input")
-            os.makedirs(dir_input, exist_ok=True)
-
-            for idx, input_file in enumerate(input_files):
-                if input_file.startswith("http://") or input_file.startswith("https://"):
-                    filename = os.path.basename(input_file.split("?")[0])
-                    local_path = os.path.join(dir_input, filename)
-                    log.info(
-                        "[%d/%d] downloading %s -> %s",
-                        idx + 1,
-                        len(input_files),
-                        input_file,
-                        local_path,
-                    )
-                    urllib.request.urlretrieve(input_file, local_path)
-                else:
-                    local_path = input_file
-
-                log.info("[%d/%d] staging %s", idx + 1, len(input_files), local_path)
-                workflow.stage(local_path)
-
-        max_z = workflow.config.get_max_z()
-        staged_files = workflow.tiles.get_filenames_from_dir("staged", z=max_z)
-
-        if enable_raster:
-            for tile_path in staged_files:
-                log.info("rasterizing %s", tile_path)
-                workflow.rasterize_vector(tile_path)
-
-        if enable_raster_parents:
-            raster_tiler = workflow.init_raster_tiler()
-            z_range: list[int] = config.get("z_range", [0, 12])
-            min_z = z_range[0]
-
-            for z_level in range(max_z - 1, min_z - 1, -1):
-                child_tiles = workflow.tiles.get_filenames_from_dir(
-                    "geotiff", z=z_level + 1
-                )
-                parent_tile_objects: set[Any] = set()
-                for child_path in child_tiles:
-                    parent_tile = workflow.tiles.get_parent_tile(child_path)
-                    if parent_tile is not None:
-                        parent_tile_objects.add(parent_tile)
-
-                for parent_tile in sorted(parent_tile_objects):
-                    log.info("z=%d creating composite %s", z_level, parent_tile)
-                    raster_tiler.parent_geotiff_from_children(parent_tile)
-
-        if enable_web_tiles:
-            raster_tiler = workflow.init_raster_tiler()
-            for geotiff_path in workflow.tiles.get_filenames_from_dir("geotiff"):
-                log.info("creating web tile %s", geotiff_path)
-                raster_tiler.webtile_from_geotiff(geotiff_path)
-
-        if enable_3dtiles:
-            for staged_path in staged_files:
-                log.info("creating 3d tile %s", staged_path)
-                workflow.staged_to_3dtile(staged_path)
+        workflow.run_workflow()
     except Exception as e:
         log.error("serial viz workflow FAILED error=%s", e)
         sys.exit(1)
