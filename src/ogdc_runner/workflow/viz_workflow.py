@@ -691,6 +691,22 @@ def run_viz_serial() -> None:
     input_files: list[str] = json.loads("{{inputs.parameters.input-manifest}}")
 
     workflow = WorkflowManager(config)
+    dir_input = workflow.config.get("dir_input")
+    os.makedirs(dir_input, exist_ok=True)
+
+    for idx, input_file in enumerate(input_files):
+        # Download to dir_input if URL; otherwise use the path as-is.
+        if input_file.startswith("http://") or input_file.startswith("https://"):
+            filename = os.path.basename(input_file.split("?")[0])
+            local_path = os.path.join(dir_input, filename)
+            log.info(
+                "serial [%d/%d] downloading %s -> %s",
+                idx + 1,
+                len(input_files),
+                input_file,
+                local_path,
+            )
+            urllib.request.urlretrieve(input_file, local_path)
 
     try:
         workflow.run_workflow()
