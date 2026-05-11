@@ -927,16 +927,6 @@ def make_and_submit_viz_workflow(
     )
 
     workflow_config_model = recipe_config.workflow
-    viz_image = workflow_config_model.viz_image
-    if viz_image != VIZ_WORKFLOW_IMAGE:
-        logger.warning(
-            "recipe viz_image=%r differs from module-level VIZ_WORKFLOW_IMAGE=%r; "
-            "the module-level constant is used in @script decorators. "
-            "Set VIZ_WORKFLOW_IMAGE env var before starting ogdc-runner.",
-            viz_image,
-            VIZ_WORKFLOW_IMAGE,
-        )
-
     parallel_cfg = workflow_config_model.parallel
     parallelism: int | None = (
         (parallel_cfg.max_parallelism or MAX_PARALLEL_LIMIT)
