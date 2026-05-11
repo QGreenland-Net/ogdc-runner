@@ -76,10 +76,14 @@ def test_parallel_config_max_parallelism():
     assert config.max_parallelism == 200
 
 
-@pytest.mark.parametrize("field", ["partition_size", "max_parallelism"])
-def test_parallel_config_rejects_non_positive(field):
+def test_parallel_config_rejects_non_positive_partition_size():
     with pytest.raises(ValidationError):
-        ParallelConfig(**{field: 0})
+        ParallelConfig(partition_size=0)
+
+
+def test_parallel_config_rejects_non_positive_max_parallelism():
+    with pytest.raises(ValidationError):
+        ParallelConfig(max_parallelism=0)
 
 
 def test_execution_function_requires_exactly_one_of_command_or_function():

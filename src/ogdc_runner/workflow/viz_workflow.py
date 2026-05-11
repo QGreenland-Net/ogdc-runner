@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, cast
+from typing import Any, TypeAlias, cast
 
 from hera.workflows import (
     DAG,
@@ -27,12 +27,13 @@ from ogdc_runner.argo import (
 from ogdc_runner.constants import MAX_PARALLEL_LIMIT
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
 from ogdc_runner.models.parallel_config import ExecutionFunction
-from ogdc_runner.models.recipe_config import RecipeConfig
+from ogdc_runner.models.recipe_config import ParallelConfig, RecipeConfig, VizWorkflow
 from ogdc_runner.partitioning import create_partitions
 
 # ruff: noqa: PLC0415
 
 logger = logging.getLogger(__name__)
+WorkflowTask: TypeAlias = Any
 
 # Viz worker container image.  Override via VIZ_WORKFLOW_IMAGE env var.
 VIZ_WORKFLOW_IMAGE: str = os.environ.get(
@@ -170,7 +171,7 @@ def stage_file_parallel() -> None:
 
     partition_manifest: str = "{{inputs.parameters.partition-manifest}}"
     partition_id: str = "{{inputs.parameters.partition-id}}"
-    input_files: list = json.loads(partition_manifest)
+    input_files: list[str] = json.loads(partition_manifest)
 
     log.info("partition=%s files=%d starting staging", partition_id, len(input_files))
 
@@ -263,7 +264,7 @@ def discover_staged_tiles() -> None:
     )
     log = logging.getLogger(__name__)
 
-    from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
+    from pdgworkflow import WorkflowManager
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
     os.chdir(str(config_path.parent))
@@ -330,7 +331,7 @@ def discover_parent_tiles() -> None:
     )
     log = logging.getLogger(__name__)
 
-    from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
+    from pdgworkflow import WorkflowManager
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
     os.chdir(str(config_path.parent))
@@ -347,7 +348,7 @@ def discover_parent_tiles() -> None:
 
     # get_parent_tile returns a morecantile.Tile object; collect unique parents
     # then convert each back to a geotiff file path via path_from_tile.
-    parent_tile_objects: set = set()
+    parent_tile_objects: set[Any] = set()
     for child_path in child_tiles:
         parent_tile = workflow.tiles.get_parent_tile(child_path)
         if parent_tile is not None:
@@ -413,7 +414,7 @@ def discover_all_geotiffs() -> None:
     )
     log = logging.getLogger(__name__)
 
-    from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
+    from pdgworkflow import WorkflowManager
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
     os.chdir(str(config_path.parent))
@@ -422,7 +423,7 @@ def discover_all_geotiffs() -> None:
 
     workflow = WorkflowManager(config)
 
-    geotiff_entries: list = []
+    geotiff_entries: list[dict[str, Any]] = []
     for path in workflow.tiles.get_filenames_from_dir("geotiff"):
         tile = workflow.tiles.dict_from_path(path)
         geotiff_entries.append({"z": int(tile["z"]), "path": path})
@@ -470,7 +471,7 @@ def rasterize_max_z_parallel() -> None:
     )
     log = logging.getLogger(__name__)
 
-    from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
+    from pdgworkflow import WorkflowManager
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
     os.chdir(str(config_path.parent))
@@ -478,7 +479,7 @@ def rasterize_max_z_parallel() -> None:
 
     workflow = WorkflowManager(config)
 
-    manifest: list = json.loads("{{inputs.parameters.staged-tiles-manifest}}")
+    manifest: list[str] = json.loads("{{inputs.parameters.staged-tiles-manifest}}")
     log.info("rasterizing tiles=%d", len(manifest))
 
     for tile_path in manifest:
@@ -520,7 +521,7 @@ def create_composite_z_parallel() -> None:
     )
     log = logging.getLogger(__name__)
 
-    from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
+    from pdgworkflow import WorkflowManager
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
     os.chdir(str(config_path.parent))
@@ -530,7 +531,9 @@ def create_composite_z_parallel() -> None:
     # raster_tiler is None after __init__; initialize it explicitly.
     raster_tiler = workflow.init_raster_tiler()
 
-    manifest: list = json.loads("{{inputs.parameters.parent-tiles-manifest}}")
+    manifest: list[dict[str, Any]] = json.loads(
+        "{{inputs.parameters.parent-tiles-manifest}}"
+    )
     log.info("composite tiles=%d", len(manifest))
 
     for item in manifest:
@@ -575,7 +578,7 @@ def create_web_tile_parallel() -> None:
     )
     log = logging.getLogger(__name__)
 
-    from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
+    from pdgworkflow import WorkflowManager
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
     os.chdir(str(config_path.parent))
@@ -585,7 +588,7 @@ def create_web_tile_parallel() -> None:
     # raster_tiler is None after __init__; initialize it explicitly.
     raster_tiler = workflow.init_raster_tiler()
 
-    manifest: list = json.loads("{{inputs.parameters.geotiff-manifest}}")
+    manifest: list[dict[str, Any]] = json.loads("{{inputs.parameters.geotiff-manifest}}")
     log.info("web tiles items=%d", len(manifest))
 
     for item in manifest:
@@ -629,7 +632,7 @@ def create_3dtile_parallel() -> None:
     )
     log = logging.getLogger(__name__)
 
-    from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
+    from pdgworkflow import WorkflowManager
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
     os.chdir(str(config_path.parent))
@@ -637,7 +640,7 @@ def create_3dtile_parallel() -> None:
 
     workflow = WorkflowManager(config)
 
-    manifest: list = json.loads("{{inputs.parameters.staged-tiles-manifest}}")
+    manifest: list[str] = json.loads("{{inputs.parameters.staged-tiles-manifest}}")
     log.info("3d tiles items=%d", len(manifest))
 
     for staged_path in manifest:
@@ -680,7 +683,7 @@ def run_viz_serial() -> None:
     )
     log = logging.getLogger(__name__)
 
-    from pdgworkflow import WorkflowManager  # type: ignore[import-not-found]
+    from pdgworkflow import WorkflowManager
 
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
     os.chdir(str(config_path.parent))
@@ -701,7 +704,7 @@ def run_viz_serial() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _link_after(deps: list[Any], task: Any) -> list[Any]:
+def _link_after(deps: list[WorkflowTask], task: WorkflowTask) -> list[WorkflowTask]:
     for dep in deps:
         dep >> task
     return [task]
@@ -722,21 +725,21 @@ def _serial_input_manifest(recipe_config: RecipeConfig) -> str:
 
 
 def _create_serial_dag(recipe_config: RecipeConfig, config_task: Task) -> None:
-    serial_task = run_viz_serial(
+    serial_task: WorkflowTask = run_viz_serial(
         arguments={
             "recipe-id": recipe_config.id,
             "input-manifest": _serial_input_manifest(recipe_config),
         },
     )
-    config_task >> serial_task
+    _link_after([config_task], serial_task)
 
 
 def _create_stage_task(
     *,
     recipe_config: RecipeConfig,
-    parallel_cfg: Any,
-    deps: list[Any],
-) -> list[Any]:
+    parallel_cfg: ParallelConfig,
+    deps: list[WorkflowTask],
+) -> list[WorkflowTask]:
     partitions = create_partitions(
         inputs=recipe_config.input.params,
         execution_function=ExecutionFunction(
@@ -753,7 +756,7 @@ def _create_stage_task(
         sum(len(p.files) for p in partitions),
     )
 
-    stage_task = stage_file_parallel(
+    stage_task: WorkflowTask = stage_file_parallel(
         arguments={
             "recipe-id": recipe_config.id,
             "partition-manifest": "{{item.files}}",
@@ -768,9 +771,9 @@ def _create_staged_tiles_discovery(
     *,
     recipe_config: RecipeConfig,
     partition_size: int,
-    deps: list[Any],
-) -> Any:
-    staged_tiles_discovery_task = discover_staged_tiles(
+    deps: list[WorkflowTask],
+) -> WorkflowTask:
+    staged_tiles_discovery_task: WorkflowTask = discover_staged_tiles(
         arguments={
             "recipe-id": recipe_config.id,
             "partition-size": str(partition_size),
@@ -783,32 +786,32 @@ def _create_staged_tiles_discovery(
 def _create_rasterize_task(
     *,
     recipe_config: RecipeConfig,
-    staged_tiles_discovery_task: Any,
-) -> Any:
-    rasterize_task = rasterize_max_z_parallel(
+    staged_tiles_discovery_task: WorkflowTask,
+) -> WorkflowTask:
+    rasterize_task: WorkflowTask = rasterize_max_z_parallel(
         arguments={
             "recipe-id": recipe_config.id,
             "staged-tiles-manifest": "{{item}}",
         },
         with_param=staged_tiles_discovery_task.get_result_as("result"),
     )
-    staged_tiles_discovery_task >> rasterize_task
+    _link_after([staged_tiles_discovery_task], rasterize_task)
     return rasterize_task
 
 
 def _create_3dtile_task(
     *,
     recipe_config: RecipeConfig,
-    staged_tiles_discovery_task: Any,
+    staged_tiles_discovery_task: WorkflowTask,
 ) -> None:
-    threedtile_task = create_3dtile_parallel(
+    threedtile_task: WorkflowTask = create_3dtile_parallel(
         arguments={
             "recipe-id": recipe_config.id,
             "staged-tiles-manifest": "{{item}}",
         },
         with_param=staged_tiles_discovery_task.get_result_as("result"),
     )
-    staged_tiles_discovery_task >> threedtile_task
+    _link_after([staged_tiles_discovery_task], threedtile_task)
 
 
 def _create_composite_tasks(
@@ -816,14 +819,14 @@ def _create_composite_tasks(
     recipe_config: RecipeConfig,
     partition_size: int,
     composite_z_levels: list[int],
-    deps: list[Any],
-    rasterize_task: Any,
-    staged_tiles_discovery_task: Any,
-) -> Any:
+    deps: list[WorkflowTask],
+    rasterize_task: WorkflowTask | None,
+    staged_tiles_discovery_task: WorkflowTask | None,
+) -> WorkflowTask | None:
     prev_task = rasterize_task or staged_tiles_discovery_task
 
     for z in composite_z_levels:
-        discover_parents_task = discover_parent_tiles(
+        discover_parents_task: WorkflowTask = discover_parent_tiles(
             name=f"discover-parents-z-{z}",
             arguments={
                 "recipe-id": recipe_config.id,
@@ -831,7 +834,7 @@ def _create_composite_tasks(
                 "partition-size": str(partition_size),
             },
         )
-        create_composites_task = create_composite_z_parallel(
+        create_composites_task: WorkflowTask = create_composite_z_parallel(
             name=f"create-composites-z-{z}",
             arguments={
                 "recipe-id": recipe_config.id,
@@ -841,11 +844,11 @@ def _create_composite_tasks(
         )
 
         if prev_task is not None:
-            prev_task >> discover_parents_task
+            _link_after([prev_task], discover_parents_task)
         else:
             _link_after(deps, discover_parents_task)
 
-        discover_parents_task >> create_composites_task
+        _link_after([discover_parents_task], create_composites_task)
         prev_task = create_composites_task
 
     return prev_task
@@ -855,10 +858,10 @@ def _create_web_tile_tasks(
     *,
     recipe_config: RecipeConfig,
     partition_size: int,
-    deps: list[Any],
-    raster_anchor: Any,
+    deps: list[WorkflowTask],
+    raster_anchor: WorkflowTask | None,
 ) -> None:
-    discover_geotiffs_task = discover_all_geotiffs(
+    discover_geotiffs_task: WorkflowTask = discover_all_geotiffs(
         arguments={
             "recipe-id": recipe_config.id,
             "partition-size": str(partition_size),
@@ -866,18 +869,18 @@ def _create_web_tile_tasks(
     )
 
     if raster_anchor is not None:
-        raster_anchor >> discover_geotiffs_task
+        _link_after([raster_anchor], discover_geotiffs_task)
     else:
         _link_after(deps, discover_geotiffs_task)
 
-    web_tile_task = create_web_tile_parallel(
+    web_tile_task: WorkflowTask = create_web_tile_parallel(
         arguments={
             "recipe-id": recipe_config.id,
             "geotiff-manifest": "{{item}}",
         },
         with_param=discover_geotiffs_task.get_result_as("result"),
     )
-    discover_geotiffs_task >> web_tile_task
+    _link_after([discover_geotiffs_task], web_tile_task)
 
 
 def make_and_submit_viz_workflow(
@@ -918,8 +921,13 @@ def make_and_submit_viz_workflow(
             f"Expected recipe configuration with workflow type `visualization`. "
             f"Got: {recipe_config.workflow.type}"
         )
+    if not isinstance(recipe_config.workflow, VizWorkflow):
+        raise OgdcInvalidRecipeConfig(
+            f"Expected VizWorkflow configuration. Got: {recipe_config.workflow}"
+    )
 
-    viz_image = recipe_config.workflow.viz_image  # type: ignore[union-attr]
+    workflow_config_model = recipe_config.workflow
+    viz_image = workflow_config_model.viz_image
     if viz_image != VIZ_WORKFLOW_IMAGE:
         logger.warning(
             "recipe viz_image=%r differs from module-level VIZ_WORKFLOW_IMAGE=%r; "
@@ -929,7 +937,7 @@ def make_and_submit_viz_workflow(
             VIZ_WORKFLOW_IMAGE,
         )
 
-    parallel_cfg = recipe_config.workflow.parallel  # type: ignore[union-attr]
+    parallel_cfg = workflow_config_model.parallel
     parallelism: int | None = (
         (parallel_cfg.max_parallelism or MAX_PARALLEL_LIMIT)
         if parallel_cfg.enabled
@@ -953,12 +961,12 @@ def make_and_submit_viz_workflow(
             "workflows.argoproj.io/archive-strategy": "false",
         },
     ) as w:
-        config_content = recipe_config.workflow.get_config_file_json()  # type: ignore[union-attr]
+        config_content = workflow_config_model.get_config_file_json()
 
         partition_size: int = parallel_cfg.partition_size or _DEFAULT_PARTITION_SIZE
 
         # Parse workflow config for z-range and feature flags.
-        workflow_config: dict = json.loads(config_content)
+        workflow_config: dict[str, Any] = json.loads(config_content)
         z_range: list[int] = workflow_config.get("z_range", [0, 12])
         min_z, max_z = z_range[0], z_range[1]
 
@@ -1011,7 +1019,7 @@ EOF"""
             if not parallel_cfg.enabled:
                 _create_serial_dag(recipe_config, config_task)
             else:
-                current_deps: list = [config_task]
+                current_deps: list[WorkflowTask] = [config_task]
 
                 if enable_stager:
                     current_deps = _create_stage_task(
