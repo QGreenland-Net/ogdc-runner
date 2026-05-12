@@ -119,6 +119,8 @@ addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
 xfail_strict = true
 filterwarnings = [
   "error",
+  # Hera still calls Pydantic's deprecated `json()` while submitting workflows.
+  "ignore:The `json` method is deprecated; use `model_dump_json` instead\\.:pydantic.warnings.PydanticDeprecatedSince20:hera\\.workflows\\.service",
   # Ignore insecure request warnings in tests. We run against a server that uses
   # a self-signed (unverified) cert in test, so this must be ignored or pytest
   # will raise errors about the insecure connection attempt.

@@ -85,6 +85,7 @@ def _render_viz_workflow(config: RecipeConfig) -> dict[str, Any]:
     rendered_workflows: list[dict[str, Any]] = []
 
     def fake_submit(workflow: Any, wait: bool = False) -> str:
+        del wait
         rendered_workflows.append(workflow.to_dict())
         return "test-workflow"
 
