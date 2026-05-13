@@ -97,7 +97,9 @@ def _render_viz_workflow(config: RecipeConfig) -> dict[str, Any]:
 
 def _main_dag_tasks(workflow: dict[str, Any]) -> list[dict[str, Any]]:
     main_template = next(
-        template for template in workflow["spec"]["templates"] if template["name"] == "main"
+        template
+        for template in workflow["spec"]["templates"]
+        if template["name"] == "main"
     )
     return cast("list[dict[str, Any]]", main_template["dag"]["tasks"])
 
