@@ -87,6 +87,15 @@ ogdc-runner create-user my-username my-password
   with the backend PostgreSQL database.
 - `OGDC_DB_PASSWORD`: database password that the service will use to interact
   with the backend PostgreSQL database.
+- `OGDC_DB_HOST`: hostname of the backend PostgreSQL database (typically
+  `${RELEASE_NAME}-db-cnpg-rw` when deployed via the ogdc-helm chart).
+- `OGDC_DB_NAME` (optional): database name, defaults to `ogdc`.
 - `OGDC_JWT_SECRET_KEY`: value of the secret key used to encode/decode the JWT
   tokens used for authentication.
 - `OGDC_ADMIN_PASSWORD`: the value desired for the service's admin user account.
+- `OGDC_WORKFLOW_PVC_NAME` (optional): name of the PersistentVolumeClaim mounted
+  into workflow pods, defaults to `cephfs-qgnet-ogdc-workflow-pvc`. The
+  ogdc-helm chart sets this to `cephfs-${RELEASE_NAME}-workflow-pvc`.
+- `ARGO_NAMESPACE` (optional): kubernetes namespace in which argo workflows are
+  submitted, defaults to `qgnet`. The ogdc-helm chart sets this to the release
+  namespace.
