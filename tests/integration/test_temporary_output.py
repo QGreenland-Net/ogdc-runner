@@ -23,7 +23,7 @@ def test_temporary_output_recipe(test_temp_output_recipe_directory, tmpdir):
     """
     tmpdir_path = Path(tmpdir)
 
-    # Note: `overwrite` is set here to ensure that outptus from a previous test
+    # Note: `overwrite` is set here to ensure that outputs from a previous test
     # run are overwritten. This is not ideal. Tests that create data should
     # cleanup after themselves.
     workflow_name = submit_ogdc_recipe(
