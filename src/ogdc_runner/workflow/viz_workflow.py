@@ -348,7 +348,7 @@ def discover_parent_tiles() -> None:
 
     # get_parent_tile returns a morecantile.Tile object; collect unique parents
     # then convert each back to a geotiff file path via path_from_tile.
-    parent_tile_objects: set[Any] = set()
+    parent_tile_objects: set[object] = set()
     for child_path in child_tiles:
         parent_tile = workflow.tiles.get_parent_tile(child_path)
         if parent_tile is not None:
@@ -423,7 +423,7 @@ def discover_all_geotiffs() -> None:
 
     workflow = WorkflowManager(config)
 
-    geotiff_entries: list[dict[str, Any]] = []
+    geotiff_entries: list[dict[str, object]] = []
     for path in workflow.tiles.get_filenames_from_dir("geotiff"):
         tile = workflow.tiles.dict_from_path(path)
         geotiff_entries.append({"z": int(tile["z"]), "path": path})
@@ -531,7 +531,7 @@ def create_composite_z_parallel() -> None:
     # raster_tiler is None after __init__; initialize it explicitly.
     raster_tiler = workflow.init_raster_tiler()
 
-    manifest: list[dict[str, Any]] = json.loads(
+    manifest: list[dict[str, object]] = json.loads(
         "{{inputs.parameters.parent-tiles-manifest}}"
     )
     log.info("composite tiles=%d", len(manifest))
@@ -588,7 +588,9 @@ def create_web_tile_parallel() -> None:
     # raster_tiler is None after __init__; initialize it explicitly.
     raster_tiler = workflow.init_raster_tiler()
 
-    manifest: list[dict[str, Any]] = json.loads("{{inputs.parameters.geotiff-manifest}}")
+    manifest: list[dict[str, object]] = json.loads(
+        "{{inputs.parameters.geotiff-manifest}}"
+    )
     log.info("web tiles items=%d", len(manifest))
 
     for item in manifest:
