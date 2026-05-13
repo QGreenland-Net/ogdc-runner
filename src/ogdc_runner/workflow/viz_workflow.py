@@ -348,7 +348,7 @@ def discover_parent_tiles() -> None:
 
     # get_parent_tile returns a morecantile.Tile object; collect unique parents
     # then convert each back to a geotiff file path via path_from_tile.
-    parent_tile_objects: set[object] = set()
+    parent_tile_objects = set()
     for child_path in child_tiles:
         parent_tile = workflow.tiles.get_parent_tile(child_path)
         if parent_tile is not None:
@@ -423,7 +423,7 @@ def discover_all_geotiffs() -> None:
 
     workflow = WorkflowManager(config)
 
-    geotiff_entries: list[dict[str, object]] = []
+    geotiff_entries: list[dict[str, int | str]] = []
     for path in workflow.tiles.get_filenames_from_dir("geotiff"):
         tile = workflow.tiles.dict_from_path(path)
         geotiff_entries.append({"z": int(tile["z"]), "path": path})
@@ -531,14 +531,14 @@ def create_composite_z_parallel() -> None:
     # raster_tiler is None after __init__; initialize it explicitly.
     raster_tiler = workflow.init_raster_tiler()
 
-    manifest: list[dict[str, object]] = json.loads(
+    manifest: list[dict[str, int | str]] = json.loads(
         "{{inputs.parameters.parent-tiles-manifest}}"
     )
     log.info("composite tiles=%d", len(manifest))
 
     for item in manifest:
-        z_level: int = item["z"]
-        parent_path: str = item["path"]
+        z_level = int(item["z"])
+        parent_path = str(item["path"])
         log.info("z=%d creating composite %s", z_level, parent_path)
         try:
             parent_tile = workflow.tiles.tile_from_path(parent_path)
@@ -588,14 +588,14 @@ def create_web_tile_parallel() -> None:
     # raster_tiler is None after __init__; initialize it explicitly.
     raster_tiler = workflow.init_raster_tiler()
 
-    manifest: list[dict[str, object]] = json.loads(
+    manifest: list[dict[str, int | str]] = json.loads(
         "{{inputs.parameters.geotiff-manifest}}"
     )
     log.info("web tiles items=%d", len(manifest))
 
     for item in manifest:
-        z_level: int = item["z"]
-        geotiff_path: str = item["path"]
+        z_level = int(item["z"])
+        geotiff_path = str(item["path"])
         log.info("creating web tile z=%d %s", z_level, geotiff_path)
         try:
             raster_tiler.webtile_from_geotiff(geotiff_path)

@@ -11,7 +11,9 @@ from pathlib import Path
 import pytest
 from hera.workflows import Workflow, models
 
+from ogdc_runner import api, argo
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished
+from ogdc_runner.workflow import viz_workflow
 
 DEFAULT_VIZ_WORKFLOW_TEST_IMAGE = (
     "ghcr.io/permafrostdiscoverygateway/viz-workflow:1.1.0-dev-2"
@@ -19,7 +21,7 @@ DEFAULT_VIZ_WORKFLOW_TEST_IMAGE = (
 
 
 @pytest.fixture(scope="module")
-def viz_recipe_directory(tmp_path_factory) -> Path:
+def viz_recipe_directory(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Use a unique recipe id so the test does not need a cleanup workflow."""
     source_dir = Path(__file__).parents[1] / "test_viz_workflow_recipe_dir"
     recipe_dir = tmp_path_factory.mktemp("viz-workflow-recipe")
@@ -53,10 +55,6 @@ def submit_ogdc_viz_recipe(monkeypatch):
     )
     monkeypatch.setenv("VIZ_WORKFLOW_IMAGE", viz_workflow_image)
     monkeypatch.setenv("VIZ_WORKFLOW_SETUP_IMAGE", viz_workflow_image)
-
-    from ogdc_runner import api
-    from ogdc_runner import argo
-    from ogdc_runner.workflow import viz_workflow
 
     @contextmanager
     def workflow_with_test_ttl(*args, **kwargs):
