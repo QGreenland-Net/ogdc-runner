@@ -942,7 +942,7 @@ def make_and_submit_viz_workflow(
     if not isinstance(recipe_config.workflow, VizWorkflow):
         raise OgdcInvalidRecipeConfig(
             f"Expected VizWorkflow configuration. Got: {recipe_config.workflow}"
-    )
+        )
 
     workflow_config_model = recipe_config.workflow
     parallel_cfg = workflow_config_model.parallel

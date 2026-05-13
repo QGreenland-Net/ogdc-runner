@@ -54,8 +54,7 @@ def submit_ogdc_viz_recipe(monkeypatch):
     monkeypatch.setenv("VIZ_WORKFLOW_IMAGE", viz_workflow_image)
     monkeypatch.setenv("VIZ_WORKFLOW_SETUP_IMAGE", viz_workflow_image)
 
-    from ogdc_runner import api
-    from ogdc_runner import argo
+    from ogdc_runner import api, argo
     from ogdc_runner.workflow import viz_workflow
 
     @contextmanager
