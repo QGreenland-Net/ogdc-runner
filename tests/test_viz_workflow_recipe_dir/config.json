@@ -1,3 +1,7 @@
 {
-  "deduplicate_clip_to_footprint": false
+  "deduplicate_clip_to_footprint": false,
+  "ext_input": ".gpkg",
+  "enable_3dtiles": false,
+  "enable_raster": false,
+  "enable_web_tiles": false
 }

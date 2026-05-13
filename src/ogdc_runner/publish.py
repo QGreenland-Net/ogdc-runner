@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from functools import cache
 
 import boto3
@@ -263,6 +264,12 @@ def data_already_published(
     otherwise `False`.
     """
     if overwrite:
+        if isinstance(recipe_config.output, TemporaryRecipeOutput):
+            logger.warning(
+                f"Skipping overwrite cleanup for temporary output recipe '{recipe_config.name}'."
+            )
+            return False
+
         # If `overwrite` is True, remove the existing data and return `False`.
         remove_existing_published_data(
             recipe_config=recipe_config,

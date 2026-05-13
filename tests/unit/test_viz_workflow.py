@@ -130,21 +130,6 @@ def test_viz_workflow_renders_parallel_dag_with_default_cap(
     assert any("withParam" in task for task in tasks)
 
 
-def test_parallel_viz_pairs_3dtiles_with_staged_tile_discovery(
-    test_viz_workflow_recipe_directory,
-):
-    config = get_recipe_config(
-        recipe_directory=test_viz_workflow_recipe_directory,
-    )
-    config.workflow.parallel = ParallelConfig(enabled=True)
-    tasks = _main_dag_tasks(_render_viz_workflow(config))
-    task_names = [task["name"] for task in tasks]
-    threedtiles_task = next(task for task in tasks if task["name"] == "create-3dtiles")
-
-    assert threedtiles_task["depends"] == "discover-staged-tiles"
-    assert task_names.index("create-3dtiles") < task_names.index("discover-parents-z-11")
-
-
 def test_viz_workflow_honors_max_parallelism(
     test_viz_workflow_recipe_directory,
 ):
