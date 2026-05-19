@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 from importlib.resources import files
 from typing import Any
 
@@ -23,11 +24,27 @@ from ogdc_runner.argo import (
     submit_workflow,
 )
 from ogdc_runner.constants import MAX_PARALLEL_LIMIT
+from ogdc_runner.exceptions import OgdcWorkflowExecutionError
 from ogdc_runner.inputs import make_fetch_input_template
 from ogdc_runner.models.parallel_config import ExecutionFunction, FilePartition
 from ogdc_runner.models.recipe_config import PvcMountInput, RecipeConfig
 from ogdc_runner.parallel import ParallelExecutionOrchestrator
 from ogdc_runner.publish import make_publish_template
+
+
+def _build_partition_processing_script(
+    user_command: str,
+    *,
+    first_command_input_mode: str = "workflow-pvc",
+) -> str:
+    """Build shell script for processing a partition of files."""
+    script_file = files("ogdc_runner.scripts").joinpath("partition_processing.sh")
+    script_template = script_file.read_text()
+
+    return script_template.replace("{user_command}", user_command).replace(
+        "{first_command_input_mode}",
+        first_command_input_mode,
+    )
 
 
 class ShellParallelExecutionOrchestrator(ParallelExecutionOrchestrator):
@@ -73,7 +90,7 @@ class ShellParallelExecutionOrchestrator(ParallelExecutionOrchestrator):
             raise ValueError(
                 f"ExecutionFunction {func.name} must have a command for shell workflows"
             )
-        command_script = self._build_partition_processing_script(func.command)
+        command_script = _build_partition_processing_script(func.command)
 
         return Container(
             name=func.name,
@@ -89,27 +106,6 @@ class ShellParallelExecutionOrchestrator(ParallelExecutionOrchestrator):
                 VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow")
             ],
         )
-
-    def _build_partition_processing_script(self, user_command: str) -> str:
-        """Build shell script for processing a partition of files.
-
-        The script:
-        1. Determines input/output directories based on command index
-        2. Processes each file by setting INPUT_FILE and OUTPUT_FILE env vars
-        3. Executes the user command for each file
-
-        Args:
-            user_command: The shell command to execute for each file
-
-        Returns:
-            Complete shell script as a string
-        """
-        # Read the shell script template from package resources
-        script_file = files("ogdc_runner.scripts").joinpath("partition_processing.sh")
-        script_template = script_file.read_text()
-
-        # Replace the user command placeholder
-        return script_template.replace("{user_command}", user_command)
 
     def _create_tasks_from_partitions(
         self,
@@ -201,7 +197,7 @@ def make_cmd_template(
 
 
 def _make_pvc_listing_template(
-    pvc_input: PvcMountInput,
+    pvc_inputs: list[PvcMountInput],
     partition_size: int,
     input_pvc_mounts: list[VolumeMount],
 ) -> Container:
@@ -211,21 +207,28 @@ def _make_pvc_listing_template(
     which Argo reads as the `partitions` output parameter for `with_param` fan-out.
 
     Args:
-        pvc_input: The PVC input describing mount path and glob pattern
+        pvc_inputs: PVC inputs describing mount paths and glob patterns
         partition_size: Number of files per partition
         input_pvc_mounts: Read-only volume mounts for the input PVC(s)
 
     Returns:
         Container template for the listing step
     """
-    full_path = pvc_input.full_path
-    glob = pvc_input.glob
+    find_commands = [
+        (
+            f"find {shlex.quote(pvc_input.full_path)} -maxdepth 1 "
+            f"-name {shlex.quote(pvc_input.glob)} -type f >> /tmp/files.txt"
+        )
+        for pvc_input in pvc_inputs
+    ]
 
     listing_cmd = "\n".join(
         [
             "set -eu",
-            f"find '{full_path}' -maxdepth 1 -name '{glob}' -type f | sort > /tmp/files.txt",
-            f"test -s /tmp/files.txt || {{ echo 'No files found matching {glob} in {full_path}' >&2; exit 1; }}",
+            ": > /tmp/files.txt",
+            *find_commands,
+            "sort -u /tmp/files.txt -o /tmp/files.txt",
+            "test -s /tmp/files.txt || { echo 'No files found for PVC inputs' >&2; exit 1; }",
             "python3 - << 'PYEOF'",
             "import json",
             "files = [line.rstrip() for line in open('/tmp/files.txt') if line.strip()]",
@@ -261,8 +264,8 @@ def _make_pvc_cmd_template(
 ) -> Container:
     """Create a Container template for a PVC-parallel command step.
 
-    Uses pvc_partition_processing.sh so that at CMD_INDEX=0 the full PVC path
-    from the partition manifest is used as INPUT_FILE directly (no download needed).
+    Uses partition_processing.sh with mounted-pvc mode so that at CMD_INDEX=0
+    the full PVC path from the partition manifest is used as INPUT_FILE directly.
     For CMD_INDEX > 0 reads from the previous step's output directory as normal.
 
     Args:
@@ -273,9 +276,10 @@ def _make_pvc_cmd_template(
     Returns:
         Container template for a parallel PVC command step
     """
-    script_file = files("ogdc_runner.scripts").joinpath("pvc_partition_processing.sh")
-    script_template = script_file.read_text()
-    command_script = script_template.replace("{user_command}", command)
+    command_script = _build_partition_processing_script(
+        command,
+        first_command_input_mode="mounted-pvc",
+    )
 
     return Container(
         name=name,
@@ -312,15 +316,13 @@ def _create_pvc_parallel_workflow(
         commands: List of shell commands to execute per partition
     """
     pvc_inputs = [p for p in recipe_config.input.params if isinstance(p, PvcMountInput)]
-    pvc_input = pvc_inputs[0]  # Single PVC input; mixed inputs are out of scope
-
     parallel_config = recipe_config.workflow.parallel
     partition_size = max(1, parallel_config.partition_size or 1)
 
     input_pvc_mounts = get_input_pvc_volume_mounts(recipe_config)
 
     listing_template = _make_pvc_listing_template(
-        pvc_input=pvc_input,
+        pvc_inputs=pvc_inputs,
         partition_size=partition_size,
         input_pvc_mounts=input_pvc_mounts,
     )
@@ -369,6 +371,12 @@ def _create_parallel_workflow(
     """
     pvc_inputs = [p for p in recipe_config.input.params if isinstance(p, PvcMountInput)]
     if pvc_inputs:
+        if len(pvc_inputs) != len(recipe_config.input.params):
+            msg = (
+                "Parallel shell workflows do not support mixing pvc_mount inputs "
+                "with URL or DataONE inputs."
+            )
+            raise OgdcWorkflowExecutionError(msg)
         _create_pvc_parallel_workflow(recipe_config, commands)
         return
 
