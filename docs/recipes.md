@@ -110,7 +110,8 @@ input:
 ```
 
 - **`claim_name`** (required): Name of the PVC in the cluster namespace.
-- **`path`** (required): Subpath within the PVC containing the input files.
+- **`path`** (required): Subpath within the PVC containing the input files. Parent
+  directory references (`..`) are rejected.
 - **`glob`** (optional, default `"*"`): Glob pattern for file selection. Used by
   parallel workflows to enumerate files at runtime.
 
@@ -124,7 +125,9 @@ no-op marker instead.
 
 PVC inputs support parallel execution. When `parallel.enabled` is `true`, the
 workflow enumerates files matching the glob pattern at runtime and distributes
-them across partitions automatically. See {ref}`parallel-execution` below.
+them across partitions automatically. Parallel shell workflows may use one or
+more `pvc_mount` inputs, but they cannot mix PVC inputs with URL or DataONE
+inputs. See {ref}`parallel-execution` below.
 
 See {class}`ogdc_runner.models.recipe_config.PvcMountInput` for details.
 

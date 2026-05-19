@@ -4,7 +4,7 @@ import json
 import logging
 import re
 from functools import cache, cached_property
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Annotated, Any, Literal, Self, TypeAlias
 
 import requests
@@ -189,11 +189,24 @@ class PvcMountInput(InputParam):
             raise ValueError(msg)
         return v
 
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, v: str) -> str:
+        if "\x00" in v:
+            msg = "path must not contain null bytes"
+            raise ValueError(msg)
+
+        path = PurePosixPath(v)
+        if ".." in path.parts:
+            msg = "path must not contain parent directory references"
+            raise ValueError(msg)
+        return v
+
     @field_validator("glob")
     @classmethod
     def validate_glob(cls, v: str) -> str:
-        if "'" in v:
-            msg = "glob must not contain single quotes"
+        if "\x00" in v:
+            msg = "glob must not contain null bytes"
             raise ValueError(msg)
         return v
 
