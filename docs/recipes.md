@@ -112,8 +112,9 @@ input:
 - **`claim_name`** (required): Name of the PVC in the cluster namespace.
 - **`path`** (required): Subpath within the PVC containing the input files. Parent
   directory references (`..`) are rejected.
-- **`glob`** (optional, default `"*"`): Glob pattern for file selection. Used by
-  parallel workflows to enumerate files at runtime.
+- **`glob`** (optional, default `"*"`): Recursive glob pattern for file
+  selection. For example, `*.gpkg` matches GeoPackages directly under `path` and
+  in any nested directories.
 
 The `claim_name` must be pre-provisioned by a cluster operator and included in
 the deployment's configured input PVC allowlist. The default OGDC workflow PVC
@@ -130,14 +131,15 @@ may use URL/DataONE inputs, but it cannot combine PVC inputs with URL/DataONE
 inputs in the same recipe.
 
 Recipe scripts read files from the mounted path. For the example above, files
-are accessible at `/mnt/data/arctic-dem-pvc/tiles/v3/*.tif`.
+are accessible at `/mnt/data/arctic-dem-pvc/tiles/v3/**/*.tif`.
 
 PVC inputs work in both sequential and parallel shell and visualization
-workflows. Sequential shell workflows link matching PVC files into `/input_dir`
-so existing shell recipes can keep using `/input_dir/...` paths. Sequential
-visualization workflows enumerate matching PVC files at runtime and call
-`workflow.stage(path)` for each path in that manifest. Parallel workflows
-enumerate files matching the glob pattern at runtime and distribute them across
+workflows. Sequential shell workflows recursively link matching PVC files into
+`/input_dir` so existing shell recipes can keep using `/input_dir/...` paths.
+Sequential visualization workflows recursively enumerate matching PVC files at
+runtime and call `workflow.stage(path)` for each path in that manifest. Parallel
+workflows recursively enumerate files matching the glob pattern at runtime and
+distribute them across
 partitions automatically.
 
 See {class}`ogdc_runner.models.recipe_config.PvcMountInput` for details.
@@ -321,8 +323,8 @@ partitioning happens **inside the cluster at workflow runtime**:
    submits it to Argo. The workflow references pre-existing PVC claims and does
    not include `volumeClaimTemplates` or create storage resources.
 2. At runtime, `list-pvc-files` runs on a pod that mounts the input PVC,
-   enumerates files matching the `glob` pattern, and groups them into partitions
-   of `partition_size`. It outputs JSON:
+   recursively enumerates files matching the `glob` pattern, and groups them
+   into partitions of `partition_size`. It outputs JSON:
    `[{"partition_id": 0, "files": ["/mnt/data/.../a.tif", ...]}, ...]`
 3. Argo reads that JSON via `with_param` and spawns one parallel task per
    partition — the same fan-out pattern used by the visualization workflow.

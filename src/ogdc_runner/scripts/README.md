@@ -13,10 +13,10 @@ file processing in Argo workflows.
 
 ### list_pvc_inputs.sh
 
-Enumerates files from one or more mounted input PVC paths and writes partition
-JSON for Argo `withParam` fan-out.
+Recursively enumerates files from one or more mounted input PVC paths and writes
+partition JSON for Argo `withParam` fan-out.
 
 ### stage_pvc_inputs.sh
 
-Links files from mounted input PVC paths into a workflow input directory so
-sequential shell recipes can continue reading from `/input_dir`.
+Recursively links files from mounted input PVC paths into a workflow input
+directory so sequential shell recipes can continue reading from `/input_dir`.
