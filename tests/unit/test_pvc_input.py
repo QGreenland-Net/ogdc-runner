@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import json
+import os
+import shlex
+import subprocess
+from importlib.resources import files
 from typing import Any
 from unittest.mock import patch
 
@@ -69,6 +74,14 @@ def test_path_rejects_parent_directory_references():
     """PVC paths must stay inside the mounted claim path."""
     with pytest.raises(ValidationError, match="parent directory"):
         PvcMountInput(claim_name="test-pvc", path="../other-pvc")
+
+
+def test_glob_rejects_unsafe_paths():
+    """PVC glob patterns must stay under the configured input path."""
+    with pytest.raises(ValidationError, match="relative"):
+        PvcMountInput(claim_name="test-pvc", path="/data/", glob="/other/*.gpkg")
+    with pytest.raises(ValidationError, match="parent directory"):
+        PvcMountInput(claim_name="test-pvc", path="/data/", glob="../*.gpkg")
 
 
 def test_input_pvc_volume_and_mount_are_read_only():
@@ -148,6 +161,82 @@ def test_pvc_listing_template_includes_all_pvc_inputs():
     assert second.full_path in script
     assert "*.tif" in script
     assert "*.gpkg" in script
+
+
+def _render_script(name: str, replacements: dict[str, str]) -> str:
+    script = files("ogdc_runner.scripts").joinpath(name).read_text()
+    for placeholder, value in replacements.items():
+        script = script.replace(placeholder, value)
+    return script
+
+
+def test_pvc_listing_script_recurses_into_subdirectories(tmp_path):
+    """PVC listing should find files staged below nested dataset directories."""
+    input_path = tmp_path / "AK_Water_Mosaic_gpkg"
+    nested_path = input_path / "43_18"
+    nested_path.mkdir(parents=True)
+    root_match = input_path / "root.gpkg"
+    nested_match = nested_path / "nested.gpkg"
+    ignored_file = nested_path / "ignored.txt"
+    root_match.touch()
+    nested_match.touch()
+    ignored_file.touch()
+
+    partitions_path = tmp_path / "partitions.json"
+    files_path = tmp_path / "files.json"
+    script = _render_script(
+        "list_pvc_inputs.sh",
+        {
+            "{pvc_inputs_json}": "PVC_INPUTS_JSON="
+            + shlex.quote(json.dumps([{"path": str(input_path), "glob": "*.gpkg"}])),
+            "{partition_size}": "10",
+        },
+    )
+
+    subprocess.run(
+        ["sh", "-c", script],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "PARTITIONS_PATH": str(partitions_path),
+            "FILES_PATH": str(files_path),
+        },
+    )
+    listed_files = json.loads(files_path.read_text())
+    partitions = json.loads(partitions_path.read_text())
+
+    assert listed_files == sorted([str(nested_match), str(root_match)])
+    assert partitions == [{"partition_id": 0, "files": listed_files}]
+
+
+def test_pvc_stage_script_recurses_into_subdirectories(tmp_path):
+    """Sequential PVC staging should symlink recursive glob matches."""
+    input_path = tmp_path / "AK_Water_Mosaic_gpkg"
+    nested_path = input_path / "43_18"
+    output_path = tmp_path / "output"
+    nested_path.mkdir(parents=True)
+    nested_match = nested_path / "nested.gpkg"
+    ignored_file = nested_path / "ignored.txt"
+    nested_match.touch()
+    ignored_file.touch()
+
+    script = _render_script(
+        "stage_pvc_inputs.sh",
+        {
+            "{pvc_inputs_json}": "PVC_INPUTS_JSON="
+            + shlex.quote(json.dumps([{"path": str(input_path), "glob": "*.gpkg"}])),
+            "{output_dir}": shlex.quote(str(output_path)),
+        },
+    )
+
+    subprocess.run(["sh", "-c", script], check=True, capture_output=True, text=True)
+
+    staged_file = output_path / nested_match.name
+    assert staged_file.is_symlink()
+    assert staged_file.resolve() == nested_match
+    assert not (output_path / ignored_file.name).exists()
 
 
 def test_partition_script_supports_mounted_pvc_mode():
