@@ -115,19 +115,30 @@ input:
 - **`glob`** (optional, default `"*"`): Glob pattern for file selection. Used by
   parallel workflows to enumerate files at runtime.
 
+The `claim_name` must be pre-provisioned by a cluster operator and included in
+the deployment's configured input PVC allowlist. The default OGDC workflow PVC
+claim configured by `OGDC_WORKFLOW_PVC_NAME` is always allowed and can also be
+referenced as a `pvc_mount` input. Recipes that reference any other PVC claim
+outside the allowlist are rejected before workflow submission.
+
+The runner does not create PersistentVolumes or PersistentVolumeClaims for
+`pvc_mount` inputs. It only adds Argo workflow volume references to existing PVC
+claim names.
+
+PVC inputs are exclusive: a recipe may use one or more `pvc_mount` inputs, or it
+may use URL/DataONE inputs, but it cannot combine PVC inputs with URL/DataONE
+inputs in the same recipe.
+
 Recipe scripts read files from the mounted path. For the example above, files
 are accessible at `/mnt/data/arctic-dem-pvc/tiles/v3/*.tif`.
 
-```{note}
-PVC mount inputs skip the download step entirely. The fetch step emits a
-no-op marker instead.
-```
-
-PVC inputs support parallel execution. When `parallel.enabled` is `true`, the
-workflow enumerates files matching the glob pattern at runtime and distributes
-them across partitions automatically. Parallel shell workflows may use one or
-more `pvc_mount` inputs, but they cannot mix PVC inputs with URL or DataONE
-inputs. See {ref}`parallel-execution` below.
+PVC inputs work in both sequential and parallel shell and visualization
+workflows. Sequential shell workflows link matching PVC files into `/input_dir`
+so existing shell recipes can keep using `/input_dir/...` paths. Sequential
+visualization workflows enumerate matching PVC files at runtime and call
+`workflow.stage(path)` for each path in that manifest. Parallel workflows
+enumerate files matching the glob pattern at runtime and distribute them across
+partitions automatically.
 
 See {class}`ogdc_runner.models.recipe_config.PvcMountInput` for details.
 
@@ -307,7 +318,8 @@ enumerate input files at submit time because it does not mount the PVC. Instead,
 partitioning happens **inside the cluster at workflow runtime**:
 
 1. The runner builds a workflow containing a `list-pvc-files` container step and
-   submits it to Argo — no file listing occurs on the runner itself.
+   submits it to Argo. The workflow references pre-existing PVC claims and does
+   not include `volumeClaimTemplates` or create storage resources.
 2. At runtime, `list-pvc-files` runs on a pod that mounts the input PVC,
    enumerates files matching the `glob` pattern, and groups them into partitions
    of `partition_size`. It outputs JSON:
@@ -335,8 +347,8 @@ At `CMD_INDEX=0`, `$INPUT_FILE` is set to the full PVC path (e.g.,
 `$INPUT_FILE` reads from the previous command's output directory as normal.
 
 ```{note}
-For URL inputs, the runner knows every URL at submit time and creates
-partitions before the workflow is submitted. For PVC inputs, the runner has
-no access to the PVC filesystem, so the listing step inside the workflow
-handles discovery and partitioning.
+For URL-only inputs, the runner knows every URL at submit time and can create
+partitions before the workflow is submitted. For PVC inputs, the runner has no
+access to the PVC filesystem, so the listing step inside the workflow handles
+discovery and partitioning.
 ```
