@@ -242,7 +242,7 @@ def test_pvc_stage_script_recurses_into_subdirectories(tmp_path):
 def test_partition_script_supports_mounted_pvc_mode():
     """PVC parallel mode should use mounted file paths directly at cmd index 0."""
     script = _build_partition_processing_script(
-        "cp \"$INPUT_FILE\" \"$OUTPUT_FILE\"",
+        'cp "$INPUT_FILE" "$OUTPUT_FILE"',
         first_command_input_mode="mounted-pvc",
     )
 
@@ -266,7 +266,9 @@ def _render_shell_workflow(config: Any) -> dict[str, Any]:
 
 def _template(workflow: dict[str, Any], name: str) -> dict[str, Any]:
     return next(
-        template for template in workflow["spec"]["templates"] if template["name"] == name
+        template
+        for template in workflow["spec"]["templates"]
+        if template["name"] == name
     )
 
 

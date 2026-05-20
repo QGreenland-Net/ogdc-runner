@@ -107,7 +107,9 @@ def _main_dag_tasks(workflow: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _template(workflow: dict[str, Any], name: str) -> dict[str, Any]:
     return next(
-        template for template in workflow["spec"]["templates"] if template["name"] == name
+        template
+        for template in workflow["spec"]["templates"]
+        if template["name"] == name
     )
 
 
@@ -247,7 +249,9 @@ def test_serial_viz_workflow_renders_pvc_mount_input(
     assert "input-pvc-ogdc-test-pvc" in listing_mounts
 
     serial_template = _template(workflow, "run-viz-serial")
-    serial_mounts = {mount["name"] for mount in serial_template["script"]["volumeMounts"]}
+    serial_mounts = {
+        mount["name"] for mount in serial_template["script"]["volumeMounts"]
+    }
     assert "input-pvc-ogdc-test-pvc" in serial_mounts
     assert "workflow.stage(local_path)" in serial_template["script"]["source"]
     assert "symlink_to" not in serial_template["script"]["source"]

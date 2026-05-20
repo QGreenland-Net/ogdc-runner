@@ -110,8 +110,8 @@ input:
 ```
 
 - **`claim_name`** (required): Name of the PVC in the cluster namespace.
-- **`path`** (required): Subpath within the PVC containing the input files. Parent
-  directory references (`..`) are rejected.
+- **`path`** (required): Subpath within the PVC containing the input files.
+  Parent directory references (`..`) are rejected.
 - **`glob`** (optional, default `"*"`): Recursive glob pattern for file
   selection. For example, `*.gpkg` matches GeoPackages directly under `path` and
   in any nested directories.
@@ -139,8 +139,7 @@ workflows. Sequential shell workflows recursively link matching PVC files into
 Sequential visualization workflows recursively enumerate matching PVC files at
 runtime and call `workflow.stage(path)` for each path in that manifest. Parallel
 workflows recursively enumerate files matching the glob pattern at runtime and
-distribute them across
-partitions automatically.
+distribute them across partitions automatically.
 
 See {class}`ogdc_runner.models.recipe_config.PvcMountInput` for details.
 

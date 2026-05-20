@@ -37,9 +37,9 @@ def make_pvc_listing_template(
     The container writes partition JSON to /tmp/partitions.json. Argo reads that
     file as the `partitions` output parameter for `with_param` fan-out.
     """
-    script_template = files("ogdc_runner.scripts").joinpath(
-        "list_pvc_inputs.sh"
-    ).read_text()
+    script_template = (
+        files("ogdc_runner.scripts").joinpath("list_pvc_inputs.sh").read_text()
+    )
     pvc_inputs_json = json.dumps(
         [
             {"path": pvc_input.full_path, "glob": pvc_input.glob}
@@ -197,9 +197,9 @@ def _build_pvc_stage_command(
     pvc_inputs: list[PvcMountInput],
     output_dir: str,
 ) -> str:
-    script_template = files("ogdc_runner.scripts").joinpath(
-        "stage_pvc_inputs.sh"
-    ).read_text()
+    script_template = (
+        files("ogdc_runner.scripts").joinpath("stage_pvc_inputs.sh").read_text()
+    )
     pvc_inputs_json = json.dumps(
         [
             {"path": pvc_input.full_path, "glob": pvc_input.glob}

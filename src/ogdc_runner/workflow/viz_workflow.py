@@ -70,7 +70,9 @@ _WORKFLOW_VOLUME_MOUNT = VolumeMount(
 )
 
 
-def _viz_volume_mounts(extra_mounts: list[VolumeMount] | None = None) -> list[VolumeMount]:
+def _viz_volume_mounts(
+    extra_mounts: list[VolumeMount] | None = None,
+) -> list[VolumeMount]:
     """Return workflow PVC mount plus any recipe-specific input PVC mounts."""
     mounts = [_WORKFLOW_VOLUME_MOUNT]
     existing_names = {mount.name for mount in mounts}

@@ -261,10 +261,13 @@ def test_OgdcWorkflow_rejects_unconfigured_input_pvc(
         params=[PvcMountInput(claim_name="ogdc-test-pvc", path="/data/")]
     )
 
-    with pytest.raises(OgdcInvalidRecipeConfig, match="ogdc-test-pvc"), OgdcWorkflow(
-        recipe_config=recipe_config,
-        name="test",
-        archive_workflow=False,
+    with (
+        pytest.raises(OgdcInvalidRecipeConfig, match="ogdc-test-pvc"),
+        OgdcWorkflow(
+            recipe_config=recipe_config,
+            name="test",
+            archive_workflow=False,
+        ),
     ):
         pass
 
@@ -287,11 +290,12 @@ def test_OgdcWorkflow_rejects_input_pvc_when_allowlist_missing_or_empty(
         params=[PvcMountInput(claim_name="ogdc-test-pvc", path="/data/")]
     )
 
-    with pytest.raises(
-        OgdcInvalidRecipeConfig, match="OGDC_ALLOWED_INPUT_PVCS"
-    ), OgdcWorkflow(
-        recipe_config=recipe_config,
-        name="test",
-        archive_workflow=False,
+    with (
+        pytest.raises(OgdcInvalidRecipeConfig, match="OGDC_ALLOWED_INPUT_PVCS"),
+        OgdcWorkflow(
+            recipe_config=recipe_config,
+            name="test",
+            archive_workflow=False,
+        ),
     ):
         pass
