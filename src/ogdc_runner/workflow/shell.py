@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shlex
 from importlib.resources import files
 from typing import Any
 
@@ -13,7 +12,7 @@ from hera.workflows import (
     Steps,
     Task,
 )
-from hera.workflows.models import ValueFrom, VolumeMount
+from hera.workflows.models import VolumeMount
 from loguru import logger
 
 from ogdc_runner.argo import (
@@ -24,8 +23,7 @@ from ogdc_runner.argo import (
     submit_workflow,
 )
 from ogdc_runner.constants import MAX_PARALLEL_LIMIT
-from ogdc_runner.exceptions import OgdcWorkflowExecutionError
-from ogdc_runner.inputs import make_fetch_input_template
+from ogdc_runner.inputs import make_fetch_input_template, make_pvc_listing_template
 from ogdc_runner.models.parallel_config import ExecutionFunction, FilePartition
 from ogdc_runner.models.recipe_config import PvcMountInput, RecipeConfig
 from ogdc_runner.parallel import ParallelExecutionOrchestrator
@@ -196,67 +194,6 @@ def make_cmd_template(
     )
 
 
-def _make_pvc_listing_template(
-    pvc_inputs: list[PvcMountInput],
-    partition_size: int,
-    input_pvc_mounts: list[VolumeMount],
-) -> Container:
-    """Create a container that enumerates PVC files at runtime and outputs partition JSON.
-
-    The container writes a JSON array of partition objects to /tmp/partitions.json,
-    which Argo reads as the `partitions` output parameter for `with_param` fan-out.
-
-    Args:
-        pvc_inputs: PVC inputs describing mount paths and glob patterns
-        partition_size: Number of files per partition
-        input_pvc_mounts: Read-only volume mounts for the input PVC(s)
-
-    Returns:
-        Container template for the listing step
-    """
-    find_commands = [
-        (
-            f"find {shlex.quote(pvc_input.full_path)} -maxdepth 1 "
-            f"-name {shlex.quote(pvc_input.glob)} -type f >> /tmp/files.txt"
-        )
-        for pvc_input in pvc_inputs
-    ]
-
-    listing_cmd = "\n".join(
-        [
-            "set -eu",
-            ": > /tmp/files.txt",
-            *find_commands,
-            "sort -u /tmp/files.txt -o /tmp/files.txt",
-            "test -s /tmp/files.txt || { echo 'No files found for PVC inputs' >&2; exit 1; }",
-            "python3 - << 'PYEOF'",
-            "import json",
-            "files = [line.rstrip() for line in open('/tmp/files.txt') if line.strip()]",
-            f"ps = {partition_size}",
-            "parts = [{'partition_id': i, 'files': files[j:j+ps]} for i, j in enumerate(range(0, len(files), ps))]",
-            "json.dump(parts, open('/tmp/partitions.json', 'w'))",
-            "import sys; sys.stderr.write('Generated ' + str(len(parts)) + ' partitions\\n')",
-            "PYEOF",
-        ]
-    )
-
-    return Container(
-        name="list-pvc-files",
-        command=["sh", "-c"],
-        args=[listing_cmd],
-        outputs=[
-            Parameter(
-                name="partitions",
-                value_from=ValueFrom(path="/tmp/partitions.json"),
-            ),
-        ],
-        volume_mounts=[
-            VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow"),
-            *input_pvc_mounts,
-        ],
-    )
-
-
 def _make_pvc_cmd_template(
     name: str,
     command: str,
@@ -321,7 +258,7 @@ def _create_pvc_parallel_workflow(
 
     input_pvc_mounts = get_input_pvc_volume_mounts(recipe_config)
 
-    listing_template = _make_pvc_listing_template(
+    listing_template = make_pvc_listing_template(
         pvc_inputs=pvc_inputs,
         partition_size=partition_size,
         input_pvc_mounts=input_pvc_mounts,
@@ -371,12 +308,6 @@ def _create_parallel_workflow(
     """
     pvc_inputs = [p for p in recipe_config.input.params if isinstance(p, PvcMountInput)]
     if pvc_inputs:
-        if len(pvc_inputs) != len(recipe_config.input.params):
-            msg = (
-                "Parallel shell workflows do not support mixing pvc_mount inputs "
-                "with URL or DataONE inputs."
-            )
-            raise OgdcWorkflowExecutionError(msg)
         _create_pvc_parallel_workflow(recipe_config, commands)
         return
 

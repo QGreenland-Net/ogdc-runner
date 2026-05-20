@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import json
+import shlex
+from importlib.resources import files
 from typing import Any
 
 from hera.workflows import (
     Artifact,
     Container,
+    Parameter,
 )
-from hera.workflows.models import VolumeMount
+from hera.workflows.models import ValueFrom, VolumeMount
 
 from ogdc_runner.argo import OGDC_WORKFLOW_PVC, get_input_pvc_volume_mounts
 from ogdc_runner.exceptions import OgdcWorkflowExecutionError
@@ -18,6 +22,57 @@ from ogdc_runner.models.recipe_config import (
     RecipeConfig,
     UrlInput,
 )
+
+
+def make_pvc_listing_template(
+    pvc_inputs: list[PvcMountInput],
+    partition_size: int,
+    input_pvc_mounts: list[VolumeMount],
+    *,
+    name: str = "list-pvc-files",
+    image: str | None = None,
+) -> Container:
+    """Create a container that enumerates PVC input files at runtime.
+
+    The container writes partition JSON to /tmp/partitions.json. Argo reads that
+    file as the `partitions` output parameter for `with_param` fan-out.
+    """
+    script_template = files("ogdc_runner.scripts").joinpath(
+        "list_pvc_inputs.sh"
+    ).read_text()
+    pvc_inputs_json = json.dumps(
+        [
+            {"path": pvc_input.full_path, "glob": pvc_input.glob}
+            for pvc_input in pvc_inputs
+        ]
+    )
+    listing_cmd = script_template.replace(
+        "{pvc_inputs_json}",
+        f"PVC_INPUTS_JSON={shlex.quote(pvc_inputs_json)}",
+    ).replace(
+        "{partition_size}",
+        shlex.quote(str(partition_size)),
+    )
+
+    container = Container(
+        name=name,
+        command=["sh", "-c"],
+        args=[listing_cmd],
+        outputs=[
+            Parameter(
+                name="partitions",
+                value_from=ValueFrom(path="/tmp/partitions.json"),
+            ),
+            Parameter(
+                name="files",
+                value_from=ValueFrom(path="/tmp/files.json"),
+            ),
+        ],
+        volume_mounts=input_pvc_mounts,
+    )
+    if image is not None:
+        container.image = image
+    return container
 
 
 def make_fetch_input_template(
@@ -94,22 +149,33 @@ def _build_fetch_commands(params: list[Any], output_dir: str) -> str:
     """
     commands = []
 
+    pvc_inputs: list[PvcMountInput] = []
+    has_fetched_inputs = False
     for param in params:
         if isinstance(param, UrlInput):
+            has_fetched_inputs = True
             commands.append(_build_url_fetch_command(str(param.value), output_dir))
         elif isinstance(param, DataOneInput):
+            has_fetched_inputs = True
             # DataONE input - download all resolved objects
             if param.resolved_objects:
                 for obj in param.resolved_objects:
                     url = obj["url"]
-                    commands.append(f"wget --content-disposition -P /output_dir/ {url}")
+                    commands.append(
+                        f"wget --content-disposition -P {output_dir}/ {url}"
+                    )
             else:
                 raise OgdcWorkflowExecutionError(
                     f"DataONE input has no resolved objects: {param}"
                 )
         elif isinstance(param, PvcMountInput):
-            # PVC inputs are already mounted — emit a marker for the fetch step.
-            commands.append(f"echo 'pvc input mounted at {param.full_path}'")
+            pvc_inputs.append(param)
+
+    if pvc_inputs:
+        if has_fetched_inputs:
+            msg = "pvc_mount inputs cannot be combined with URL or DataONE inputs"
+            raise OgdcWorkflowExecutionError(msg)
+        commands.append(_build_pvc_stage_command(pvc_inputs, output_dir))
 
     return " && ".join(commands) if commands else "echo 'No input files to fetch'"
 
@@ -125,3 +191,25 @@ def _build_url_fetch_command(url: str, output_dir: str) -> str:
         Shell command string
     """
     return f"wget --content-disposition -P {output_dir}/ {url}"
+
+
+def _build_pvc_stage_command(
+    pvc_inputs: list[PvcMountInput],
+    output_dir: str,
+) -> str:
+    script_template = files("ogdc_runner.scripts").joinpath(
+        "stage_pvc_inputs.sh"
+    ).read_text()
+    pvc_inputs_json = json.dumps(
+        [
+            {"path": pvc_input.full_path, "glob": pvc_input.glob}
+            for pvc_input in pvc_inputs
+        ]
+    )
+    return script_template.replace(
+        "{pvc_inputs_json}",
+        f"PVC_INPUTS_JSON={shlex.quote(pvc_inputs_json)}",
+    ).replace(
+        "{output_dir}",
+        shlex.quote(output_dir),
+    )
