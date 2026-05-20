@@ -179,10 +179,10 @@ class PvcMountInput(InputParam):
     @field_validator("claim_name")
     @classmethod
     def validate_claim_name(cls, v: str) -> str:
-        # K8s volume names are capped at 63 chars; "input-pvc-" prefix is 10.
-        max_len = 53
-        if len(v) > max_len:
-            msg = f"claim_name too long ({len(v)} > {max_len})"
+        # PVC claim names are Kubernetes DNS labels. Generated Argo volume names
+        # are truncated separately when the "input-pvc-" prefix would exceed 63.
+        if len(v) > 63:
+            msg = f"claim_name too long ({len(v)} > 63)"
             raise ValueError(msg)
         if not re.match(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", v):
             msg = f"claim_name must be a valid K8s DNS label: {v!r}"
@@ -235,9 +235,16 @@ class RecipeInput(OgdcBaseModel):
 
     @field_validator("params")
     def validate_params(cls, params: list[InputParamType]) -> list[InputParamType]:
-        """Ensure there's at least one input parameter."""
+        """Ensure inputs are non-empty and do not mix PVC with fetched inputs."""
         if not params:
             error_msg = "At least one input parameter is required"
+            raise ValueError(error_msg)
+        has_pvc_input = any(isinstance(param, PvcMountInput) for param in params)
+        has_fetched_input = any(
+            isinstance(param, (DataOneInput, UrlInput)) for param in params
+        )
+        if has_pvc_input and has_fetched_input:
+            error_msg = "pvc_mount inputs cannot be combined with URL or DataONE inputs"
             raise ValueError(error_msg)
         return params
 

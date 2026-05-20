@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import os
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
+from hashlib import sha256
 from typing import Any
 
 from hera.shared import global_config
@@ -15,7 +17,7 @@ from hera.workflows import (
 )
 from loguru import logger
 
-from ogdc_runner.exceptions import OgdcWorkflowExecutionError
+from ogdc_runner.exceptions import OgdcInvalidRecipeConfig, OgdcWorkflowExecutionError
 from ogdc_runner.models.recipe_config import PvcMountInput, RecipeConfig
 
 # Kubernetes names must be no more than 63 characters.
@@ -52,19 +54,34 @@ def make_generate_name(*, recipe_id: str, suffix: str = "") -> str:
     return truncated_id
 
 
+OGDC_WORKFLOW_PVC_CLAIM_NAME = os.environ.get(
+    "OGDC_WORKFLOW_PVC_NAME", "cephfs-qgnet-ogdc-workflow-pvc"
+)
+
 OGDC_WORKFLOW_PVC = models.Volume(
     name="workflow-volume",
     persistent_volume_claim=models.PersistentVolumeClaimVolumeSource(
-        claim_name=os.environ.get(
-            "OGDC_WORKFLOW_PVC_NAME", "cephfs-qgnet-ogdc-workflow-pvc"
-        ),
+        claim_name=OGDC_WORKFLOW_PVC_CLAIM_NAME,
     ),
 )
 
 
+def _is_workflow_pvc_claim(claim_name: str) -> bool:
+    return claim_name == OGDC_WORKFLOW_PVC_CLAIM_NAME
+
+
 def _input_pvc_volume_name(claim_name: str) -> str:
     """Deterministic, k8s-safe volume name for an input PVC."""
-    return f"input-pvc-{claim_name}"
+    if _is_workflow_pvc_claim(claim_name):
+        return OGDC_WORKFLOW_PVC.name
+    volume_name = f"input-pvc-{claim_name}"
+    if len(volume_name) <= KUBERNETES_NAME_MAX_LENGTH:
+        return volume_name
+
+    digest = sha256(claim_name.encode("utf-8")).hexdigest()[:10]
+    prefix_len = KUBERNETES_NAME_MAX_LENGTH - len("input-pvc-") - len(digest) - 1
+    claim_prefix = claim_name[:prefix_len].rstrip("-")
+    return f"input-pvc-{claim_prefix}-{digest}"
 
 
 def make_input_pvc_volume(claim_name: str) -> models.Volume:
@@ -91,6 +108,68 @@ def _get_pvc_inputs(recipe_config: RecipeConfig) -> list[PvcMountInput]:
     return [p for p in recipe_config.input.params if isinstance(p, PvcMountInput)]
 
 
+def get_allowed_input_pvc_claims(
+    raw_allowlist: str | None = None,
+) -> set[str]:
+    """Parse configured input PVC claim names from OGDC_ALLOWED_INPUT_PVCS."""
+    if raw_allowlist is None:
+        raw_allowlist = os.environ.get("OGDC_ALLOWED_INPUT_PVCS", "[]")
+
+    if not raw_allowlist.strip():
+        raw_allowlist = "[]"
+
+    try:
+        allowlist = json.loads(raw_allowlist)
+    except json.JSONDecodeError as e:
+        msg = "OGDC_ALLOWED_INPUT_PVCS must be a JSON array"
+        raise OgdcInvalidRecipeConfig(msg) from e
+
+    if not isinstance(allowlist, list):
+        msg = "OGDC_ALLOWED_INPUT_PVCS must be a JSON array"
+        raise OgdcInvalidRecipeConfig(msg)
+
+    claim_names: set[str] = set()
+    for item in allowlist:
+        claim_name: Any
+        if isinstance(item, str):
+            claim_name = item
+        elif isinstance(item, dict):
+            claim_name = item.get("claimName") or item.get("claim_name")
+        else:
+            msg = (
+                "OGDC_ALLOWED_INPUT_PVCS entries must be strings or objects with "
+                "claimName"
+            )
+            raise OgdcInvalidRecipeConfig(msg)
+
+        if not isinstance(claim_name, str) or not claim_name:
+            msg = "OGDC_ALLOWED_INPUT_PVCS entries must include a non-empty claimName"
+            raise OgdcInvalidRecipeConfig(msg)
+
+        claim_names.add(claim_name)
+
+    claim_names.add(OGDC_WORKFLOW_PVC_CLAIM_NAME)
+    return claim_names
+
+
+def validate_recipe_input_pvcs_allowed(recipe_config: RecipeConfig) -> None:
+    """Reject recipe input PVC claims not configured by the deployment."""
+    requested_claims = {pvc.claim_name for pvc in _get_pvc_inputs(recipe_config)}
+    if not requested_claims:
+        return
+
+    allowed_claims = get_allowed_input_pvc_claims()
+    rejected_claims = sorted(requested_claims - allowed_claims)
+    if rejected_claims:
+        msg = (
+            "Recipe references input PVC claim(s) that are not configured in "
+            f"OGDC_ALLOWED_INPUT_PVCS: {', '.join(rejected_claims)}. "
+            "Ask an operator to add approved claims to the Helm "
+            "ogdc_input_pvcs value."
+        )
+        raise OgdcInvalidRecipeConfig(msg)
+
+
 def get_input_pvc_volumes(recipe_config: RecipeConfig) -> list[models.Volume]:
     """Return Argo Volumes for every PVC input referenced by the recipe.
 
@@ -102,6 +181,8 @@ def get_input_pvc_volumes(recipe_config: RecipeConfig) -> list[models.Volume]:
         if pvc.claim_name in seen:
             continue
         seen.add(pvc.claim_name)
+        if _is_workflow_pvc_claim(pvc.claim_name):
+            continue
         volumes.append(make_input_pvc_volume(pvc.claim_name))
     return volumes
 
@@ -391,6 +472,7 @@ def OgdcWorkflow(
 
     All other kwargs are passed directly to `argo.workflows.Workflow.
     """
+    validate_recipe_input_pvcs_allowed(recipe_config)
 
     # Merge labels provided by user with `ogdc/persist-workflow-in-archive`.
     labels = {

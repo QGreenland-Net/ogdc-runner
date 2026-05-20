@@ -7,7 +7,16 @@ from typing import Any
 import pytest
 from hera.workflows import Container
 
-from ogdc_runner.argo import OgdcWorkflow
+from ogdc_runner.argo import (
+    OGDC_WORKFLOW_PVC,
+    OGDC_WORKFLOW_PVC_CLAIM_NAME,
+    OgdcWorkflow,
+    get_allowed_input_pvc_claims,
+    get_input_pvc_volume_mounts,
+    get_input_pvc_volumes,
+)
+from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
+from ogdc_runner.models.recipe_config import PvcMountInput, RecipeInput
 from ogdc_runner.recipe import get_recipe_config
 
 
@@ -178,3 +187,111 @@ def test_OgdcWorfklow_with_temp_output(test_temp_output_recipe_directory):
         # Expect 7 days for recipes with temporary output type.
         assert w.ttl_strategy
         assert w.ttl_strategy.seconds_after_success == 60 * 60 * 24 * 7
+
+
+def test_OgdcWorkflow_allows_configured_input_pvc(
+    monkeypatch,
+    test_shell_workflow_recipe_directory,
+):
+    monkeypatch.setenv(
+        "OGDC_ALLOWED_INPUT_PVCS",
+        '[{"claimName": "ogdc-test-pvc", "description": "test data"}]',
+    )
+    recipe_config = get_recipe_config(
+        test_shell_workflow_recipe_directory, check_urls=False
+    )
+    recipe_config.input = RecipeInput(
+        params=[PvcMountInput(claim_name="ogdc-test-pvc", path="/data/")]
+    )
+
+    with OgdcWorkflow(
+        recipe_config=recipe_config,
+        name="test",
+        archive_workflow=False,
+    ) as w:
+        assert w.generate_name == f"{recipe_config.id}-test-"
+
+
+@pytest.mark.parametrize("allowlist_env", [None, "", "[]"])
+def test_OgdcWorkflow_allows_default_workflow_pvc_as_input(
+    monkeypatch,
+    test_shell_workflow_recipe_directory,
+    allowlist_env,
+):
+    if allowlist_env is None:
+        monkeypatch.delenv("OGDC_ALLOWED_INPUT_PVCS", raising=False)
+    else:
+        monkeypatch.setenv("OGDC_ALLOWED_INPUT_PVCS", allowlist_env)
+    recipe_config = get_recipe_config(
+        test_shell_workflow_recipe_directory, check_urls=False
+    )
+    recipe_config.input = RecipeInput(
+        params=[PvcMountInput(claim_name=OGDC_WORKFLOW_PVC_CLAIM_NAME, path="/inputs/")]
+    )
+
+    assert OGDC_WORKFLOW_PVC_CLAIM_NAME in get_allowed_input_pvc_claims()
+    assert get_input_pvc_volumes(recipe_config) == []
+
+    mounts = get_input_pvc_volume_mounts(recipe_config)
+    assert len(mounts) == 1
+    assert mounts[0].name == OGDC_WORKFLOW_PVC.name
+    assert mounts[0].mount_path == f"/mnt/data/{OGDC_WORKFLOW_PVC_CLAIM_NAME}"
+    assert mounts[0].read_only is True
+
+    with OgdcWorkflow(
+        recipe_config=recipe_config,
+        name="test",
+        archive_workflow=False,
+    ) as w:
+        assert w.generate_name == f"{recipe_config.id}-test-"
+
+
+def test_OgdcWorkflow_rejects_unconfigured_input_pvc(
+    monkeypatch,
+    test_shell_workflow_recipe_directory,
+):
+    monkeypatch.setenv(
+        "OGDC_ALLOWED_INPUT_PVCS",
+        '[{"claimName": "different-pvc", "description": "test data"}]',
+    )
+    recipe_config = get_recipe_config(
+        test_shell_workflow_recipe_directory, check_urls=False
+    )
+    recipe_config.input = RecipeInput(
+        params=[PvcMountInput(claim_name="ogdc-test-pvc", path="/data/")]
+    )
+
+    with pytest.raises(OgdcInvalidRecipeConfig, match="ogdc-test-pvc"), OgdcWorkflow(
+        recipe_config=recipe_config,
+        name="test",
+        archive_workflow=False,
+    ):
+        pass
+
+
+@pytest.mark.parametrize("allowlist_env", [None, "[]"])
+def test_OgdcWorkflow_rejects_input_pvc_when_allowlist_missing_or_empty(
+    monkeypatch,
+    test_shell_workflow_recipe_directory,
+    allowlist_env,
+):
+    if allowlist_env is None:
+        monkeypatch.delenv("OGDC_ALLOWED_INPUT_PVCS", raising=False)
+    else:
+        monkeypatch.setenv("OGDC_ALLOWED_INPUT_PVCS", allowlist_env)
+
+    recipe_config = get_recipe_config(
+        test_shell_workflow_recipe_directory, check_urls=False
+    )
+    recipe_config.input = RecipeInput(
+        params=[PvcMountInput(claim_name="ogdc-test-pvc", path="/data/")]
+    )
+
+    with pytest.raises(
+        OgdcInvalidRecipeConfig, match="OGDC_ALLOWED_INPUT_PVCS"
+    ), OgdcWorkflow(
+        recipe_config=recipe_config,
+        name="test",
+        archive_workflow=False,
+    ):
+        pass
