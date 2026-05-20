@@ -208,6 +208,13 @@ class PvcMountInput(InputParam):
         if "\x00" in v:
             msg = "glob must not contain null bytes"
             raise ValueError(msg)
+        path = PurePosixPath(v)
+        if path.is_absolute():
+            msg = "glob must be relative to the PVC input path"
+            raise ValueError(msg)
+        if ".." in path.parts:
+            msg = "glob must not contain parent directory references"
+            raise ValueError(msg)
         return v
 
     @property

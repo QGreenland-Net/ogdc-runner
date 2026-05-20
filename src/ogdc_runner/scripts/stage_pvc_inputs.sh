@@ -6,7 +6,6 @@ export PVC_INPUTS_JSON
 export OUTPUT_DIR="{output_dir}"
 
 python3 - <<'PYEOF'
-import fnmatch
 import json
 import os
 import sys
@@ -26,9 +25,7 @@ for pvc_input in pvc_inputs:
         sys.exit(1)
 
     matches = [
-        child
-        for child in sorted(input_path.iterdir())
-        if child.is_file() and fnmatch.fnmatch(child.name, pattern)
+        child for child in sorted(input_path.rglob(pattern)) if child.is_file()
     ]
     if not matches:
         sys.stderr.write(
