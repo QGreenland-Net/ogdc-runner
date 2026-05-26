@@ -13,7 +13,10 @@ import os
 import sys
 from pathlib import Path
 
-pvc_inputs = json.loads(os.environ["PVC_INPUTS_JSON"])
+try:
+    pvc_inputs = json.loads(os.environ["PVC_INPUTS_JSON"])
+except json.JSONDecodeError:
+    pvc_inputs = json.loads(os.environ["PVC_INPUTS_JSON"].replace("\\", "\\\\"))
 partition_size = int(os.environ["PARTITION_SIZE"])
 partitions_path = Path(os.environ.get("PARTITIONS_PATH", "/tmp/partitions.json"))
 files_path = Path(os.environ.get("FILES_PATH", "/tmp/files.json"))

@@ -13,7 +13,10 @@ import os
 import sys
 from pathlib import Path
 
-pvc_inputs = json.loads(os.environ["PVC_INPUTS_JSON"])
+try:
+    pvc_inputs = json.loads(os.environ["PVC_INPUTS_JSON"])
+except json.JSONDecodeError:
+    pvc_inputs = json.loads(os.environ["PVC_INPUTS_JSON"].replace("\\", "\\\\"))
 output_dir = Path(os.environ["OUTPUT_DIR"])
 output_dir.mkdir(parents=True, exist_ok=True)
 
