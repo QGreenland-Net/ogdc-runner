@@ -139,7 +139,11 @@ workflows. Sequential shell workflows recursively link matching PVC files into
 Sequential visualization workflows recursively enumerate matching PVC files at
 runtime and call `workflow.stage(path)` for each path in that manifest. Parallel
 workflows recursively enumerate files matching the glob pattern at runtime and
-distribute them across partitions automatically.
+distribute them across partitions automatically. For visualization workflows,
+the PVC manifest feeds staging when `enable_stager` is true. When
+`enable_stager` is false, the same PVC manifest can feed rasterization, 3D tile
+generation, or web tile generation directly, depending on the enabled viz
+workflow stages.
 
 See {class}`ogdc_runner.models.recipe_config.PvcMountInput` for details.
 
