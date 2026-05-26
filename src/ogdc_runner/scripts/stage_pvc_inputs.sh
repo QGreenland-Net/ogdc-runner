@@ -1,11 +1,11 @@
 #!/bin/sh
 # shellcheck disable=SC1073,SC1054,SC1083,SC1056,SC1072
-# This is a template file with {pvc_inputs_json} placeholder replaced by Python.
+# This file is rendered as a shell template before execution.
 set -eu
 
 {pvc_inputs_json}
 export PVC_INPUTS_JSON
-export OUTPUT_DIR="{output_dir}"
+export OUTPUT_DIR={output_dir}
 
 python3 - <<'PYEOF'
 import json
@@ -55,5 +55,5 @@ for pvc_input in pvc_inputs:
         target.symlink_to(source)
         linked += 1
 
-sys.stderr.write(f"Linked {linked} PVC input files into {output_dir}\n")
+sys.stderr.write("Linked %d PVC input files into %s\n" % (linked, output_dir))
 PYEOF
