@@ -1,4 +1,6 @@
 #!/bin/sh
+# shellcheck disable=SC1073,SC1054,SC1083,SC1056,SC1072
+# This is a template file with {pvc_inputs_json} placeholder replaced by Python.
 set -eu
 
 {pvc_inputs_json}
