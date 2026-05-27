@@ -34,6 +34,21 @@ Artifacts will be automatically garbage collected on workflow deletion. See the
 {ref}`workflow-persistence` section below for details on automatic workflow
 deletion.
 
+## Workflow PVC data
+
+All OGDC workflows mount the configured workflow PVC at `/mnt/workflow`. Parallel
+workflows use this PVC for retained partition manifests:
+
+```text
+/mnt/workflow/{recipe_id}/partition-manifests/
+```
+
+The runner does not remove these manifests when the Argo workflow completes.
+They are kept with the workflow-local files on PVC for provenance and
+debugging. Operators should treat them as part of the recipe's retained
+workflow data and clean them up only through the same PVC retention process used
+for other workflow-local data.
+
 <!-- prettier-ignore-start -->
 (workflow-persistence)=
 ## Workflow persistence

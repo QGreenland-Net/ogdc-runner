@@ -137,13 +137,13 @@ PVC inputs work in both sequential and parallel shell and visualization
 workflows. Sequential shell workflows recursively link matching PVC files into
 `/input_dir` so existing shell recipes can keep using `/input_dir/...` paths.
 Sequential visualization workflows recursively enumerate matching PVC files at
-runtime and call `workflow.stage(path)` for each path in that manifest. Parallel
-workflows recursively enumerate files matching the glob pattern at runtime and
-distribute them across partitions automatically. For visualization workflows,
-the PVC manifest feeds staging when `enable_stager` is true. When
-`enable_stager` is false, the same PVC manifest can feed rasterization, 3D tile
-generation, or web tile generation directly, depending on the enabled viz
-workflow stages.
+runtime and call `workflow.stage(path)` for each path in the input manifest.
+Parallel workflows recursively enumerate files matching the glob pattern at
+runtime, write retained partition manifests to the workflow PVC, and distribute
+those partitions automatically. For visualization workflows, the retained PVC
+manifests feed staging when `enable_stager` is true. When `enable_stager` is
+false, the same manifests can feed rasterization, 3D tile generation, or web
+tile generation directly, depending on the enabled viz workflow stages.
 
 See {class}`ogdc_runner.models.recipe_config.PvcMountInput` for details.
 
@@ -251,7 +251,7 @@ example.
 ## Parallel Execution
 <!-- prettier-ignore-end -->
 
-Currently only `shell` workflows support parallel execution for processing
+`shell` and `visualization` workflows support parallel execution for processing
 multiple input files concurrently. Parallel execution distributes work across
 multiple Argo workflow tasks, enabling efficient processing of large datasets.
 
@@ -301,9 +301,22 @@ independent tasks that can run concurrently. The maximum parallelism is
 controlled at the workflow level, allowing Argo to automatically schedule tasks
 as cluster resources become available.
 
+For partitioned workflows, the full file lists for each partition are written
+to retained JSON manifests on the workflow PVC:
+
+```text
+/mnt/workflow/{recipe_id}/partition-manifests/{stage}/partition-{partition_id}.json
+```
+
+Argo fan-out parameters only carry compact partition IDs and manifest path
+references. This keeps large file lists out of the workflow spec and Argo
+controller state while preserving the manifests on PVC for provenance and
+debugging.
+
 Each parallel task:
 
-- Receives a partition of input files via workflow parameters
+- Receives a partition ID and reads its file list from a manifest on the
+  workflow PVC
 - Executes the same command independently for **each file** in its partition
 - Writes outputs to isolated directories (one per partition)
 - Runs in a separate container with its own resource allocation
@@ -327,10 +340,13 @@ partitioning happens **inside the cluster at workflow runtime**:
    not include `volumeClaimTemplates` or create storage resources.
 2. At runtime, `list-pvc-files` runs on a pod that mounts the input PVC,
    recursively enumerates files matching the `glob` pattern, and groups them
-   into partitions of `partition_size`. It outputs JSON:
-   `[{"partition_id": 0, "files": ["/mnt/data/.../a.tif", ...]}, ...]`
-3. Argo reads that JSON via `with_param` and spawns one parallel task per
-   partition — the same fan-out pattern used by the visualization workflow.
+   into partitions of `partition_size`.
+3. The listing step writes full partition manifests under
+   `/mnt/workflow/{recipe_id}/partition-manifests/pvc-inputs/` and outputs a
+   compact JSON list like `[{"partition_id": 0}, ...]`.
+4. Argo reads that compact JSON via `with_param` and spawns one parallel task
+   per partition. Each task reads its full file list from the retained manifest
+   on the workflow PVC.
 
 ```yaml
 input:
@@ -352,8 +368,8 @@ At `CMD_INDEX=0`, `$INPUT_FILE` is set to the full PVC path (e.g.,
 `$INPUT_FILE` reads from the previous command's output directory as normal.
 
 ```{note}
-For URL-only inputs, the runner knows every URL at submit time and can create
-partitions before the workflow is submitted. For PVC inputs, the runner has no
-access to the PVC filesystem, so the listing step inside the workflow handles
-discovery and partitioning.
+For URL/DataONE inputs, the runner knows every input at submit time and creates
+the initial partition manifests before fan-out starts. For PVC inputs, the
+runner has no access to the PVC filesystem, so the listing step inside the
+workflow handles discovery and writes the manifests at runtime.
 ```
