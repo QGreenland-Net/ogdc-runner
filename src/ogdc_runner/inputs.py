@@ -22,6 +22,19 @@ from ogdc_runner.models.recipe_config import (
     RecipeConfig,
     UrlInput,
 )
+from ogdc_runner.partition_manifests import FILES_MANIFEST_PATH_PARAM
+
+
+def _dedupe_volume_mounts(mounts: list[VolumeMount]) -> list[VolumeMount]:
+    deduped: list[VolumeMount] = []
+    seen: set[tuple[str | None, str | None]] = set()
+    for mount in mounts:
+        key = (mount.name, mount.mount_path)
+        if key in seen:
+            continue
+        deduped.append(mount)
+        seen.add(key)
+    return deduped
 
 
 def make_pvc_listing_template(
@@ -34,8 +47,8 @@ def make_pvc_listing_template(
 ) -> Container:
     """Create a container that enumerates PVC input files at runtime.
 
-    The container writes partition JSON to /tmp/partitions.json. Argo reads that
-    file as the `partitions` output parameter for `with_param` fan-out.
+    The container writes full manifests to the workflow PVC and only exposes
+    compact manifest references as Argo output parameters.
     """
     script_template = (
         files("ogdc_runner.scripts").joinpath("list_pvc_inputs.sh").read_text()
@@ -58,17 +71,23 @@ def make_pvc_listing_template(
         name=name,
         command=["sh", "-c"],
         args=[listing_cmd],
+        inputs=[Parameter(name="recipe-id")],
         outputs=[
             Parameter(
                 name="partitions",
                 value_from=ValueFrom(path="/tmp/partitions.json"),
             ),
             Parameter(
-                name="files",
-                value_from=ValueFrom(path="/tmp/files.json"),
+                name=FILES_MANIFEST_PATH_PARAM,
+                value_from=ValueFrom(path="/tmp/files_manifest_path.txt"),
             ),
         ],
-        volume_mounts=input_pvc_mounts,
+        volume_mounts=_dedupe_volume_mounts(
+            [
+                VolumeMount(name=OGDC_WORKFLOW_PVC.name, mount_path="/mnt/workflow"),
+                *input_pvc_mounts,
+            ]
+        ),
     )
     if image is not None:
         container.image = image

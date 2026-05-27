@@ -19,7 +19,16 @@ except json.JSONDecodeError:
     pvc_inputs = json.loads(os.environ["PVC_INPUTS_JSON"].replace("\\", "\\\\"))
 partition_size = int(os.environ["PARTITION_SIZE"])
 partitions_path = Path(os.environ.get("PARTITIONS_PATH", "/tmp/partitions.json"))
-files_path = Path(os.environ.get("FILES_PATH", "/tmp/files.json"))
+files_manifest_path_output = Path(
+    os.environ.get("FILES_MANIFEST_PATH_OUTPUT", "/tmp/files_manifest_path.txt")
+)
+recipe_id = os.environ.get("RECIPE_ID", "{{inputs.parameters.recipe-id}}")
+manifest_dir = Path(
+    os.environ.get(
+        "PARTITION_MANIFEST_DIR",
+        f"/mnt/workflow/{recipe_id}/partition-manifests/pvc-inputs",
+    )
+)
 
 files = set()
 for pvc_input in pvc_inputs:
@@ -39,18 +48,36 @@ if not files:
     sys.exit(1)
 
 partitions = [
-    {"partition_id": i, "files": files[start : start + partition_size]}
+    {
+        "partition_id": i,
+        "files": files[start : start + partition_size],
+    }
     for i, start in enumerate(range(0, len(files), partition_size))
 ]
+partition_refs = []
 
 partitions_path.parent.mkdir(parents=True, exist_ok=True)
-files_path.parent.mkdir(parents=True, exist_ok=True)
+files_manifest_path_output.parent.mkdir(parents=True, exist_ok=True)
+manifest_dir.mkdir(parents=True, exist_ok=True)
+
+files_manifest_path = manifest_dir / "all-files.json"
+with files_manifest_path.open("w") as f:
+    json.dump(files, f)
+
+for partition in partitions:
+    partition_path = manifest_dir / f"partition-{partition['partition_id']}.json"
+    with partition_path.open("w") as f:
+        json.dump(partition["files"], f)
+    partition_refs.append(
+        {
+            "partition_id": partition["partition_id"],
+        }
+    )
 
 with partitions_path.open("w") as f:
-    json.dump(partitions, f)
+    json.dump(partition_refs, f)
 
-with files_path.open("w") as f:
-    json.dump(files, f)
+files_manifest_path_output.write_text(str(files_manifest_path))
 
 sys.stderr.write(f"Generated {len(partitions)} partitions\n")
 PYEOF

@@ -27,6 +27,15 @@ from ogdc_runner.inputs import make_fetch_input_template, make_pvc_listing_templ
 from ogdc_runner.models.parallel_config import ExecutionFunction, FilePartition
 from ogdc_runner.models.recipe_config import PvcMountInput, RecipeConfig
 from ogdc_runner.parallel import ParallelExecutionOrchestrator
+from ogdc_runner.partition_manifests import (
+    PARTITION_MANIFEST_PARAM,
+    PARTITION_MANIFEST_PATH_PARAM,
+    make_partition_manifest_writer_template,
+    partition_manifest_inputs,
+    partition_manifest_path_arg,
+    partition_manifest_records,
+)
+from ogdc_runner.partitioning import create_partitions
 from ogdc_runner.publish import make_publish_template
 
 
@@ -95,7 +104,7 @@ class ShellParallelExecutionOrchestrator(ParallelExecutionOrchestrator):
             command=["sh", "-c"],
             args=[command_script],
             inputs=[
-                Parameter(name="partition-manifest"),
+                *partition_manifest_inputs(),
                 Parameter(name="recipe-id"),
                 Parameter(name="partition-id"),
                 Parameter(name="cmd-index"),
@@ -161,7 +170,7 @@ class ShellParallelExecutionOrchestrator(ParallelExecutionOrchestrator):
             name=f"{func_name}-partition-{partition.partition_id}",
             template=template,
             arguments=[
-                Parameter(name="partition-manifest", value=partition_manifest),
+                Parameter(name=PARTITION_MANIFEST_PARAM, value=partition_manifest),
                 Parameter(name="recipe-id", value=self.recipe_config.id),
                 Parameter(name="partition-id", value=str(partition.partition_id)),
                 Parameter(name="cmd-index", value=cmd_index),
@@ -223,7 +232,7 @@ def _make_pvc_cmd_template(
         command=["sh", "-c"],
         args=[command_script],
         inputs=[
-            Parameter(name="partition-manifest"),
+            *partition_manifest_inputs(),
             Parameter(name="recipe-id"),
             Parameter(name="partition-id"),
             Parameter(name="cmd-index"),
@@ -273,7 +282,11 @@ def _create_pvc_parallel_workflow(
     ]
 
     with DAG(name="main"):
-        listing_task = Task(name="list-pvc-files", template=listing_template)
+        listing_task = Task(
+            name="list-pvc-files",
+            template=listing_template,
+            arguments=[Parameter(name="recipe-id", value=recipe_config.id)],
+        )
 
         previous_tasks: list[Task] = [listing_task]
         for idx, cmd_template in enumerate(cmd_templates):
@@ -282,7 +295,12 @@ def _create_pvc_parallel_workflow(
                 template=cmd_template,
                 with_param=listing_task.get_parameter("partitions"),
                 arguments=[
-                    Parameter(name="partition-manifest", value="{{item.files}}"),
+                    Parameter(
+                        name=PARTITION_MANIFEST_PATH_PARAM,
+                        value=partition_manifest_path_arg(
+                            recipe_config.id, "pvc-inputs"
+                        ),
+                    ),
                     Parameter(name="recipe-id", value=recipe_config.id),
                     Parameter(name="partition-id", value="{{item.partition_id}}"),
                     Parameter(name="cmd-index", value=str(idx)),
@@ -311,18 +329,91 @@ def _create_parallel_workflow(
         _create_pvc_parallel_workflow(recipe_config, commands)
         return
 
+    partition_manifest_template = _make_static_partition_manifest_template(
+        recipe_config=recipe_config,
+        manifest_subdir="shell-inputs",
+        template_name="write-partition-manifests",
+    )
     fetch_template = make_fetch_input_template(recipe_config, use_pvc=True)
-
-    # Create orchestrators and templates outside DAG context
-    orchestrators_with_templates = [
-        _create_orchestrator_with_template(recipe_config, idx, command)
-        for idx, command in enumerate(commands)
+    cmd_templates = [
+        _make_pvc_cmd_template(name=f"cmd-{idx}", command=cmd, extra_volume_mounts=[])
+        for idx, cmd in enumerate(commands)
     ]
 
-    # Create DAG structure
     with DAG(name="main"):
+        manifest_task = Task(
+            name="write-partition-manifests",
+            template=partition_manifest_template,
+        )
         fetch_task = Task(name="fetch", template=fetch_template)
-        _build_parallel_task_dependencies(fetch_task, orchestrators_with_templates)
+        manifest_task >> fetch_task
+        _build_manifest_backed_task_chain(
+            recipe_config=recipe_config,
+            manifest_task=manifest_task,
+            initial_deps=[fetch_task],
+            cmd_templates=cmd_templates,
+            manifest_subdir="shell-inputs",
+        )
+
+
+def _make_static_partition_manifest_template(
+    *,
+    recipe_config: RecipeConfig,
+    manifest_subdir: str,
+    template_name: str,
+    image: str | None = None,
+) -> Container:
+    partitions = create_partitions(
+        inputs=recipe_config.input.params,
+        execution_function=ExecutionFunction(name=manifest_subdir, command="partition"),
+        parallel_config=recipe_config.workflow.parallel,
+    )
+    logger.info(
+        "partition manifests=%d total_files=%d subdir=%s",
+        len(partitions),
+        sum(len(p.files) for p in partitions),
+        manifest_subdir,
+    )
+    return make_partition_manifest_writer_template(
+        name=template_name,
+        recipe_id=recipe_config.id,
+        manifest_subdir=manifest_subdir,
+        partitions=partition_manifest_records(partitions),
+        workflow_volume_name=OGDC_WORKFLOW_PVC.name,
+        image=image,
+    )
+
+
+def _build_manifest_backed_task_chain(
+    *,
+    recipe_config: RecipeConfig,
+    manifest_task: Task,
+    initial_deps: list[Task],
+    cmd_templates: list[Container],
+    manifest_subdir: str,
+) -> None:
+    previous_tasks = initial_deps
+
+    for idx, cmd_template in enumerate(cmd_templates):
+        cmd_task = Task(
+            name=f"cmd-{idx}",
+            template=cmd_template,
+            with_param=manifest_task.get_parameter("partitions"),
+            arguments=[
+                Parameter(
+                    name=PARTITION_MANIFEST_PATH_PARAM,
+                    value=partition_manifest_path_arg(
+                        recipe_config.id, manifest_subdir
+                    ),
+                ),
+                Parameter(name="recipe-id", value=recipe_config.id),
+                Parameter(name="partition-id", value="{{item.partition_id}}"),
+                Parameter(name="cmd-index", value=str(idx)),
+            ],
+        )
+        for prev_task in previous_tasks:
+            prev_task >> cmd_task
+        previous_tasks = [cmd_task]
 
 
 def _create_orchestrator_with_template(
