@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import AnyUrl, ValidationError
 
+from ogdc_runner.models.parallel_config import ExecutionFunction, FilePartition
 from ogdc_runner.models.recipe_config import (
     DataOneRecipeOutput,
     ParallelConfig,
@@ -62,26 +63,45 @@ def test_recipe_meta_failure_bad_id():
         )
 
 
-def test_parallel_config_default():
-    """Test default ParallelConfig values."""
+def test_parallel_config_defaults():
     config = ParallelConfig()
-
     assert config.enabled is False
-    assert config.partition_strategy == "files"
     assert config.partition_size is None
+    assert config.max_parallelism is None
 
 
-def test_parallel_config_custom():
-    """Test ParallelConfig with custom values."""
-    config = ParallelConfig(
-        enabled=True,
-        partition_strategy="files",
-        partition_size=5,
+def test_parallel_config_max_parallelism():
+    config = ParallelConfig(enabled=True, partition_size=500, max_parallelism=200)
+    assert config.partition_size == 500
+    assert config.max_parallelism == 200
+
+
+def test_parallel_config_rejects_non_positive_partition_size():
+    with pytest.raises(ValidationError):
+        ParallelConfig(partition_size=0)
+
+
+def test_parallel_config_rejects_non_positive_max_parallelism():
+    with pytest.raises(ValidationError):
+        ParallelConfig(max_parallelism=0)
+
+
+def test_execution_function_requires_exactly_one_of_command_or_function():
+    with pytest.raises(Exception, match="Must specify exactly one of"):
+        ExecutionFunction(name="run-stage")
+    with pytest.raises(Exception, match="Can only specify one of"):
+        ExecutionFunction(name="run-stage", command="echo hi", function=lambda: None)
+
+
+def test_file_partition_basic():
+    fp = FilePartition(
+        partition_id=0,
+        files=["gs://bucket/a.fgb", "gs://bucket/b.fgb"],
+        execution_function="stage-files",
     )
-
-    assert config.enabled is True
-    assert config.partition_strategy == "files"
-    assert config.partition_size == 5
+    assert fp.partition_id == 0
+    assert len(fp.files) == 2
+    assert fp.metadata == {}
 
 
 def test_shell_workflow_with_parallel_config(tmpdir):

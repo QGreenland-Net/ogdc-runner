@@ -101,7 +101,7 @@ def _publish_template_for_dataone(
 ) -> Container:
     """Creates a container template that will zip final output data and store
     the output as an artifact in dataone."""
-    err = "TODO!"
+    err = "Publishing recipe outputs to DataONE is not implemented."
     raise NotImplementedError(err)
 
 
@@ -263,6 +263,12 @@ def data_already_published(
     otherwise `False`.
     """
     if overwrite:
+        if isinstance(recipe_config.output, TemporaryRecipeOutput):
+            logger.warning(
+                f"Skipping overwrite cleanup for temporary output recipe '{recipe_config.name}'."
+            )
+            return False
+
         # If `overwrite` is True, remove the existing data and return `False`.
         remove_existing_published_data(
             recipe_config=recipe_config,
