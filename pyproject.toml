@@ -46,6 +46,7 @@ dependencies = [
   "dataone.libclient>=3.5.0",
   # s3 API
   "boto3 >=1.42",
+  "dataone-auth",
 ]
 
 [project.optional-dependencies]
@@ -219,3 +220,6 @@ isort.required-imports = ["from __future__ import annotations"]
 "tests/**" = ["T20"]
 "noxfile.py" = ["T20"]
 "**/recipe_config.py" = ["UP007"]
+
+[tool.uv.sources]
+dataone-auth = { git = "https://github.com/dataoneorg/dataone-auth", rev = "develop" }
