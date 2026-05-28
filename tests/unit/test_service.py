@@ -3,11 +3,11 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 from httpx import HTTPError, Response
+from ogdc_runner.service.user import ADMIN_USERNAME
 
 from ogdc_runner import __version__
 from ogdc_runner.service.auth import AUTH_TOKEN_URL
 from ogdc_runner.service.main import app
-from ogdc_runner.service.user import ADMIN_USERNAME
 
 
 def test_version(mock_db):  # noqa: ARG001
