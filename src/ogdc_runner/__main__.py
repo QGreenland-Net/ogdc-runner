@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import os
 import subprocess
 import sys
 import time
-from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlparse
 
 import click
 import requests
 import urllib3
+from dataone.auth import is_token_valid, parse_tokens_dict, refresh_tokens
 from pydantic import ValidationError
 
 from ogdc_runner.exceptions import (
-    OgdcMissingEnvvar,
     OgdcServiceApiError,
     OgdcWorkflowExecutionError,
 )
@@ -42,6 +42,7 @@ OGDC_API_URL = os.environ.get("OGDC_API_URL", default_url)
 
 SESSION = requests.Session()
 SESSION.verify = verify_ssl
+TOKEN_CACHE_FILE = Path.home() / ".config" / "ogdc" / "tokens.json"
 
 
 @click.group
@@ -49,66 +50,35 @@ def cli() -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
 
 
-def _get_api_token_factory() -> Callable[[], str]:
-    """Helper function that creates a callable that returns an OGDC API token.
+def get_api_token() -> str:
+    if not TOKEN_CACHE_FILE.exists():
+        msg = "Run 'ogdc-runner set-token' first."
+        raise RuntimeError(msg)
 
-    This is a closure (see e.g., https://realpython.com/python-closure/) - it
-    allows caching a requested access token based on its expiration datetime.
-    """
-    token_data: None | dict[str, str] = None
+    with TOKEN_CACHE_FILE.open("r") as f:
+        data = json.load(f)
 
-    def _get_api_token() -> str:
-        """Get an OGDC API token using envvar-provided username/password.
+    if is_token_valid(data.get("access_token")):
+        return data["access_token"]
 
-        `OGDC_API_USERNAME` and `OGDC_API_PASSWORD` must be set or an
-        `OgdcMissingEnvvar` exception will be raised.
-
-        The resulting access token can be used to authenticate with OGDC API
-        endpoitns.
-        """
-        nonlocal token_data
-
-        # Check if the token is valid.
-        if token_data is not None:
-            token_expiration_utc = dt.datetime.fromisoformat(
-                token_data["utc_expiration"]
+    if is_token_valid(data.get("refresh_token")):
+        try:
+            new_tokens = refresh_tokens(
+                refresh_url=f"{OGDC_API_URL}/refresh", 
+                refresh_token=data["refresh_token"]
             )
-            # Use a 1 minute buffer to account for time between check and the
-            # next request.
-            current_utc = dt.datetime.now(dt.UTC) + dt.timedelta(minutes=1)
-            if token_expiration_utc > current_utc:
-                # Return the existing token - it is still valid.
-                return token_data["access_token"]
+            
+            with TOKEN_CACHE_FILE.open("w") as f:
+                json.dump(new_tokens, f, indent=2)
+                
+            return new_tokens["access_token"]
+            
+        except Exception as e:
+            msg = f"Session refresh failed: {e}"
+            raise RuntimeError(msg) from e
 
-        username = os.environ.get("OGDC_API_USERNAME")
-        password = os.environ.get("OGDC_API_PASSWORD")
-        if not username or not password:
-            err = "OGDC_API_USERNAME and OGDC_API_PASSWORD must be set."
-            raise OgdcMissingEnvvar(err)
-
-        response = SESSION.post(
-            f"{OGDC_API_URL}/token",
-            data={
-                "username": username,
-                "password": password,
-            },
-        )
-
-        response.raise_for_status()
-
-        token_data = response.json()
-        if not isinstance(token_data, dict) or not isinstance(
-            token_data.get("access_token"), str
-        ):
-            err_msg = "Failed to get valid access token from OGDC API."
-            raise OgdcServiceApiError(err_msg)
-
-        return token_data["access_token"]
-
-    return _get_api_token
-
-
-get_api_token = _get_api_token_factory()
+    msg = "Session expired. Please log back in and set new tokens."
+    raise RuntimeError(msg)
 
 
 def _check_ogdc_api_error(response: requests.Response) -> None:
@@ -156,6 +126,70 @@ def _wait_for_workflow_completion(workflow_name: str) -> None:
                 return
         time.sleep(5)
 
+
+@cli.command()
+@click.option("--access", help="The OIDC Access Token string")
+@click.option("--refresh", help="The OIDC Refresh Token string")
+@click.option("--json-str", help="A raw JSON token string containing both keys")
+def set_token(access, refresh, json_str):
+    """Save OIDC tokens to the local user configuration folder."""
+    # initialize
+    new_access = access
+    new_refresh = refresh
+
+    if json_str:
+        parsed = parse_tokens_dict(json_str)
+        # pick CLI over parsed if both are provided
+        new_access = new_access or parsed.get("access_token")
+        new_refresh = new_refresh or parsed.get("refresh_token")
+    
+    # load existing state
+    existing_data = {}
+    if TOKEN_CACHE_FILE.exists():
+        try:
+            with TOKEN_CACHE_FILE.open("r") as f:
+                existing_data = json.load(f)
+        except json.JSONDecodeError:
+            # if the file is mangled, ignore it. overwrite below
+            pass
+    
+    # merge states. prefer new tokens. keep old if they exist and are not expired
+    final_access = new_access
+    if (
+        not final_access 
+        and "access_token" in existing_data 
+        and is_token_valid(existing_data["access_token"])
+    ):
+        final_access = existing_data["access_token"]
+    
+    final_refresh = new_refresh
+    if (
+        not final_refresh 
+        and "refresh_token" in existing_data 
+        and is_token_valid(existing_data["refresh_token"])
+    ):
+        final_refresh = existing_data["refresh_token"]
+
+    # make sure we wind up with something to save
+    if not final_access and not final_refresh:
+        msg = (
+            "At least one of 'access', 'refresh', or "
+            "'json-str' must be provided to set a token."
+        )
+        raise click.UsageError(msg)
+
+    TOKEN_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    
+    data = {}
+    if final_access:
+        data["access_token"] = final_access
+    if final_refresh:
+        data["refresh_token"] = final_refresh
+
+    with TOKEN_CACHE_FILE.open("w") as f:
+        json.dump(data, f, indent=2)
+        
+    click.echo("OGDC tokens updated successfully.")
 
 @cli.command
 @click.argument(
