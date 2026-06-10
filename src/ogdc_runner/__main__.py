@@ -63,10 +63,10 @@ def get_api_token() -> str:
 
     if is_token_valid(data.get("refresh_token")):
         try:
-            new_tokens = refresh_tokens(
+            new_tokens = parse_tokens_dict(refresh_tokens(
                 refresh_url=f"{OGDC_API_URL}/refresh", 
                 refresh_token=data["refresh_token"]
-            )
+            ))
             
             with TOKEN_CACHE_FILE.open("w") as f:
                 json.dump(new_tokens, f, indent=2)
