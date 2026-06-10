@@ -30,14 +30,14 @@ from ogdc_runner.recipe import (
 env = os.environ.get("ENVIRONMENT")
 verify_ssl = True
 if env == "local":
-    default_url = "https://localhost:7443/ogdc/api"
+    default_url = "https://localhost:7443/api"
     verify_ssl = False
     # Disable urllib3 insecure connection warnings for local development.
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 elif env == "dev":
-    default_url = "https://api.test.dataone.org/ogdc/api"
+    default_url = "https://ogdc.test.dataone.org/api"
 else:
-    default_url = "https://api.dataone.org/ogdc/api"
+    default_url = "https://ogdc.dataone.org/api"
 OGDC_API_URL = os.environ.get("OGDC_API_URL", default_url)
 
 SESSION = requests.Session()
