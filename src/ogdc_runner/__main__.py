@@ -27,7 +27,7 @@ from ogdc_runner.recipe import (
 
 
 class Config:
-    def __init__(self):
+    def __init__(self) -> None:
         # Default the OGDC API URL based on the environment, falling back to the prod
         # URL.
         self.env = os.environ.get("ENVIRONMENT")
@@ -55,12 +55,12 @@ class Config:
 
 @click.group()
 @click.pass_context
-def cli(ctx) -> None:
+def cli(ctx: click.Context) -> None:
     """A tool for submitting data transformation recipes to OGDC for execution."""
     ctx.obj = Config()
 
 
-def _get_api_token(config) -> str:
+def _get_api_token(config: Config) -> str:
     if not config.token_cache_file.exists():
         msg = "Run 'ogdc-runner set-token' first."
         raise RuntimeError(msg)
@@ -105,7 +105,7 @@ def _check_ogdc_api_error(response: requests.Response) -> None:
         raise OgdcServiceApiError(err_msg)
 
 
-def _get_workflow_status(config, workflow_name: str) -> str:
+def _get_workflow_status(config: Config, workflow_name: str) -> str:
     """Get the given workflow's status as a string."""
     headers = {}
     if config.access_mode != "open":
@@ -123,7 +123,7 @@ def _get_workflow_status(config, workflow_name: str) -> str:
     return str(status)
 
 
-def _wait_for_workflow_completion(config, workflow_name: str) -> None:
+def _wait_for_workflow_completion(config: Config, workflow_name: str) -> None:
     """Wait for the given workflow to complete."""
     while True:
         status = _get_workflow_status(config, workflow_name)
@@ -324,7 +324,7 @@ def validate_all_recipes(recipes_location: str, ref: str) -> None:
         sys.exit(1)
 
 
-def _download_output_for_workflow(config, workflow_name: str, output_dir: Path) -> None:
+def _download_output_for_workflow(config: Config, workflow_name: str, output_dir: Path) -> None:
 
     headers = {}
     if config.access_mode != "open":
