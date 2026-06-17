@@ -17,8 +17,7 @@ def mock_cache_paths(tmp_path, monkeypatch):
     mock_dir = tmp_path / "ogdc"
     mock_file = mock_dir / "tokens.json"
     
-    monkeypatch.setattr(f"{TARGET_MODULE_FOR_MOCK}.TOKEN_CACHE_FILE", mock_file)
-    
+    monkeypatch.setenv("TOKEN_CACHE_FILE", str(mock_file))
     return mock_file
 
 def test_help():

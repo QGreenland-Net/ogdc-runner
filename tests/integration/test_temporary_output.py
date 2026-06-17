@@ -3,11 +3,11 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from ogdc_runner.__main__ import _download_output_for_workflow
+from ogdc_runner.__main__ import Config, _download_output_for_workflow
 from ogdc_runner.api import submit_ogdc_recipe
 
 
-def test_temporary_output_recipe(test_temp_output_recipe_directory, tmpdir):
+def test_temporary_output_recipe(test_temp_output_recipe_directory, tmpdir, monkeypatch):
     """Test that an ogdc recipe with a temporary output can be submitted, executes successfully, and outputs are accessible for download as a zip package.
 
     TODO/NOTE: this test and the recipe that's invoked is similar to that in the
@@ -21,6 +21,7 @@ def test_temporary_output_recipe(test_temp_output_recipe_directory, tmpdir):
     database is complete, the separation of this test from
     `test_submit_ogdc_recipe` can be removed.
     """
+    monkeypatch.setenv("ENVIRONMENT", "local")
     tmpdir_path = Path(tmpdir)
 
     # Note: `overwrite` is set here to ensure that outputs from a previous test
@@ -32,8 +33,9 @@ def test_temporary_output_recipe(test_temp_output_recipe_directory, tmpdir):
         wait=True,
     )
 
-    # retrieve the data and assret that it is correct.
-    _download_output_for_workflow(workflow_name, tmpdir_path)
+    # retrieve the data and assert that it is correct.
+    config = Config()
+    _download_output_for_workflow(config, workflow_name, tmpdir_path)
 
     # There should be one zip file with the workflow output contents
     zip_files = list(tmpdir_path.glob("*.zip"))
