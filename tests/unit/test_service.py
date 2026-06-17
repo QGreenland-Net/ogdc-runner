@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
-from httpx import HTTPError, Response
 
 from ogdc_runner import __version__
 from ogdc_runner.service.main import app
