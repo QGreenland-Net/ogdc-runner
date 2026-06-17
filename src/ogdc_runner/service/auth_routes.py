@@ -15,7 +15,7 @@ from ogdc_runner.publish import get_temporary_output_data_url
 from ogdc_runner.recipe import stage_ogdc_recipe
 from ogdc_runner.service.auth import auth_client
 
-bearer_schema = HTTPBearer()
+bearer_schema = HTTPBearer(auto_error=False)
 
 router = APIRouter(
     # Require that all routes in this module be authenticated via an access
