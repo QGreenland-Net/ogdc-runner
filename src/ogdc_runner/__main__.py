@@ -329,7 +329,9 @@ def validate_all_recipes(recipes_location: str, ref: str) -> None:
         sys.exit(1)
 
 
-def _download_output_for_workflow(config: Config, workflow_name: str, output_dir: Path) -> None:
+def _download_output_for_workflow(
+    config: Config, workflow_name: str, output_dir: Path
+) -> None:
 
     headers = {}
     if config.access_mode != "open":
