@@ -49,27 +49,33 @@ app = FastAPI(
 )
 
 app.add_middleware(
-    SessionMiddleware, 
-    secret_key=os.getenv("SECRET_KEY", os.urandom(32).hex())
+    SessionMiddleware, secret_key=os.getenv("SECRET_KEY", os.urandom(32).hex())
 )
 
 app.include_router(auth_routes.router)
 
+
 class VersionResponse(pydantic.BaseModel):
     ogdc_runner_version: str = __version__
+
 
 @app.get("/version")
 def version() -> VersionResponse:
     """Return the OGDC runner version."""
     return VersionResponse()
 
+
 @app.get("/login")
 async def login(request: Request):
-    return await auth_client.login(request, redirect_uri=str(request.url_for("authorize")))
+    return await auth_client.login(
+        request, redirect_uri=str(request.url_for("authorize"))
+    )
+
 
 @app.get("/authorize")
 async def authorize(request: Request):
     return await auth_client.authorize(request)
+
 
 @app.post("/refresh")
 async def refresh(request: Request):
