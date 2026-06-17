@@ -22,9 +22,10 @@ router = APIRouter(
     # token with appropriate scopes
     dependencies=[
         Depends(bearer_schema),
-        Depends(auth_client.require_scope("ogdc:admin"))
+        Depends(auth_client.require_scope("ogdc:admin")),
     ],
 )
+
 
 class SubmitRecipeRequest(pydantic.BaseModel):
     recipe_path: str

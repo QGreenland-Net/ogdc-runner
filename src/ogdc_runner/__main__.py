@@ -32,7 +32,7 @@ class Config:
         # URL.
         self.env = os.environ.get("ENVIRONMENT")
         self.verify_ssl = True
-        
+
         if self.env == "local":
             self.default_url = "https://localhost:7443/api"
             self.verify_ssl = False
@@ -46,11 +46,13 @@ class Config:
             self.access_mode = "authenticated"
 
         self.api_url = os.environ.get("OGDC_API_URL", self.default_url)
-        
+
         self.session = requests.Session()
         self.session.verify = self.verify_ssl
         env_path = os.environ.get("TOKEN_CACHE_FILE")
-        self.token_cache_file = Path(env_path) if env_path else Path.home() / ".config/ogdc/tokens.json"
+        self.token_cache_file = (
+            Path(env_path) if env_path else Path.home() / ".config/ogdc/tokens.json"
+        )
 
 
 @click.group()
@@ -73,16 +75,18 @@ def _get_api_token(config) -> str:
 
     if is_token_valid(data.get("refresh_token")):
         try:
-            new_tokens = parse_tokens_dict(refresh_tokens(
-                refresh_url=f"{config.api_url}/refresh", 
-                refresh_token=data["refresh_token"]
-            ))
-            
+            new_tokens = parse_tokens_dict(
+                refresh_tokens(
+                    refresh_url=f"{config.api_url}/refresh",
+                    refresh_token=data["refresh_token"],
+                )
+            )
+
             with config.token_cache_file.open("w") as f:
                 json.dump(new_tokens, f, indent=2)
-                
+
             return new_tokens["access_token"]
-            
+
         except Exception as e:
             msg = f"Session refresh failed: {e}"
             raise RuntimeError(msg) from e
@@ -116,7 +120,7 @@ def _get_workflow_status(config, workflow_name: str) -> str:
         headers=headers,
     )
 
-    _check_ogdc_api_error(response) # And here!
+    _check_ogdc_api_error(response)  # And here!
 
     status = response.json()["status"]
 
@@ -159,7 +163,7 @@ def set_token(ctx: click.Context, access, refresh, json_str):
         # pick CLI over parsed if both are provided
         new_access = new_access or parsed.get("access_token")
         new_refresh = new_refresh or parsed.get("refresh_token")
-    
+
     # load existing state
     existing_data = {}
     if config.token_cache_file.exists():
@@ -169,20 +173,20 @@ def set_token(ctx: click.Context, access, refresh, json_str):
         except json.JSONDecodeError:
             # if the file is mangled, ignore it. overwrite below
             pass
-    
+
     # merge states. prefer new tokens. keep old if they exist and are not expired
     final_access = new_access
     if (
-        not final_access 
-        and "access_token" in existing_data 
+        not final_access
+        and "access_token" in existing_data
         and is_token_valid(existing_data["access_token"])
     ):
         final_access = existing_data["access_token"]
-    
+
     final_refresh = new_refresh
     if (
-        not final_refresh 
-        and "refresh_token" in existing_data 
+        not final_refresh
+        and "refresh_token" in existing_data
         and is_token_valid(existing_data["refresh_token"])
     ):
         final_refresh = existing_data["refresh_token"]
@@ -196,7 +200,7 @@ def set_token(ctx: click.Context, access, refresh, json_str):
         raise click.UsageError(msg)
 
     config.token_cache_file.parent.mkdir(parents=True, exist_ok=True)
-    
+
     data = {}
     if final_access:
         data["access_token"] = final_access
@@ -205,8 +209,9 @@ def set_token(ctx: click.Context, access, refresh, json_str):
 
     with config.token_cache_file.open("w") as f:
         json.dump(data, f, indent=2)
-        
+
     click.echo("OGDC tokens updated successfully.")
+
 
 @cli.command
 @click.argument(
@@ -248,7 +253,7 @@ def submit(ctx: click.Context, recipe_path: str, wait: bool, overwrite: bool) ->
             "recipe_path": recipe_path,
             "overwrite": overwrite,
         },
-        headers=headers
+        headers=headers,
     )
 
     _check_ogdc_api_error(response)

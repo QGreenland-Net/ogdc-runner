@@ -1,4 +1,5 @@
 """Authentication service for OIDC integration."""
+
 from __future__ import annotations
 
 from dataone.auth import AuthFactory, load_client_secrets

@@ -7,7 +7,9 @@ from ogdc_runner.__main__ import Config, _download_output_for_workflow
 from ogdc_runner.api import submit_ogdc_recipe
 
 
-def test_temporary_output_recipe(test_temp_output_recipe_directory, tmpdir, monkeypatch):
+def test_temporary_output_recipe(
+    test_temp_output_recipe_directory, tmpdir, monkeypatch
+):
     """Test that an ogdc recipe with a temporary output can be submitted, executes successfully, and outputs are accessible for download as a zip package.
 
     TODO/NOTE: this test and the recipe that's invoked is similar to that in the
