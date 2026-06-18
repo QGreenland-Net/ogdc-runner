@@ -124,6 +124,9 @@ filterwarnings = [
   # a self-signed (unverified) cert in test, so this must be ignored or pytest
   # will raise errors about the insecure connection attempt.
   "ignore::urllib3.exceptions.InsecureRequestWarning",
+  # Ignore warnings about httpx being deprecated - this is a super new change (May 2026), better to see how it plays out before doing full refactor
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated:UserWarning",
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated:DeprecationWarning",
 ]
 log_cli_level = "INFO"
 testpaths = [
