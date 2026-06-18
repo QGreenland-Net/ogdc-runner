@@ -71,7 +71,8 @@ def _get_api_token(config: Config) -> str:
         data = json.load(f)
 
     if is_token_valid(data.get("access_token")):
-        return data["access_token"]
+        access_token: str = data["access_token"]
+        return access_token
 
     if is_token_valid(data.get("refresh_token")):
         try:
@@ -85,7 +86,8 @@ def _get_api_token(config: Config) -> str:
             with config.token_cache_file.open("w") as f:
                 json.dump(new_tokens, f, indent=2)
 
-            return new_tokens["access_token"]
+            new_access_token: str = new_tokens["access_token"]
+            return new_access_token
 
         except Exception as e:
             msg = f"Session refresh failed: {e}"
@@ -150,7 +152,10 @@ def _wait_for_workflow_completion(config: Config, workflow_name: str) -> None:
 @click.option("--refresh", help="The OIDC Refresh Token string")
 @click.option("--json-str", help="A raw JSON token string containing both keys")
 @click.pass_context
-def set_token(ctx: click.Context, access, refresh, json_str):
+def set_token(ctx: click.Context,
+              access: str | None,
+              refresh: str | None,
+              json_str: str | None) -> None:
     """Save OIDC tokens to the local user configuration folder."""
     # initialize
     config = ctx.obj

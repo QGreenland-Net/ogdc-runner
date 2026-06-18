@@ -14,6 +14,7 @@ import pydantic
 from fastapi import FastAPI, Request
 from loguru import logger
 from starlette.middleware.sessions import SessionMiddleware
+from typing import Any
 
 from ogdc_runner import __version__
 from ogdc_runner.service import auth_routes, db
@@ -66,16 +67,16 @@ def version() -> VersionResponse:
 
 
 @app.get("/login")
-async def login(request: Request):
+async def login(request: Request) -> Any:
     return await auth_client.login(
         redirect_uri=str(request.url_for("authorize")), request=request)
 
 
 @app.get("/authorize")
-async def authorize(request: Request):
+async def authorize(request: Request) -> Any:
     return await auth_client.authorize(request=request)
 
 
 @app.post("/refresh")
-async def refresh(request: Request):
+async def refresh(request: Request) -> Any:
     return await auth_client.refresh(await request.json())
