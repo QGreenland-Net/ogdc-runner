@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+from typing import Any
 
 import pydantic
 from fastapi import FastAPI, Request
 from loguru import logger
 from starlette.middleware.sessions import SessionMiddleware
-from typing import Any
 
 from ogdc_runner import __version__
 from ogdc_runner.service import auth_routes, db

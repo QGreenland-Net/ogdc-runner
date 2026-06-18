@@ -152,10 +152,9 @@ def _wait_for_workflow_completion(config: Config, workflow_name: str) -> None:
 @click.option("--refresh", help="The OIDC Refresh Token string")
 @click.option("--json-str", help="A raw JSON token string containing both keys")
 @click.pass_context
-def set_token(ctx: click.Context,
-              access: str | None,
-              refresh: str | None,
-              json_str: str | None) -> None:
+def set_token(
+    ctx: click.Context, access: str | None, refresh: str | None, json_str: str | None
+) -> None:
     """Save OIDC tokens to the local user configuration folder."""
     # initialize
     config = ctx.obj
