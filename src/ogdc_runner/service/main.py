@@ -68,7 +68,8 @@ def version() -> VersionResponse:
 @app.get("/login")
 async def login(request: Request):
     return await auth_client.login(
-        redirect_uri=str(request.url_for("authorize")), request=request)
+        redirect_uri=str(request.url_for("authorize")), request=request
+    )
 
 
 @app.get("/authorize")
