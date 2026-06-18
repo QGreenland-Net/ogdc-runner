@@ -27,30 +27,30 @@ See {mod}`ogdc_runner.service.db` for details.
 
 ## Authentication
 
-The OGDC API uses OpenID Connect (OIDC), via the DataONE keycloak service, for 
-authentication. Instead of local username/password logins, clients authenticate via a 
-standard redirect flow to the DataONE keycloak. Keycloak issues access and refresh 
-tokens, which are then used to authorize subsequent actions (like submitting a recipe).
+The OGDC API uses OpenID Connect (OIDC), via the DataONE keycloak service, for
+authentication. Instead of local username/password logins, clients authenticate
+via a standard redirect flow to the DataONE keycloak. Keycloak issues access and
+refresh tokens, which are then used to authorize subsequent actions (like
+submitting a recipe).
 
 See {mod}ogdc_runner.service.auth and the
-[dataone.auth](https://github.com/DataONEorg/dataone-auth) package for implementation
-details.
+[dataone.auth](https://github.com/DataONEorg/dataone-auth) package for
+implementation details.
 
 ### Routes needing auth
 
-When writing new API routes, consider if they require user authentication or specific
-permissions. We enforce authentication and scope validation using FastAPI dependencies, 
-which are assigned directly to the APIRouter in {mod}`ogdc_runner.service.auth_routes`.
-The dependency can also be added explicitly to invidividual function signatures, but is
-not required.
+When writing new API routes, consider if they require user authentication or
+specific permissions. We enforce authentication and scope validation using
+FastAPI dependencies, which are assigned directly to the APIRouter in
+{mod}`ogdc_runner.service.auth_routes`. The dependency can also be added
+explicitly to invidividual function signatures, but is not required.
 
-The `dataone.auth` auth client is set up in {mod}`ogdc_runner.service.auth`, and is used
-to communicate with the keycloak instance.
+The `dataone.auth` auth client is set up in {mod}`ogdc_runner.service.auth`, and
+is used to communicate with the keycloak instance.
 
 ### Adding new users
 
-New users can be given access via the keycloak administrator user interface. 
-
+New users can be given access via the keycloak administrator user interface.
 
 ## Required envvars
 
