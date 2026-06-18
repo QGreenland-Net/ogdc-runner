@@ -48,16 +48,16 @@ Commands:
 
 ### Submitting a recipe
 
-In order to submit recipes to the OGDC service backend, a token must be set. Retrieve a
-token for the dev cluster from ogdc.test.dataone.org/api/login. Then, copy the entire 
-json string to pass to `set-token`.
+In order to submit recipes to the OGDC service backend, a token must be set.
+Retrieve a token for the dev cluster from ogdc.test.dataone.org/api/login. Then,
+copy the entire json string to pass to `set-token`.
 
 ```
 ogdc-runner set-token --json-str='{"message":"Success","token":{"access_token":...,"refresh_token":...}}'
 ```
 
-Alternately, the access token and refresh token can be passed as their own arguments
-if desired.
+Alternately, the access token and refresh token can be passed as their own
+arguments if desired.
 
 Then, to submit an OGDC recipe, use the `submit` subcommand.
 
