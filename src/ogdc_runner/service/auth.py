@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from dataone.auth import AuthFactory, load_client_secrets
 
 SCOPE_ADMIN = os.getenv("OGDC_SCOPE_ADMIN", "odgc:admin")
