@@ -17,12 +17,14 @@ from ogdc_runner.service.auth import auth_client
 
 bearer_schema = HTTPBearer(auto_error=False)
 
+SCOPE_ADMIN = os.getenv("OGDC_SCOPE_ADMIN", "odgc:admin")
+
 router = APIRouter(
     # Require that all routes in this module be authenticated via an access
     # token with appropriate scopes
     dependencies=[
         Depends(bearer_schema),
-        Depends(auth_client.require_scope("ogdc:admin")),
+        Depends(auth_client.require_scope(SCOPE_ADMIN)),
     ],
 )
 

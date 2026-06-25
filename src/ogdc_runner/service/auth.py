@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataone.auth import AuthFactory, load_client_secrets
 
-ACCESS_MODE_AUTHENTICATED = "authenticated"
-scopes = ["ogdc:admin"]
+SCOPE_ADMIN = os.getenv("OGDC_SCOPE_ADMIN", "odgc:admin")
+scopes = [SCOPE_ADMIN]
 
 # load secrets and instantiate the client
 secrets = load_client_secrets()
