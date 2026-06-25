@@ -50,7 +50,7 @@ app = FastAPI(
 )
 
 app.add_middleware(
-    SessionMiddleware, secret_key=os.getenv("SECRET_KEY", os.urandom(32).hex())
+    SessionMiddleware, secret_key=os.getenv("OGDC_SECRET_KEY", os.urandom(32).hex())
 )
 
 app.include_router(auth_routes.router)
