@@ -61,8 +61,8 @@ New users can be given access via the keycloak administrator user interface.
 - `OGDC_DB_HOST`: hostname of the backend PostgreSQL database (typically
   `${RELEASE_NAME}-db-cnpg-rw` when deployed via the ogdc-helm chart).
 - `OGDC_DB_NAME` (optional): database name, defaults to `ogdc`.
-- `OGDC_SECRET_KEY` (optional): value of the secret key used to encode/decode cookies used
-  for authentication.
+- `OGDC_SECRET_KEY` (optional): value of the secret key used to encode/decode
+  cookies used for authentication.
 - `OGDC_WORKFLOW_PVC_NAME` (optional): name of the PersistentVolumeClaim mounted
   into workflow pods, defaults to `cephfs-qgnet-ogdc-workflow-pvc`. The
   ogdc-helm chart sets this to `cephfs-${RELEASE_NAME}-workflow-pvc`.
