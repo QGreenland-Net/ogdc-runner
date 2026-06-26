@@ -44,7 +44,6 @@ def mock_db(monkeypatch):
 
     Ensures required envvars are set:
         * `OGDC_SECRET_KEY`
-        * `OGDC_ADMIN_PASSWORD` (set to `password`)
     """
 
     @cache
@@ -59,7 +58,6 @@ def mock_db(monkeypatch):
         )
 
     monkeypatch.setattr(db, "get_engine", mock_get_engine)
-    monkeypatch.setenv("OGDC_ADMIN_PASSWORD", "password")
     monkeypatch.setenv(
         "OGDC_SECRET_KEY",
         "2ae25b5398824129235724f243811d7a335a98339abe4630e4e27d25e4f144a2",
