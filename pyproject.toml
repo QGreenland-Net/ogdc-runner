@@ -39,13 +39,12 @@ dependencies = [
   "sqlmodel",
   # Required by sqlmodel to connect to postgresql
   "psycopg2-binary",
-  # required for auth
-  "pyjwt",
-  "pwdlib[argon2]",
   # d1_python package
   "dataone.libclient>=3.5.0",
   # s3 API
   "boto3 >=1.42",
+  "itsdangerous>=2.2.0",
+  "dataone-auth @ git+https://github.com/dataoneorg/dataone-auth@feature-auth-helpers",
 ]
 
 [project.optional-dependencies]
@@ -125,6 +124,9 @@ filterwarnings = [
   # a self-signed (unverified) cert in test, so this must be ignored or pytest
   # will raise errors about the insecure connection attempt.
   "ignore::urllib3.exceptions.InsecureRequestWarning",
+  # Ignore warnings about httpx being deprecated - this is a super new change (May 2026), better to see how it plays out before doing full refactor
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated:UserWarning",
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated:DeprecationWarning",
 ]
 log_cli_level = "INFO"
 testpaths = [
@@ -219,3 +221,6 @@ isort.required-imports = ["from __future__ import annotations"]
 "tests/**" = ["T20"]
 "noxfile.py" = ["T20"]
 "**/recipe_config.py" = ["UP007"]
+
+[tool.hatch.metadata]
+allow-direct-references = true

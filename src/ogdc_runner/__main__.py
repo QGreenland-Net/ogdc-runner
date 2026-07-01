@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import os
 import subprocess
 import sys
 import time
-from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlparse
 
 import click
 import requests
 import urllib3
+from dataone.auth import is_token_valid, parse_tokens_dict, refresh_tokens
 from pydantic import ValidationError
 
 from ogdc_runner.exceptions import (
-    OgdcMissingEnvvar,
     OgdcServiceApiError,
     OgdcWorkflowExecutionError,
 )
@@ -25,90 +25,76 @@ from ogdc_runner.recipe import (
     validate_all_recipes_in_repo,
 )
 
-# Default the OGDC API URL based on the environment, falling back to the prod
-# URL.
-env = os.environ.get("ENVIRONMENT")
-verify_ssl = True
-if env == "local":
-    default_url = "https://localhost:7443/ogdc/api"
-    verify_ssl = False
-    # Disable urllib3 insecure connection warnings for local development.
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-elif env == "dev":
-    default_url = "https://api.test.dataone.org/ogdc/api"
-else:
-    default_url = "https://api.dataone.org/ogdc/api"
-OGDC_API_URL = os.environ.get("OGDC_API_URL", default_url)
 
-SESSION = requests.Session()
-SESSION.verify = verify_ssl
+class Config:
+    def __init__(self) -> None:
+        # Default the OGDC API URL based on the environment, falling back to the prod
+        # URL.
+        self.env = os.environ.get("ENVIRONMENT")
+        self.verify_ssl = True
 
+        if self.env == "local":
+            self.default_url = "https://localhost:7443/api"
+            self.verify_ssl = False
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            self.access_mode = "open"
+        elif self.env == "dev":
+            self.default_url = "https://ogdc.test.dataone.org/api"
+            self.access_mode = "authenticated"
+        else:
+            self.default_url = "https://ogdc.dataone.org/api"
+            self.access_mode = "authenticated"
 
-@click.group
-def cli() -> None:
-    """A tool for submitting data transformation recipes to OGDC for execution."""
+        self.api_url = os.environ.get("OGDC_API_URL", self.default_url)
 
-
-def _get_api_token_factory() -> Callable[[], str]:
-    """Helper function that creates a callable that returns an OGDC API token.
-
-    This is a closure (see e.g., https://realpython.com/python-closure/) - it
-    allows caching a requested access token based on its expiration datetime.
-    """
-    token_data: None | dict[str, str] = None
-
-    def _get_api_token() -> str:
-        """Get an OGDC API token using envvar-provided username/password.
-
-        `OGDC_API_USERNAME` and `OGDC_API_PASSWORD` must be set or an
-        `OgdcMissingEnvvar` exception will be raised.
-
-        The resulting access token can be used to authenticate with OGDC API
-        endpoitns.
-        """
-        nonlocal token_data
-
-        # Check if the token is valid.
-        if token_data is not None:
-            token_expiration_utc = dt.datetime.fromisoformat(
-                token_data["utc_expiration"]
-            )
-            # Use a 1 minute buffer to account for time between check and the
-            # next request.
-            current_utc = dt.datetime.now(dt.UTC) + dt.timedelta(minutes=1)
-            if token_expiration_utc > current_utc:
-                # Return the existing token - it is still valid.
-                return token_data["access_token"]
-
-        username = os.environ.get("OGDC_API_USERNAME")
-        password = os.environ.get("OGDC_API_PASSWORD")
-        if not username or not password:
-            err = "OGDC_API_USERNAME and OGDC_API_PASSWORD must be set."
-            raise OgdcMissingEnvvar(err)
-
-        response = SESSION.post(
-            f"{OGDC_API_URL}/token",
-            data={
-                "username": username,
-                "password": password,
-            },
+        self.session = requests.Session()
+        self.session.verify = self.verify_ssl
+        env_path = os.environ.get("TOKEN_CACHE_FILE")
+        self.token_cache_file = (
+            Path(env_path) if env_path else Path.home() / ".config/ogdc/tokens.json"
         )
 
-        response.raise_for_status()
 
-        token_data = response.json()
-        if not isinstance(token_data, dict) or not isinstance(
-            token_data.get("access_token"), str
-        ):
-            err_msg = "Failed to get valid access token from OGDC API."
-            raise OgdcServiceApiError(err_msg)
-
-        return token_data["access_token"]
-
-    return _get_api_token
+@click.group()
+@click.pass_context
+def cli(ctx: click.Context) -> None:
+    """A tool for submitting data transformation recipes to OGDC for execution."""
+    ctx.obj = Config()
 
 
-get_api_token = _get_api_token_factory()
+def _get_api_token(config: Config) -> str:
+    if not config.token_cache_file.exists():
+        msg = "Run 'ogdc-runner set-token' first."
+        raise RuntimeError(msg)
+
+    with config.token_cache_file.open("r") as f:
+        data = json.load(f)
+
+    if is_token_valid(data.get("access_token")):
+        access_token: str = data["access_token"]
+        return access_token
+
+    if is_token_valid(data.get("refresh_token")):
+        try:
+            new_tokens = parse_tokens_dict(
+                refresh_tokens(
+                    refresh_url=f"{config.api_url}/refresh",
+                    refresh_token=data["refresh_token"],
+                )
+            )
+
+            with config.token_cache_file.open("w") as f:
+                json.dump(new_tokens, f, indent=2)
+
+            new_access_token: str = new_tokens["access_token"]
+            return new_access_token
+
+        except Exception as e:
+            msg = f"Session refresh failed: {e}"
+            raise RuntimeError(msg) from e
+
+    msg = "Session expired. Please log back in and set new tokens."
+    raise RuntimeError(msg)
 
 
 def _check_ogdc_api_error(response: requests.Response) -> None:
@@ -125,24 +111,28 @@ def _check_ogdc_api_error(response: requests.Response) -> None:
         raise OgdcServiceApiError(err_msg)
 
 
-def _get_workflow_status(workflow_name: str) -> str:
+def _get_workflow_status(config: Config, workflow_name: str) -> str:
     """Get the given workflow's status as a string."""
-    response = SESSION.get(
-        url=f"{OGDC_API_URL}/status/{workflow_name}",
-        headers={"Authorization": f"Bearer {get_api_token()}"},
+    headers = {}
+    if config.access_mode != "open":
+        headers["Authorization"] = f"Bearer {_get_api_token(config)}"
+
+    response = config.session.get(
+        url=f"{config.api_url}/status/{workflow_name}",
+        headers=headers,
     )
 
-    _check_ogdc_api_error(response)
+    _check_ogdc_api_error(response)  # And here!
 
     status = response.json()["status"]
 
     return str(status)
 
 
-def _wait_for_workflow_completion(workflow_name: str) -> None:
+def _wait_for_workflow_completion(config: Config, workflow_name: str) -> None:
     """Wait for the given workflow to complete."""
     while True:
-        status = _get_workflow_status(workflow_name)
+        status = _get_workflow_status(config, workflow_name)
         if status:
             print(
                 f"Workflow status for {workflow_name} ({dt.datetime.now():%Y-%m-%d@%H:%M:%S}): {status}"
@@ -155,6 +145,76 @@ def _wait_for_workflow_completion(workflow_name: str) -> None:
             if status == "Succeeded":
                 return
         time.sleep(5)
+
+
+@cli.command()
+@click.option("--access", help="The OIDC Access Token string")
+@click.option("--refresh", help="The OIDC Refresh Token string")
+@click.option("--json-str", help="A raw JSON token string containing both keys")
+@click.pass_context
+def set_token(
+    ctx: click.Context, access: str | None, refresh: str | None, json_str: str | None
+) -> None:
+    """Save OIDC tokens to the local user configuration folder."""
+    # initialize
+    config = ctx.obj
+
+    new_access = access
+    new_refresh = refresh
+
+    if json_str:
+        parsed = parse_tokens_dict(json_str)
+        # pick CLI over parsed if both are provided
+        new_access = new_access or parsed.get("access_token")
+        new_refresh = new_refresh or parsed.get("refresh_token")
+
+    # load existing state
+    existing_data = {}
+    if config.token_cache_file.exists():
+        try:
+            with config.token_cache_file.open("r") as f:
+                existing_data = json.load(f)
+        except json.JSONDecodeError:
+            # if the file is mangled, ignore it. overwrite below
+            pass
+
+    # merge states. prefer new tokens. keep old if they exist and are not expired
+    final_access = new_access
+    if (
+        not final_access
+        and "access_token" in existing_data
+        and is_token_valid(existing_data["access_token"])
+    ):
+        final_access = existing_data["access_token"]
+
+    final_refresh = new_refresh
+    if (
+        not final_refresh
+        and "refresh_token" in existing_data
+        and is_token_valid(existing_data["refresh_token"])
+    ):
+        final_refresh = existing_data["refresh_token"]
+
+    # make sure we wind up with something to save
+    if not final_access and not final_refresh:
+        msg = (
+            "At least one of 'access', 'refresh', or "
+            "'json-str' must be provided to set a token."
+        )
+        raise click.UsageError(msg)
+
+    config.token_cache_file.parent.mkdir(parents=True, exist_ok=True)
+
+    data = {}
+    if final_access:
+        data["access_token"] = final_access
+    if final_refresh:
+        data["refresh_token"] = final_refresh
+
+    with config.token_cache_file.open("w") as f:
+        json.dump(data, f, indent=2)
+
+    click.echo("OGDC tokens updated successfully.")
 
 
 @cli.command
@@ -176,7 +236,8 @@ def _wait_for_workflow_completion(workflow_name: str) -> None:
     default=False,
     help="Overwrite existing outputs of the given recipe if it has already run before.",
 )
-def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
+@click.pass_context
+def submit(ctx: click.Context, recipe_path: str, wait: bool, overwrite: bool) -> None:
     """
     Submit a recipe to OGDC for execution.
 
@@ -184,13 +245,19 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     representing a remote and publicly accessible recipe directory (e.g., for
     GitHub, 'github://qgreenland-net:ogdc-recipes@main/recipes/seal-tags').
     """
-    response = SESSION.post(
-        url=f"{OGDC_API_URL}/submit",
+    config = ctx.obj
+
+    headers = {}
+    if config.access_mode != "open":
+        headers["Authorization"] = f"Bearer {_get_api_token(config)}"
+
+    response = config.session.post(
+        url=f"{config.api_url}/submit",
         json={
             "recipe_path": recipe_path,
             "overwrite": overwrite,
         },
-        headers={"Authorization": f"Bearer {get_api_token()}"},
+        headers=headers,
     )
 
     _check_ogdc_api_error(response)
@@ -199,7 +266,7 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     if wait:
         workflow_name = response.json()["recipe_workflow_name"]
         print("Waiting for completion...")
-        _wait_for_workflow_completion(workflow_name)
+        _wait_for_workflow_completion(config, workflow_name)
 
 
 @cli.command
@@ -208,9 +275,11 @@ def submit(recipe_path: str, wait: bool, overwrite: bool) -> None:
     required=True,
     type=str,
 )
-def check_workflow_status(workflow_name: str) -> None:
+@click.pass_context
+def check_workflow_status(ctx: click.Context, workflow_name: str) -> None:
     """Check an argo workflow's status."""
-    status = _get_workflow_status(workflow_name)
+    config = ctx.obj
+    status = _get_workflow_status(config, workflow_name)
     print(f"Workflow {workflow_name} has status {status}.")
 
 
@@ -264,38 +333,17 @@ def validate_all_recipes(recipes_location: str, ref: str) -> None:
         sys.exit(1)
 
 
-@cli.command
-@click.argument(
-    "username",
-    required=True,
-    metavar="USERNAME",
-    type=str,
-)
-@click.argument(
-    "password",
-    required=True,
-    metavar="PASSWORD",
-    type=str,
-)
-def create_user(username: str, password: str) -> None:
-    """Create a new OGDC user. This operation is only supported for the admin user."""
-    response = SESSION.post(
-        url=f"{OGDC_API_URL}/create_user",
-        data={
-            "username": username,
-            "password": password,
-        },
-        headers={"Authorization": f"Bearer {get_api_token()}"},
-    )
+def _download_output_for_workflow(
+    config: Config, workflow_name: str, output_dir: Path
+) -> None:
 
-    _check_ogdc_api_error(response)
-    print(response.json()["message"])
+    headers = {}
+    if config.access_mode != "open":
+        headers["Authorization"] = f"Bearer {_get_api_token(config)}"
 
-
-def _download_output_for_workflow(workflow_name: str, output_dir: Path) -> None:
-    response = SESSION.get(
-        url=f"{OGDC_API_URL}/output/{workflow_name}",
-        headers={"Authorization": f"Bearer {get_api_token()}"},
+    response = config.session.get(
+        url=f"{config.api_url}/output/{workflow_name}",
+        headers=headers,
     )
 
     _check_ogdc_api_error(response)
@@ -306,7 +354,7 @@ def _download_output_for_workflow(workflow_name: str, output_dir: Path) -> None:
 
     # Download the data for the user to the given directory.
     output_filepath = output_dir / data_filename
-    with SESSION.get(data_url, stream=True) as response:
+    with config.session.get(data_url, stream=True) as response:
         response.raise_for_status()
         with output_filepath.open("wb") as f:
             for chunk in response.iter_content():
@@ -329,6 +377,8 @@ def _download_output_for_workflow(workflow_name: str, output_dir: Path) -> None:
         writable=True, file_okay=False, dir_okay=True, resolve_path=True, path_type=Path
     ),
 )
-def get_output(workflow_name: str, output_dir: Path) -> None:
+@click.pass_context
+def get_output(ctx: click.Context, workflow_name: str, output_dir: Path) -> None:
     """Get the temporary output for the given workflow."""
-    _download_output_for_workflow(workflow_name, output_dir)
+    config = ctx.obj
+    _download_output_for_workflow(config, workflow_name, output_dir)
