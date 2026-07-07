@@ -27,59 +27,30 @@ See {mod}`ogdc_runner.service.db` for details.
 
 ## Authentication
 
-The OGDC API uses a standard OAuth2 approach. Users authenticate with a
-username/password, and the service responds with a token that can then be used
-to authenticate further actions (like submitting a recipe). The approach is
-roughly based on the
-[FastAPI Security Tutorial](https://fastapi.tiangolo.com/tutorial/security/).
+The OGDC API uses OpenID Connect (OIDC), via the DataONE keycloak service, for
+authentication. Instead of local username/password logins, clients authenticate
+via a standard redirect flow to the DataONE keycloak. Keycloak issues access and
+refresh tokens, which are then used to authorize subsequent actions (like
+submitting a recipe).
 
-See {mod}`ogdc_runner.service.auth` for details.
+See {mod}ogdc_runner.service.auth and the
+[dataone.auth](https://github.com/DataONEorg/dataone-auth) package for
+implementation details.
 
 ### Routes needing auth
 
-When writing new API routes, consider if the route should require user
-authentication. If so, use the `auth.AuthenticatedUserDependency` as a type
-annotation in the function args:
+When writing new API routes, consider if they require user authentication or
+specific permissions. We enforce authentication and scope validation using
+FastAPI dependencies, which are assigned directly to the APIRouter in
+{mod}`ogdc_runner.service.auth_routes`. The dependency can also be added
+explicitly to invidividual function signatures, but is not required.
 
-```
-from ogdc_runner.service import auth
-
-@app.get("/user")
-async def get_current_user(
-    current_user: auth.AuthenticatedUserDependency,
-) -> dict[str, str]:
-    """Return the current authenticated user.
-
-    Useful for testing that authentication is working as expected.
-    """
-    return {"current_user": current_user.name}
-```
-
-Using the `auth.AuthenticatedUserDependency` as a type annotation in the
-function args will cause the associated route (in this case, `user`) to require
-authentication via a token obtained via the
-{class}`ogdc_runner.service.auth.token` route (which requires
-username/password).
-
-By default, all routes in {mod}`ogdc_runner.service.auth_routes` require a valid
-auth token and do not need to explicitly use `auth.AuthenticatedUserDependency`
-in the function signature.
+The `dataone.auth` auth client is set up in {mod}`ogdc_runner.service.auth`, and
+is used to communicate with the keycloak instance.
 
 ### Adding new users
 
-Currently, only the admin user can create other users. Ensure that you have
-admin credentials set:
-
-```
-export OGDC_API_USERNAME=admin
-export OGDC_API_password=admin-password
-```
-
-Then, use the `ogdc-runner` CLI to create the new user:
-
-```
-ogdc-runner create-user my-username my-password
-```
+New users can be given access via the keycloak administrator user interface.
 
 ## Required envvars
 
@@ -90,9 +61,8 @@ ogdc-runner create-user my-username my-password
 - `OGDC_DB_HOST`: hostname of the backend PostgreSQL database (typically
   `${RELEASE_NAME}-db-cnpg-rw` when deployed via the ogdc-helm chart).
 - `OGDC_DB_NAME` (optional): database name, defaults to `ogdc`.
-- `OGDC_JWT_SECRET_KEY`: value of the secret key used to encode/decode the JWT
-  tokens used for authentication.
-- `OGDC_ADMIN_PASSWORD`: the value desired for the service's admin user account.
+- `OGDC_SECRET_KEY` (optional): value of the secret key used to encode/decode
+  cookies used for authentication.
 - `OGDC_WORKFLOW_PVC_NAME` (optional): name of the PersistentVolumeClaim mounted
   into workflow pods, defaults to `cephfs-qgnet-ogdc-workflow-pvc`. The
   ogdc-helm chart sets this to `cephfs-${RELEASE_NAME}-workflow-pvc`.

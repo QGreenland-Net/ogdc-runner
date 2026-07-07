@@ -7,7 +7,7 @@
 FROM ghcr.io/osgeo/gdal:ubuntu-full-3.12.0
 # We use and wget to fetch data from remote sources.
 # libpq-dev is required for connecting to postgresql db
-RUN apt update && apt install -y wget rsync pip python3-venv libpq-dev zip netcdf-bin libnetcdf-dev
+RUN apt update && apt install -y wget rsync pip python3-venv libpq-dev zip netcdf-bin libnetcdf-dev git
 
 WORKDIR /ogdc_runner/
 COPY . /ogdc_runner
@@ -16,4 +16,4 @@ RUN python -m venv .venv && . ./.venv/bin/activate && pip install --editable .
 EXPOSE 8000
 
 # Default to running the production fastapi server
-CMD . ./.venv/bin/activate && fastapi run --port 8000 --host 0.0.0.0 src/ogdc_runner/service/main.py
+CMD . ./.venv/bin/activate && fastapi run --port 8000 --host 0.0.0.0 --forwarded-allow-ips="*" src/ogdc_runner/service/main.py
