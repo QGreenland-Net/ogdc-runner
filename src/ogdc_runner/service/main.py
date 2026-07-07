@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+from typing import Any
 
 import pydantic
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from loguru import logger
+from starlette.middleware.sessions import SessionMiddleware
 
 from ogdc_runner import __version__
-from ogdc_runner.service import auth, auth_routes, db, user
+from ogdc_runner.service import auth_routes, db
+from ogdc_runner.service.auth import auth_client
 
 
 @asynccontextmanager
@@ -33,8 +36,6 @@ async def lifespan(_app: FastAPI):  # type: ignore[no-untyped-def]
     logger.info("FastAPI Lifespan start")
     # Initialize the database.
     db.init_db()
-    # Create the admin user.
-    user.create_admin_user()
     yield
     db.close_db()
     logger.info("FastAPI Lifespan end")
@@ -48,7 +49,10 @@ app = FastAPI(
     root_path=os.environ.get("API_ROOT_PATH", "/"),
 )
 
-app.include_router(auth.router)
+app.add_middleware(
+    SessionMiddleware, secret_key=os.getenv("OGDC_SECRET_KEY", os.urandom(32).hex())
+)
+
 app.include_router(auth_routes.router)
 
 
@@ -60,3 +64,20 @@ class VersionResponse(pydantic.BaseModel):
 def version() -> VersionResponse:
     """Return the OGDC runner version."""
     return VersionResponse()
+
+
+@app.get("/login")
+async def login(request: Request) -> Any:
+    return await auth_client.login(
+        redirect_uri=str(request.url_for("authorize")), request=request
+    )
+
+
+@app.get("/authorize")
+async def authorize(request: Request) -> Any:
+    return await auth_client.authorize(request=request)
+
+
+@app.post("/refresh")
+async def refresh(request: Request) -> Any:
+    return await auth_client.refresh(await request.json())
