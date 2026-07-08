@@ -388,8 +388,8 @@ independent tasks that can run concurrently. The maximum parallelism is
 controlled at the workflow level, allowing Argo to automatically schedule tasks
 as cluster resources become available.
 
-For partitioned workflows, the full file lists for each partition are written
-to retained JSON manifests on the workflow PVC:
+For partitioned workflows, the full file lists for each partition are written to
+retained JSON manifests on the workflow PVC:
 
 ```text
 /mnt/workflow/{recipe_id}/partition-manifests/{stage}/partition-{partition_id}.json
