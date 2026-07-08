@@ -8,6 +8,7 @@ set -eu
 RECIPE_ID="{{inputs.parameters.recipe-id}}"
 PARTITION_ID="{{inputs.parameters.partition-id}}"
 CMD_INDEX="{{inputs.parameters.cmd-index}}"
+FIRST_COMMAND_INPUT_MODE="{first_command_input_mode}"
 
 # Determine input directory based on command index
 if [ "$CMD_INDEX" -eq 0 ]; then
@@ -29,23 +30,28 @@ if [ "$CMD_INDEX" -eq 0 ]; then
     echo "Input directory: $INPUT_DIR"
     echo "Output directory: $OUTPUT_DIR"
 
-    # Parse JSON array into individual file paths
-    FILES=$(echo "$PARTITION_FILES" | tr -d '[]"' | tr ',' '\n')
-
     # Process each file in the partition
-    for file in $FILES; do
+    printf '%s' "$PARTITION_FILES" | python3 -c 'import json, sys
+for file_path in json.load(sys.stdin):
+    print(file_path)
+' > /tmp/partition-files.txt
+
+    while IFS= read -r file; do
         [ -z "$file" ] && continue
 
-        file=$(echo "$file" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         filename=$(basename "$file")
 
         echo "Processing file: $file"
-        export INPUT_FILE="$INPUT_DIR/$filename"
+        if [ "$FIRST_COMMAND_INPUT_MODE" = "mounted-pvc" ]; then
+            export INPUT_FILE="$file"
+        else
+            export INPUT_FILE="$INPUT_DIR/$filename"
+        fi
         export OUTPUT_FILE="$OUTPUT_DIR/$filename"
 
         # Execute user command
         {user_command}
-    done
+    done < /tmp/partition-files.txt
 else
     # For subsequent commands, process all files from previous output directory
     echo "Discovering files from previous command output: $INPUT_DIR"

@@ -19,6 +19,7 @@ from ogdc_runner.models.parallel_config import (
 from ogdc_runner.models.recipe_config import (
     DataOneInput,
     ParallelConfig,
+    PvcMountInput,
     UrlInput,
 )
 
@@ -27,7 +28,7 @@ _DEFAULT_PARTITION_SIZE = 1000
 
 
 def create_partitions(
-    inputs: Sequence[DataOneInput | UrlInput] | Sequence[Path],
+    inputs: Sequence[DataOneInput | UrlInput | PvcMountInput] | Sequence[Path],
     execution_function: ExecutionFunction,
     parallel_config: ParallelConfig | None = None,
 ) -> list[FilePartition]:
@@ -62,12 +63,15 @@ def create_partitions(
 
 
 def _extract_file_paths(
-    inputs: Sequence[DataOneInput | UrlInput] | Sequence[Path],
+    inputs: Sequence[DataOneInput | UrlInput | PvcMountInput] | Sequence[Path],
 ) -> list[str]:
     """Extract file paths or URLs from inputs.
 
     Handles both InputParam objects (from recipe config) and Path objects
     (from dynamic discovery), converting them to string paths.
+
+    PVC inputs are skipped — file enumeration happens at workflow runtime via
+    an in-workflow listing step, so there is nothing to extract here.
 
     Args:
         inputs: List of input parameters or Path objects

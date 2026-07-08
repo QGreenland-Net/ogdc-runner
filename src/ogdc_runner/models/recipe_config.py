@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from functools import cache, cached_property
-from pathlib import Path
-from typing import Any, Literal, Self, TypeAlias
+from pathlib import Path, PurePosixPath
+from typing import Annotated, Any, Literal, Self, TypeAlias
 
 import requests
 from pydantic import (
@@ -162,7 +163,77 @@ class DataOneInput(InputParam):
         return self
 
 
-InputParamType: TypeAlias = DataOneInput | UrlInput
+class PvcMountInput(InputParam):
+    """Input from a Kubernetes PersistentVolumeClaim mount.
+
+    The specified PVC is mounted read-only at `/mnt/data/{claim_name}/` in
+    workflow containers. Files under `path` (relative to the PVC root) are
+    available for recipe commands to read directly.
+    """
+
+    type: Literal["pvc_mount"] = "pvc_mount"
+    claim_name: str
+    path: str
+    glob: str = "*"
+
+    @field_validator("claim_name")
+    @classmethod
+    def validate_claim_name(cls, v: str) -> str:
+        # PVC claim names are Kubernetes DNS labels. Generated Argo volume names
+        # are truncated separately when the "input-pvc-" prefix would exceed 63.
+        if len(v) > 63:
+            msg = f"claim_name too long ({len(v)} > 63)"
+            raise ValueError(msg)
+        if not re.match(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", v):
+            msg = f"claim_name must be a valid K8s DNS label: {v!r}"
+            raise ValueError(msg)
+        return v
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, v: str) -> str:
+        if "\x00" in v:
+            msg = "path must not contain null bytes"
+            raise ValueError(msg)
+
+        path = PurePosixPath(v)
+        if ".." in path.parts:
+            msg = "path must not contain parent directory references"
+            raise ValueError(msg)
+        return v
+
+    @field_validator("glob")
+    @classmethod
+    def validate_glob(cls, v: str) -> str:
+        if "\x00" in v:
+            msg = "glob must not contain null bytes"
+            raise ValueError(msg)
+        path = PurePosixPath(v)
+        if path.is_absolute():
+            msg = "glob must be relative to the PVC input path"
+            raise ValueError(msg)
+        if ".." in path.parts:
+            msg = "glob must not contain parent directory references"
+            raise ValueError(msg)
+        return v
+
+    @property
+    def mount_path(self) -> str:
+        return f"/mnt/data/{self.claim_name}"
+
+    @property
+    def full_path(self) -> str:
+        # Normalize to avoid double-slashes when `path` starts/ends with `/`.
+        stripped = self.path.strip("/")
+        if not stripped:
+            return self.mount_path
+        return f"{self.mount_path}/{stripped}"
+
+
+InputParamType: TypeAlias = Annotated[
+    DataOneInput | UrlInput | PvcMountInput,
+    Field(discriminator="type"),
+]
 
 
 # Create a model for the recipe input
@@ -171,9 +242,16 @@ class RecipeInput(OgdcBaseModel):
 
     @field_validator("params")
     def validate_params(cls, params: list[InputParamType]) -> list[InputParamType]:
-        """Ensure there's at least one input parameter."""
+        """Ensure inputs are non-empty and do not mix PVC with fetched inputs."""
         if not params:
             error_msg = "At least one input parameter is required"
+            raise ValueError(error_msg)
+        has_pvc_input = any(isinstance(param, PvcMountInput) for param in params)
+        has_fetched_input = any(
+            isinstance(param, (DataOneInput, UrlInput)) for param in params
+        )
+        if has_pvc_input and has_fetched_input:
+            error_msg = "pvc_mount inputs cannot be combined with URL or DataONE inputs"
             raise ValueError(error_msg)
         return params
 

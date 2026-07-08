@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from collections.abc import Callable
 from typing import Any, TypeAlias, cast
 
 from hera.workflows import (
@@ -10,6 +11,7 @@ from hera.workflows import (
     Artifact,
     Container,
     Parameter,
+    Script,
     Task,
     script,
 )
@@ -22,18 +24,27 @@ from ogdc_runner.argo import (
     ARGO_MANAGER,
     OGDC_WORKFLOW_PVC,
     OgdcWorkflow,
+    get_input_pvc_volume_mounts,
+    get_input_pvc_volumes,
     submit_workflow,
 )
 from ogdc_runner.constants import MAX_PARALLEL_LIMIT
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
+from ogdc_runner.inputs import make_pvc_listing_template
 from ogdc_runner.models.parallel_config import ExecutionFunction
-from ogdc_runner.models.recipe_config import ParallelConfig, RecipeConfig, VizWorkflow
+from ogdc_runner.models.recipe_config import (
+    ParallelConfig,
+    PvcMountInput,
+    RecipeConfig,
+    VizWorkflow,
+)
 from ogdc_runner.partitioning import create_partitions
 
 # ruff: noqa: PLC0415
 
 logger = logging.getLogger(__name__)
 WorkflowTask: TypeAlias = Any
+WorkflowScript: TypeAlias = Callable[..., WorkflowTask]
 
 # Viz worker container image.  Override via VIZ_WORKFLOW_IMAGE env var.
 VIZ_WORKFLOW_IMAGE: str = os.environ.get(
@@ -58,13 +69,45 @@ _WORKFLOW_VOLUME_MOUNT = VolumeMount(
     mount_path="/mnt/workflow",
 )
 
-# Shared kwargs applied to every viz @script decorator.
-_VIZ_SCRIPT_KWARGS: dict[str, Any] = {
-    "image": VIZ_WORKFLOW_IMAGE,
-    "image_pull_policy": VIZ_WORKFLOW_IMAGE_PULL_POLICY,
-    "command": ["python"],
-    "volume_mounts": [_WORKFLOW_VOLUME_MOUNT],
-}
+
+def _viz_volume_mounts(
+    extra_mounts: list[VolumeMount] | None = None,
+) -> list[VolumeMount]:
+    """Return workflow PVC mount plus any recipe-specific input PVC mounts."""
+    mounts = [_WORKFLOW_VOLUME_MOUNT]
+    existing_names = {mount.name for mount in mounts}
+    for mount in extra_mounts or []:
+        if mount.name in existing_names:
+            continue
+        mounts.append(mount)
+        existing_names.add(mount.name)
+    return mounts
+
+
+def _viz_script_kwargs(
+    extra_volume_mounts: list[VolumeMount] | None = None,
+) -> dict[str, Any]:
+    return {
+        "image": VIZ_WORKFLOW_IMAGE,
+        "image_pull_policy": VIZ_WORKFLOW_IMAGE_PULL_POLICY,
+        "command": ["python"],
+        "volume_mounts": _viz_volume_mounts(extra_volume_mounts),
+    }
+
+
+def _stage_file_inputs() -> list[Parameter]:
+    return [
+        Parameter(name="partition-manifest"),
+        Parameter(name="recipe-id"),
+        Parameter(name="partition-id"),
+    ]
+
+
+def _run_viz_serial_inputs() -> list[Parameter]:
+    return [
+        Parameter(name="recipe-id"),
+        Parameter(name="input-manifest"),
+    ]
 
 
 _DEFAULT_VIZ_WORKFLOW_RESOURCES: dict[str, dict[str, dict[str, str]]] = {
@@ -135,12 +178,8 @@ _DISCOVERY_RESOURCES = _viz_resource_requirements("discovery")
 
 @script(
     name="stage-files",
-    inputs=[
-        Parameter(name="partition-manifest"),
-        Parameter(name="recipe-id"),
-        Parameter(name="partition-id"),
-    ],
-    **_VIZ_SCRIPT_KWARGS,
+    inputs=_stage_file_inputs(),
+    **_viz_script_kwargs(),
     resources=_STAGE_RESOURCES,
 )
 def stage_file_parallel() -> None:
@@ -243,7 +282,7 @@ def stage_file_parallel() -> None:
             path="/tmp/staged_tiles_manifest.json",
         ),
     ],
-    **_VIZ_SCRIPT_KWARGS,
+    **_viz_script_kwargs(),
     resources=_DISCOVERY_RESOURCES,
 )
 def discover_staged_tiles() -> None:
@@ -309,7 +348,7 @@ def discover_staged_tiles() -> None:
             path="/tmp/parent_tiles_manifest.json",
         ),
     ],
-    **_VIZ_SCRIPT_KWARGS,
+    **_viz_script_kwargs(),
     resources=_DISCOVERY_RESOURCES,
 )
 def discover_parent_tiles() -> None:
@@ -392,7 +431,7 @@ def discover_parent_tiles() -> None:
             path="/tmp/geotiffs_manifest.json",
         ),
     ],
-    **_VIZ_SCRIPT_KWARGS,
+    **_viz_script_kwargs(),
     resources=_DISCOVERY_RESOURCES,
 )
 def discover_all_geotiffs() -> None:
@@ -453,7 +492,7 @@ def discover_all_geotiffs() -> None:
         Parameter(name="recipe-id"),
         Parameter(name="staged-tiles-manifest"),
     ],
-    **_VIZ_SCRIPT_KWARGS,
+    **_viz_script_kwargs(),
     resources=_RASTER_RESOURCES,
 )
 def rasterize_max_z_parallel() -> None:
@@ -503,7 +542,7 @@ def rasterize_max_z_parallel() -> None:
         Parameter(name="recipe-id"),
         Parameter(name="parent-tiles-manifest"),
     ],
-    **_VIZ_SCRIPT_KWARGS,
+    **_viz_script_kwargs(),
     resources=_RASTER_RESOURCES,
 )
 def create_composite_z_parallel() -> None:
@@ -560,7 +599,7 @@ def create_composite_z_parallel() -> None:
         Parameter(name="recipe-id"),
         Parameter(name="geotiff-manifest"),
     ],
-    **_VIZ_SCRIPT_KWARGS,
+    **_viz_script_kwargs(),
     resources=_STAGE_RESOURCES,
 )
 def create_web_tile_parallel() -> None:
@@ -588,14 +627,21 @@ def create_web_tile_parallel() -> None:
     # raster_tiler is None after __init__; initialize it explicitly.
     raster_tiler = workflow.init_raster_tiler()
 
-    manifest: list[dict[str, int | str]] = json.loads(
+    manifest: list[dict[str, int | str] | str] = json.loads(
         "{{inputs.parameters.geotiff-manifest}}"
     )
     log.info("web tiles items=%d", len(manifest))
 
     for item in manifest:
-        z_level = int(item["z"])
-        geotiff_path = str(item["path"])
+        if isinstance(item, dict):
+            z_level = int(item["z"])
+            geotiff_path = str(item["path"])
+        else:
+            geotiff_path = str(item)
+            try:
+                z_level = int(workflow.tiles.dict_from_path(geotiff_path)["z"])
+            except Exception:
+                z_level = -1
         log.info("creating web tile z=%d %s", z_level, geotiff_path)
         try:
             raster_tiler.webtile_from_geotiff(geotiff_path)
@@ -616,7 +662,7 @@ def create_web_tile_parallel() -> None:
         Parameter(name="recipe-id"),
         Parameter(name="staged-tiles-manifest"),
     ],
-    **_VIZ_SCRIPT_KWARGS,
+    **_viz_script_kwargs(),
     resources=_THREEDTILE_RESOURCES,
 )
 def create_3dtile_parallel() -> None:
@@ -662,11 +708,8 @@ def create_3dtile_parallel() -> None:
 
 @script(
     name="run-viz-serial",
-    inputs=[
-        Parameter(name="recipe-id"),
-        Parameter(name="input-manifest"),
-    ],
-    **_VIZ_SCRIPT_KWARGS,
+    inputs=_run_viz_serial_inputs(),
+    **_viz_script_kwargs(),
     resources=_RASTER_RESOURCES,
 )
 def run_viz_serial() -> None:
@@ -693,25 +736,47 @@ def run_viz_serial() -> None:
     input_files: list[str] = json.loads("{{inputs.parameters.input-manifest}}")
 
     workflow = WorkflowManager(config)
-    dir_input = workflow.config.get("dir_input")
-    Path(dir_input).mkdir(parents=True, exist_ok=True)
-
-    for idx, input_file in enumerate(input_files):
-        # Download to dir_input if URL; otherwise use the path as-is.
-        if input_file.startswith(("http://", "https://")):
-            filename = Path(input_file.split("?")[0]).name
-            local_path = str(Path(dir_input) / filename)
-            log.info(
-                "serial [%d/%d] downloading %s -> %s",
-                idx + 1,
-                len(input_files),
-                input_file,
-                local_path,
-            )
-            urllib.request.urlretrieve(input_file, local_path)
 
     try:
-        workflow.run_workflow()
+        if workflow.config.is_stager_enabled():
+            dir_input = workflow.config.get("dir_input")
+            Path(dir_input).mkdir(parents=True, exist_ok=True)
+
+            for idx, input_file in enumerate(input_files):
+                if input_file.startswith(("http://", "https://")):
+                    filename = Path(input_file.split("?")[0]).name
+                    local_path = str(Path(dir_input) / filename)
+                    log.info(
+                        "serial [%d/%d] downloading %s -> %s",
+                        idx + 1,
+                        len(input_files),
+                        input_file,
+                        local_path,
+                    )
+                    urllib.request.urlretrieve(input_file, local_path)
+                else:
+                    local_path = input_file
+
+                log.info(
+                    "serial [%d/%d] staging %s",
+                    idx + 1,
+                    len(input_files),
+                    local_path,
+                )
+                workflow.stage(local_path)
+
+        if workflow.config.is_raster_enabled():
+            workflow.run_rasterization()
+
+        if workflow.config.is_3dtiles_enabled():
+            workflow.run_3d_tiling()
+
+        if workflow.config.is_generate_wmtsCapabilities_enabled() and (
+            workflow.config.is_stager_enabled()
+            or workflow.config.is_raster_enabled()
+            or workflow.config.is_web_tiles_enabled()
+        ):
+            workflow.generate_wmts_capabilities()
     except Exception as e:
         log.error("serial viz workflow FAILED error=%s", e)
         sys.exit(1)
@@ -720,6 +785,53 @@ def run_viz_serial() -> None:
 # ---------------------------------------------------------------------------
 # Workflow entry point
 # ---------------------------------------------------------------------------
+
+
+def _script_source(task_func: Callable[..., Any]) -> Callable[..., Any]:
+    """Return the original Python function behind a Hera @script wrapper."""
+    source = getattr(task_func, "wrapped_function", task_func)
+    return cast(Callable[..., Any], source)
+
+
+def _make_stage_file_template(extra_volume_mounts: list[VolumeMount]) -> Script:
+    return _make_viz_script_template(
+        name="stage-files",
+        task_func=stage_file_parallel,
+        inputs=_stage_file_inputs(),
+        resources=_STAGE_RESOURCES,
+        extra_volume_mounts=extra_volume_mounts,
+    )
+
+
+def _make_run_viz_serial_template(extra_volume_mounts: list[VolumeMount]) -> Script:
+    return _make_viz_script_template(
+        name="run-viz-serial",
+        task_func=run_viz_serial,
+        inputs=_run_viz_serial_inputs(),
+        resources=_RASTER_RESOURCES,
+        extra_volume_mounts=extra_volume_mounts,
+    )
+
+
+def _make_viz_script_template(
+    *,
+    name: str,
+    task_func: Callable[..., Any],
+    inputs: list[Parameter],
+    resources: ResourceRequirements,
+    extra_volume_mounts: list[VolumeMount],
+) -> Script:
+    return Script(
+        name=name,
+        source=_script_source(task_func),
+        inputs=inputs,
+        resources=resources,
+        **_viz_script_kwargs(extra_volume_mounts),
+    )
+
+
+def _get_viz_pvc_inputs(recipe_config: RecipeConfig) -> list[PvcMountInput]:
+    return [p for p in recipe_config.input.params if isinstance(p, PvcMountInput)]
 
 
 def _link_after(deps: list[WorkflowTask], task: WorkflowTask) -> list[WorkflowTask]:
@@ -742,8 +854,33 @@ def _serial_input_manifest(recipe_config: RecipeConfig) -> str:
     return json.dumps(input_files)
 
 
-def _create_serial_dag(recipe_config: RecipeConfig, config_task: Task) -> None:
-    serial_task: WorkflowTask = run_viz_serial(
+def _create_serial_dag(
+    recipe_config: RecipeConfig,
+    config_task: Task,
+    run_viz_serial_template: WorkflowScript = run_viz_serial,
+) -> None:
+    pvc_inputs = _get_viz_pvc_inputs(recipe_config)
+    if pvc_inputs:
+        listing_task = Task(
+            name="list-pvc-files",
+            template=make_pvc_listing_template(
+                pvc_inputs=pvc_inputs,
+                partition_size=_DEFAULT_PARTITION_SIZE,
+                input_pvc_mounts=get_input_pvc_volume_mounts(recipe_config),
+                image=VIZ_WORKFLOW_SETUP_IMAGE,
+            ),
+        )
+        _link_after([config_task], listing_task)
+        pvc_serial_task: WorkflowTask = run_viz_serial_template(
+            arguments={
+                "recipe-id": recipe_config.id,
+                "input-manifest": listing_task.get_parameter("files"),
+            },
+        )
+        _link_after([listing_task], pvc_serial_task)
+        return
+
+    serial_task: WorkflowTask = run_viz_serial_template(
         arguments={
             "recipe-id": recipe_config.id,
             "input-manifest": _serial_input_manifest(recipe_config),
@@ -757,7 +894,33 @@ def _create_stage_task(
     recipe_config: RecipeConfig,
     parallel_cfg: ParallelConfig,
     deps: list[WorkflowTask],
+    stage_template: WorkflowScript = stage_file_parallel,
 ) -> list[WorkflowTask]:
+    pvc_inputs = _get_viz_pvc_inputs(recipe_config)
+    if pvc_inputs:
+        input_pvc_mounts = get_input_pvc_volume_mounts(recipe_config)
+        listing_task = Task(
+            name="list-pvc-files",
+            template=make_pvc_listing_template(
+                pvc_inputs=pvc_inputs,
+                partition_size=parallel_cfg.partition_size or _DEFAULT_PARTITION_SIZE,
+                input_pvc_mounts=input_pvc_mounts,
+                image=VIZ_WORKFLOW_SETUP_IMAGE,
+            ),
+        )
+        _link_after(deps, listing_task)
+
+        pvc_stage_task: WorkflowTask = stage_template(
+            arguments={
+                "recipe-id": recipe_config.id,
+                "partition-manifest": "{{item.files}}",
+                "partition-id": "{{item.partition_id}}",
+            },
+            with_param=listing_task.get_parameter("partitions"),
+        )
+        listing_task >> pvc_stage_task
+        return [pvc_stage_task]
+
     partitions = create_partitions(
         inputs=recipe_config.input.params,
         execution_function=ExecutionFunction(
@@ -774,7 +937,7 @@ def _create_stage_task(
         sum(len(p.files) for p in partitions),
     )
 
-    stage_task: WorkflowTask = stage_file_parallel(
+    stage_task: WorkflowTask = stage_template(
         arguments={
             "recipe-id": recipe_config.id,
             "partition-manifest": "{{item.files}}",
@@ -801,35 +964,64 @@ def _create_staged_tiles_discovery(
     return staged_tiles_discovery_task
 
 
+def _create_pvc_listing_task(
+    *,
+    recipe_config: RecipeConfig,
+    partition_size: int,
+    deps: list[WorkflowTask],
+) -> WorkflowTask | None:
+    pvc_inputs = _get_viz_pvc_inputs(recipe_config)
+    if not pvc_inputs:
+        return None
+
+    listing_task = Task(
+        name="list-pvc-files",
+        template=make_pvc_listing_template(
+            pvc_inputs=pvc_inputs,
+            partition_size=partition_size,
+            input_pvc_mounts=get_input_pvc_volume_mounts(recipe_config),
+            image=VIZ_WORKFLOW_SETUP_IMAGE,
+        ),
+    )
+    _link_after(deps, listing_task)
+    return listing_task
+
+
 def _create_rasterize_task(
     *,
     recipe_config: RecipeConfig,
-    staged_tiles_discovery_task: WorkflowTask,
+    staged_tiles_with_param: Any,
+    deps: list[WorkflowTask],
+    staged_tiles_manifest_argument: str = "{{item}}",
+    rasterize_template: WorkflowScript = rasterize_max_z_parallel,
 ) -> WorkflowTask:
-    rasterize_task: WorkflowTask = rasterize_max_z_parallel(
+    rasterize_task: WorkflowTask = rasterize_template(
         arguments={
             "recipe-id": recipe_config.id,
-            "staged-tiles-manifest": "{{item}}",
+            "staged-tiles-manifest": staged_tiles_manifest_argument,
         },
-        with_param=staged_tiles_discovery_task.get_result_as("result"),
+        with_param=staged_tiles_with_param,
     )
-    _link_after([staged_tiles_discovery_task], rasterize_task)
+    _link_after(deps, rasterize_task)
     return rasterize_task
 
 
 def _create_3dtile_task(
     *,
     recipe_config: RecipeConfig,
-    staged_tiles_discovery_task: WorkflowTask,
+    staged_tiles_with_param: Any,
+    deps: list[WorkflowTask],
+    staged_tiles_manifest_argument: str = "{{item}}",
+    threedtile_template: WorkflowScript = create_3dtile_parallel,
 ) -> None:
-    threedtile_task: WorkflowTask = create_3dtile_parallel(
+    threedtile_task: WorkflowTask = threedtile_template(
         arguments={
             "recipe-id": recipe_config.id,
-            "staged-tiles-manifest": "{{item}}",
+            "staged-tiles-manifest": staged_tiles_manifest_argument,
         },
-        with_param=staged_tiles_discovery_task.get_result_as("result"),
+        with_param=staged_tiles_with_param,
     )
-    _link_after([staged_tiles_discovery_task], threedtile_task)
+    _link_after(deps, threedtile_task)
 
 
 def _create_composite_tasks(
@@ -878,7 +1070,21 @@ def _create_web_tile_tasks(
     partition_size: int,
     deps: list[WorkflowTask],
     raster_anchor: WorkflowTask | None,
+    geotiff_with_param: Any | None = None,
+    geotiff_manifest_argument: str = "{{item}}",
+    web_tile_template: WorkflowScript = create_web_tile_parallel,
 ) -> None:
+    if geotiff_with_param is not None:
+        direct_web_tile_task: WorkflowTask = web_tile_template(
+            arguments={
+                "recipe-id": recipe_config.id,
+                "geotiff-manifest": geotiff_manifest_argument,
+            },
+            with_param=geotiff_with_param,
+        )
+        _link_after(deps, direct_web_tile_task)
+        return
+
     discover_geotiffs_task: WorkflowTask = discover_all_geotiffs(
         arguments={
             "recipe-id": recipe_config.id,
@@ -891,7 +1097,7 @@ def _create_web_tile_tasks(
     else:
         _link_after(deps, discover_geotiffs_task)
 
-    web_tile_task: WorkflowTask = create_web_tile_parallel(
+    web_tile_task: WorkflowTask = web_tile_template(
         arguments={
             "recipe-id": recipe_config.id,
             "geotiff-manifest": "{{item}}",
@@ -899,6 +1105,51 @@ def _create_web_tile_tasks(
         with_param=discover_geotiffs_task.get_result_as("result"),
     )
     _link_after([discover_geotiffs_task], web_tile_task)
+
+
+def _relative_workflow_dir(base: str, path: str | None) -> str | None:
+    if not path:
+        return None
+    stripped = path.rstrip("/")
+    if not stripped or stripped.startswith("/"):
+        return None
+    return f"{base}/{stripped}"
+
+
+def _setup_directories(
+    *,
+    base: str,
+    workflow_config: dict[str, Any],
+    enable_stager: bool,
+    enable_raster: bool,
+    enable_web_tiles: bool,
+    enable_3dtiles: bool,
+) -> set[str]:
+    dirs = {base}
+    maybe_dirs = []
+
+    if enable_stager:
+        maybe_dirs.extend(
+            [
+                workflow_config.get("dir_input"),
+                workflow_config.get("dir_staged"),
+            ]
+        )
+    if enable_raster:
+        maybe_dirs.append(workflow_config.get("dir_geotiff"))
+    if enable_web_tiles:
+        maybe_dirs.append(workflow_config.get("dir_web_tiles"))
+    if enable_3dtiles:
+        maybe_dirs.append(workflow_config.get("dir_3dtiles", "output/3dtiles"))
+
+    for configured_dir in maybe_dirs:
+        if not isinstance(configured_dir, str):
+            continue
+        workflow_dir = _relative_workflow_dir(base, configured_dir)
+        if workflow_dir is not None:
+            dirs.add(workflow_dir)
+
+    return dirs
 
 
 def make_and_submit_viz_workflow(
@@ -951,18 +1202,76 @@ def make_and_submit_viz_workflow(
         if parallel_cfg.enabled
         else None
     )
+    input_pvc_mounts = get_input_pvc_volume_mounts(recipe_config)
+    workflow_volumes = [OGDC_WORKFLOW_PVC, *get_input_pvc_volumes(recipe_config)]
+    stage_template: WorkflowScript = cast(
+        WorkflowScript,
+        _make_stage_file_template(input_pvc_mounts)
+        if input_pvc_mounts
+        else stage_file_parallel,
+    )
+    run_viz_serial_template: WorkflowScript = cast(
+        WorkflowScript,
+        _make_run_viz_serial_template(input_pvc_mounts)
+        if input_pvc_mounts
+        else run_viz_serial,
+    )
+    rasterize_template: WorkflowScript = cast(
+        WorkflowScript,
+        _make_viz_script_template(
+            name="rasterize-max-z",
+            task_func=rasterize_max_z_parallel,
+            inputs=[
+                Parameter(name="recipe-id"),
+                Parameter(name="staged-tiles-manifest"),
+            ],
+            resources=_RASTER_RESOURCES,
+            extra_volume_mounts=input_pvc_mounts,
+        )
+        if input_pvc_mounts
+        else rasterize_max_z_parallel,
+    )
+    threedtile_template: WorkflowScript = cast(
+        WorkflowScript,
+        _make_viz_script_template(
+            name="create-3dtiles",
+            task_func=create_3dtile_parallel,
+            inputs=[
+                Parameter(name="recipe-id"),
+                Parameter(name="staged-tiles-manifest"),
+            ],
+            resources=_THREEDTILE_RESOURCES,
+            extra_volume_mounts=input_pvc_mounts,
+        )
+        if input_pvc_mounts
+        else create_3dtile_parallel,
+    )
+    web_tile_template: WorkflowScript = cast(
+        WorkflowScript,
+        _make_viz_script_template(
+            name="create-web-tiles",
+            task_func=create_web_tile_parallel,
+            inputs=[
+                Parameter(name="recipe-id"),
+                Parameter(name="geotiff-manifest"),
+            ],
+            resources=_STAGE_RESOURCES,
+            extra_volume_mounts=input_pvc_mounts,
+        )
+        if input_pvc_mounts
+        else create_web_tile_parallel,
+    )
 
     with OgdcWorkflow(
         name="visualization",
         recipe_config=recipe_config,
         archive_workflow=True,
         entrypoint="main",
-        volumes=[OGDC_WORKFLOW_PVC],
+        volumes=workflow_volumes,
         parallelism=parallelism,
         annotations={
             "workflows.argoproj.io/description": (
-                "Parallel 5-stage viz workflow "
-                "(stage→rasterise→composite→web-tile→3d-tile)"
+                "Parallel Viz Workflow (stage→rasterise→composite→web-tile→3d-tile)"
             ),
         },
         labels={
@@ -989,14 +1298,18 @@ def make_and_submit_viz_workflow(
 
         # ----------------------------------------------------------------
         # Setup container — write config.json and create output directories
-        # Directories are derived from the config so they always match,
-        # regardless of what dir_* values the recipe sets.
+        # Only create workflow-local directories for enabled stages. Absolute
+        # paths may refer to mounted input PVCs and must not be pre-created.
         # ----------------------------------------------------------------
         _base = f"/mnt/workflow/{recipe_config.id}"
-        _dirs: set[str] = {f"{_base}/output/3dtiles"}  # always needed
-        for _k, _v in workflow_config.items():
-            if _k.startswith("dir_") and _v and isinstance(_v, str):
-                _dirs.add(f"{_base}/{_v.rstrip('/')}")
+        _dirs = _setup_directories(
+            base=_base,
+            workflow_config=workflow_config,
+            enable_stager=enable_stager,
+            enable_raster=enable_raster,
+            enable_web_tiles=enable_web_tiles,
+            enable_3dtiles=enable_3dtiles,
+        )
         _mkdir_cmds = " && \\\n".join(f"mkdir -p {d}" for d in sorted(_dirs))
 
         setup_template = Container(
@@ -1025,64 +1338,116 @@ EOF"""
             )
 
             if not parallel_cfg.enabled:
-                _create_serial_dag(recipe_config, config_task)
+                _create_serial_dag(
+                    recipe_config,
+                    config_task,
+                    run_viz_serial_template=run_viz_serial_template,
+                )
             else:
                 current_deps: list[WorkflowTask] = [config_task]
+                pvc_listing_task: WorkflowTask | None = None
 
                 if enable_stager:
                     current_deps = _create_stage_task(
                         recipe_config=recipe_config,
                         parallel_cfg=parallel_cfg,
                         deps=current_deps,
+                        stage_template=stage_template,
                     )
-
-                staged_tiles_discovery_task = None
-                if enable_raster or enable_3dtiles:
-                    staged_tiles_discovery_task = _create_staged_tiles_discovery(
+                else:
+                    pvc_listing_task = _create_pvc_listing_task(
                         recipe_config=recipe_config,
                         partition_size=partition_size,
                         deps=current_deps,
                     )
 
+                staged_tiles_source_tasks: list[WorkflowTask] = []
+                staged_tiles_with_param: Any | None = None
+                staged_tiles_manifest_argument = "{{item}}"
+                if pvc_listing_task is not None:
+                    staged_tiles_source_tasks = [pvc_listing_task]
+                    staged_tiles_with_param = pvc_listing_task.get_parameter(
+                        "partitions"
+                    )
+                    staged_tiles_manifest_argument = "{{item.files}}"
+                if (
+                    enable_raster or enable_3dtiles
+                ) and staged_tiles_with_param is None:
+                    # Without a stager, PVC manifests can directly seed raster and
+                    # 3D tile work. URL/DataONE inputs still require discovery from
+                    # staged workflow output.
+                    staged_tiles_discovery_task = _create_staged_tiles_discovery(
+                        recipe_config=recipe_config,
+                        partition_size=partition_size,
+                        deps=current_deps,
+                    )
+                    staged_tiles_source_tasks = [staged_tiles_discovery_task]
+                    staged_tiles_with_param = staged_tiles_discovery_task.get_result_as(
+                        "result"
+                    )
+
                 rasterize_task = None
-                if enable_raster and staged_tiles_discovery_task is not None:
+                if enable_raster and staged_tiles_with_param is not None:
                     rasterize_task = _create_rasterize_task(
                         recipe_config=recipe_config,
-                        staged_tiles_discovery_task=staged_tiles_discovery_task,
+                        staged_tiles_with_param=staged_tiles_with_param,
+                        deps=staged_tiles_source_tasks,
+                        staged_tiles_manifest_argument=staged_tiles_manifest_argument,
+                        rasterize_template=rasterize_template,
                     )
 
                 # Stage 5 uses the same staged vector manifest as rasterization,
                 # so attach it next to Step 1 discovery instead of as a separate
                 # tail block.
-                if enable_3dtiles and staged_tiles_discovery_task is not None:
+                if enable_3dtiles and staged_tiles_with_param is not None:
                     _create_3dtile_task(
                         recipe_config=recipe_config,
-                        staged_tiles_discovery_task=staged_tiles_discovery_task,
+                        staged_tiles_with_param=staged_tiles_with_param,
+                        deps=staged_tiles_source_tasks,
+                        staged_tiles_manifest_argument=staged_tiles_manifest_argument,
+                        threedtile_template=threedtile_template,
                     )
 
                 final_composite_task = None
-                if enable_raster_parents:
+                # PVC geotiff inputs can seed web tile generation directly.
+                # Parent-raster discovery still expects workflow-local geotiffs,
+                # so do not put that discovery in front of direct PVC web tiles.
+                can_create_raster_parents = not (
+                    pvc_listing_task is not None and not enable_raster
+                )
+                if enable_raster_parents and can_create_raster_parents:
                     final_composite_task = _create_composite_tasks(
                         recipe_config=recipe_config,
                         partition_size=partition_size,
                         composite_z_levels=composite_z_levels,
                         deps=current_deps,
                         rasterize_task=rasterize_task,
-                        staged_tiles_discovery_task=staged_tiles_discovery_task,
+                        staged_tiles_discovery_task=staged_tiles_source_tasks[0]
+                        if staged_tiles_source_tasks
+                        else None,
                     )
 
                 if enable_web_tiles:
-                    raster_anchor = (
-                        final_composite_task
-                        or rasterize_task
-                        or staged_tiles_discovery_task
+                    raster_anchor = final_composite_task or rasterize_task
+                    geotiff_with_param = (
+                        pvc_listing_task.get_parameter("partitions")
+                        if pvc_listing_task is not None and raster_anchor is None
+                        else None
+                    )
+                    geotiff_manifest_argument = (
+                        "{{item.files}}"
+                        if geotiff_with_param is not None
+                        else "{{item}}"
                     )
                     _create_web_tile_tasks(
                         recipe_config=recipe_config,
                         partition_size=partition_size,
                         deps=current_deps,
                         raster_anchor=raster_anchor,
+                        geotiff_with_param=geotiff_with_param,
+                        geotiff_manifest_argument=geotiff_manifest_argument,
+                        web_tile_template=web_tile_template,
                     )
 
-    workflow_name: str = submit_workflow(w, wait=wait)
+        workflow_name: str = submit_workflow(w, wait=wait)
     return workflow_name
