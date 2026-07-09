@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -12,7 +14,10 @@ from ogdc_runner.models.recipe_config import (
     ShellWorkflow,
     UrlInput,
 )
-from ogdc_runner.workflow.shell import ShellParallelExecutionOrchestrator
+from ogdc_runner.workflow.shell import (
+    ShellParallelExecutionOrchestrator,
+    make_and_submit_shell_workflow,
+)
 
 
 @pytest.fixture
@@ -53,6 +58,46 @@ def test_orchestrator_creates_correct_partitions(sample_recipe_config):
     partitions = orchestrator._create_partitions()
 
     assert len(partitions) == 3
+
+
+def test_parallel_shell_workflow_uses_retained_partition_manifests(
+    sample_recipe_config,
+):
+    rendered_workflows: list[dict[str, Any]] = []
+
+    def fake_submit(workflow: Any, wait: bool = False) -> str:
+        del wait
+        rendered_workflows.append(workflow.to_dict())
+        return "test-workflow"
+
+    with patch("ogdc_runner.workflow.shell.submit_workflow", fake_submit):
+        assert (
+            make_and_submit_shell_workflow(sample_recipe_config, wait=False)
+            == "test-workflow"
+        )
+
+    workflow = rendered_workflows[0]
+    main_template = next(
+        template
+        for template in workflow["spec"]["templates"]
+        if template["name"] == "main"
+    )
+    tasks = main_template["dag"]["tasks"]
+    task_names = [task["name"] for task in tasks]
+
+    assert "write-partition-manifests" in task_names
+    cmd_task = next(task for task in tasks if task["name"] == "cmd-0")
+    assert (
+        cmd_task["withParam"]
+        == "{{tasks.write-partition-manifests.outputs.parameters.partitions}}"
+    )
+    assert cmd_task["arguments"]["parameters"][0] == {
+        "name": "partition-manifest-path",
+        "value": (
+            f"/mnt/workflow/{sample_recipe_config.id}/partition-manifests/"
+            "shell-inputs/partition-{{item.partition_id}}.json"
+        ),
+    }
 
 
 def test_execution_function_validation():

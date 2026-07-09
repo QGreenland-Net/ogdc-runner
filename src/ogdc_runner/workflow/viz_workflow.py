@@ -38,6 +38,15 @@ from ogdc_runner.models.recipe_config import (
     RecipeConfig,
     VizWorkflow,
 )
+from ogdc_runner.partition_manifests import (
+    FILES_MANIFEST_PATH_PARAM,
+    PARTITION_MANIFEST_PATH_PARAM,
+    make_partition_manifest_writer_template,
+    manifest_inputs,
+    partition_manifest_inputs,
+    partition_manifest_path_arg,
+    partition_manifest_records,
+)
 from ogdc_runner.partitioning import create_partitions
 
 # ruff: noqa: PLC0415
@@ -97,7 +106,7 @@ def _viz_script_kwargs(
 
 def _stage_file_inputs() -> list[Parameter]:
     return [
-        Parameter(name="partition-manifest"),
+        *partition_manifest_inputs(),
         Parameter(name="recipe-id"),
         Parameter(name="partition-id"),
     ]
@@ -106,8 +115,23 @@ def _stage_file_inputs() -> list[Parameter]:
 def _run_viz_serial_inputs() -> list[Parameter]:
     return [
         Parameter(name="recipe-id"),
-        Parameter(name="input-manifest"),
+        *manifest_inputs("input-manifest", "input-manifest-path"),
     ]
+
+
+def _manifest_arguments(
+    *,
+    inline_name: str,
+    path_name: str,
+    inline_value: str | None = None,
+    path_value: str | None = None,
+) -> dict[str, str]:
+    arguments: dict[str, str] = {}
+    if inline_value is not None:
+        arguments[inline_name] = inline_value
+    if path_value is not None:
+        arguments[path_name] = path_value
+    return arguments
 
 
 _DEFAULT_VIZ_WORKFLOW_RESOURCES: dict[str, dict[str, dict[str, str]]] = {
@@ -209,8 +233,13 @@ def stage_file_parallel() -> None:
     config = json.loads(config_path.read_text())
 
     partition_manifest: str = "{{inputs.parameters.partition-manifest}}"
+    partition_manifest_path: str = "{{inputs.parameters.partition-manifest-path}}"
     partition_id: str = "{{inputs.parameters.partition-id}}"
-    input_files: list[str] = json.loads(partition_manifest)
+    input_files: list[str] = json.loads(
+        Path(partition_manifest_path).read_text()
+        if partition_manifest_path
+        else partition_manifest
+    )
 
     log.info("partition=%s files=%d starting staging", partition_id, len(input_files))
 
@@ -317,17 +346,28 @@ def discover_staged_tiles() -> None:
 
     log.info("max_z=%d staged_files=%d", max_z, len(staged_files))
 
-    partitions = [
+    partitions: list[list[str]] = [
         staged_files[i : i + partition_size]
         for i in range(0, len(staged_files), partition_size)
     ]
     log.info("partitions=%d partition_size=%d", len(partitions), partition_size)
 
-    output_path = Path("{{outputs.artifacts.staged-tiles-manifest.path}}")
-    output_path.write_text(json.dumps(partitions))
+    manifest_dir = (
+        Path("/mnt/workflow/{{inputs.parameters.recipe-id}}")
+        / "partition-manifests"
+        / "staged-tiles"
+    )
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    partition_refs = []
+    for idx, partition in enumerate(partitions):
+        partition_path = manifest_dir / f"partition-{idx}.json"
+        partition_path.write_text(json.dumps(partition))
+        partition_refs.append({"partition_id": idx})
 
-    # stdout captured by Argo withParam
-    print(json.dumps(partitions))
+    output_path = Path("{{outputs.artifacts.staged-tiles-manifest.path}}")
+    output_path.write_text(json.dumps(partition_refs))
+
+    print(json.dumps(partition_refs))
 
 
 # ---------------------------------------------------------------------------
@@ -402,16 +442,28 @@ def discover_parent_tiles() -> None:
     ]
     log.info("z=%d parent_tiles=%d", z_level, len(parent_tiles_list))
 
-    partitions = [
+    partitions: list[list[dict[str, int | str]]] = [
         parent_tiles_list[i : i + partition_size]
         for i in range(0, len(parent_tiles_list), partition_size)
     ]
     log.info("z=%d partitions=%d", z_level, len(partitions))
 
-    output_path = Path("{{outputs.artifacts.parent-tiles-manifest.path}}")
-    output_path.write_text(json.dumps(partitions))
+    manifest_dir = (
+        Path("/mnt/workflow/{{inputs.parameters.recipe-id}}")
+        / "partition-manifests"
+        / f"parent-tiles-z-{z_level}"
+    )
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    partition_refs = []
+    for idx, partition in enumerate(partitions):
+        partition_path = manifest_dir / f"partition-{idx}.json"
+        partition_path.write_text(json.dumps(partition))
+        partition_refs.append({"partition_id": idx})
 
-    print(json.dumps(partitions))
+    output_path = Path("{{outputs.artifacts.parent-tiles-manifest.path}}")
+    output_path.write_text(json.dumps(partition_refs))
+
+    print(json.dumps(partition_refs))
 
 
 # ---------------------------------------------------------------------------
@@ -469,16 +521,28 @@ def discover_all_geotiffs() -> None:
 
     log.info("geotiff_files=%d", len(geotiff_entries))
 
-    partitions = [
+    partitions: list[list[dict[str, int | str]]] = [
         geotiff_entries[i : i + partition_size]
         for i in range(0, len(geotiff_entries), partition_size)
     ]
     log.info("partitions=%d partition_size=%d", len(partitions), partition_size)
 
-    output_path = Path("{{outputs.artifacts.geotiff-manifest.path}}")
-    output_path.write_text(json.dumps(partitions))
+    manifest_dir = (
+        Path("/mnt/workflow/{{inputs.parameters.recipe-id}}")
+        / "partition-manifests"
+        / "geotiffs"
+    )
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    partition_refs = []
+    for idx, partition in enumerate(partitions):
+        partition_path = manifest_dir / f"partition-{idx}.json"
+        partition_path.write_text(json.dumps(partition))
+        partition_refs.append({"partition_id": idx})
 
-    print(json.dumps(partitions))
+    output_path = Path("{{outputs.artifacts.geotiff-manifest.path}}")
+    output_path.write_text(json.dumps(partition_refs))
+
+    print(json.dumps(partition_refs))
 
 
 # ---------------------------------------------------------------------------
@@ -490,7 +554,7 @@ def discover_all_geotiffs() -> None:
     name="rasterize-max-z",
     inputs=[
         Parameter(name="recipe-id"),
-        Parameter(name="staged-tiles-manifest"),
+        *manifest_inputs("staged-tiles-manifest", "staged-tiles-manifest-path"),
     ],
     **_viz_script_kwargs(),
     resources=_RASTER_RESOURCES,
@@ -518,7 +582,11 @@ def rasterize_max_z_parallel() -> None:
 
     workflow = WorkflowManager(config)
 
-    manifest: list[str] = json.loads("{{inputs.parameters.staged-tiles-manifest}}")
+    manifest_json = "{{inputs.parameters.staged-tiles-manifest}}"
+    manifest_path = "{{inputs.parameters.staged-tiles-manifest-path}}"
+    manifest: list[str] = json.loads(
+        Path(manifest_path).read_text() if manifest_path else manifest_json
+    )
     log.info("rasterizing tiles=%d", len(manifest))
 
     for tile_path in manifest:
@@ -540,7 +608,7 @@ def rasterize_max_z_parallel() -> None:
     name="create-composite-z",
     inputs=[
         Parameter(name="recipe-id"),
-        Parameter(name="parent-tiles-manifest"),
+        *manifest_inputs("parent-tiles-manifest", "parent-tiles-manifest-path"),
     ],
     **_viz_script_kwargs(),
     resources=_RASTER_RESOURCES,
@@ -570,8 +638,10 @@ def create_composite_z_parallel() -> None:
     # raster_tiler is None after __init__; initialize it explicitly.
     raster_tiler = workflow.init_raster_tiler()
 
+    manifest_json = "{{inputs.parameters.parent-tiles-manifest}}"
+    manifest_path = "{{inputs.parameters.parent-tiles-manifest-path}}"
     manifest: list[dict[str, int | str]] = json.loads(
-        "{{inputs.parameters.parent-tiles-manifest}}"
+        Path(manifest_path).read_text() if manifest_path else manifest_json
     )
     log.info("composite tiles=%d", len(manifest))
 
@@ -597,7 +667,7 @@ def create_composite_z_parallel() -> None:
     name="create-web-tiles",
     inputs=[
         Parameter(name="recipe-id"),
-        Parameter(name="geotiff-manifest"),
+        *manifest_inputs("geotiff-manifest", "geotiff-manifest-path"),
     ],
     **_viz_script_kwargs(),
     resources=_STAGE_RESOURCES,
@@ -627,8 +697,10 @@ def create_web_tile_parallel() -> None:
     # raster_tiler is None after __init__; initialize it explicitly.
     raster_tiler = workflow.init_raster_tiler()
 
+    manifest_json = "{{inputs.parameters.geotiff-manifest}}"
+    manifest_path = "{{inputs.parameters.geotiff-manifest-path}}"
     manifest: list[dict[str, int | str] | str] = json.loads(
-        "{{inputs.parameters.geotiff-manifest}}"
+        Path(manifest_path).read_text() if manifest_path else manifest_json
     )
     log.info("web tiles items=%d", len(manifest))
 
@@ -660,7 +732,7 @@ def create_web_tile_parallel() -> None:
     name="create-3dtiles",
     inputs=[
         Parameter(name="recipe-id"),
-        Parameter(name="staged-tiles-manifest"),
+        *manifest_inputs("staged-tiles-manifest", "staged-tiles-manifest-path"),
     ],
     **_viz_script_kwargs(),
     resources=_THREEDTILE_RESOURCES,
@@ -688,7 +760,11 @@ def create_3dtile_parallel() -> None:
 
     workflow = WorkflowManager(config)
 
-    manifest: list[str] = json.loads("{{inputs.parameters.staged-tiles-manifest}}")
+    manifest_json = "{{inputs.parameters.staged-tiles-manifest}}"
+    manifest_path = "{{inputs.parameters.staged-tiles-manifest-path}}"
+    manifest: list[str] = json.loads(
+        Path(manifest_path).read_text() if manifest_path else manifest_json
+    )
     log.info("3d tiles items=%d", len(manifest))
 
     for staged_path in manifest:
@@ -733,7 +809,13 @@ def run_viz_serial() -> None:
     config_path = Path("/mnt/workflow/{{inputs.parameters.recipe-id}}/config.json")
     os.chdir(str(config_path.parent))
     config = json.loads(config_path.read_text())
-    input_files: list[str] = json.loads("{{inputs.parameters.input-manifest}}")
+    input_manifest_json = "{{inputs.parameters.input-manifest}}"
+    input_manifest_path = "{{inputs.parameters.input-manifest-path}}"
+    input_files: list[str] = json.loads(
+        Path(input_manifest_path).read_text()
+        if input_manifest_path
+        else input_manifest_json
+    )
 
     workflow = WorkflowManager(config)
 
@@ -869,12 +951,15 @@ def _create_serial_dag(
                 input_pvc_mounts=get_input_pvc_volume_mounts(recipe_config),
                 image=VIZ_WORKFLOW_SETUP_IMAGE,
             ),
+            arguments=[Parameter(name="recipe-id", value=recipe_config.id)],
         )
         _link_after([config_task], listing_task)
         pvc_serial_task: WorkflowTask = run_viz_serial_template(
             arguments={
                 "recipe-id": recipe_config.id,
-                "input-manifest": listing_task.get_parameter("files"),
+                "input-manifest-path": listing_task.get_parameter(
+                    FILES_MANIFEST_PATH_PARAM
+                ),
             },
         )
         _link_after([listing_task], pvc_serial_task)
@@ -907,13 +992,16 @@ def _create_stage_task(
                 input_pvc_mounts=input_pvc_mounts,
                 image=VIZ_WORKFLOW_SETUP_IMAGE,
             ),
+            arguments=[Parameter(name="recipe-id", value=recipe_config.id)],
         )
         _link_after(deps, listing_task)
 
         pvc_stage_task: WorkflowTask = stage_template(
             arguments={
                 "recipe-id": recipe_config.id,
-                "partition-manifest": "{{item.files}}",
+                PARTITION_MANIFEST_PATH_PARAM: partition_manifest_path_arg(
+                    recipe_config.id, "pvc-inputs"
+                ),
                 "partition-id": "{{item.partition_id}}",
             },
             with_param=listing_task.get_parameter("partitions"),
@@ -928,8 +1016,13 @@ def _create_stage_task(
         ),
         parallel_config=parallel_cfg,
     )
-    stage_partitions_json = json.dumps(
-        [{"index": i, "files": p.files} for i, p in enumerate(partitions)]
+    manifest_template = make_partition_manifest_writer_template(
+        name="write-stage-partition-manifests",
+        recipe_id=recipe_config.id,
+        manifest_subdir="stage-files",
+        partitions=partition_manifest_records(partitions),
+        workflow_volume_name=OGDC_WORKFLOW_PVC.name,
+        image=VIZ_WORKFLOW_SETUP_IMAGE,
     )
     logger.info(
         "stage1 partitions=%d total_files=%d",
@@ -937,15 +1030,22 @@ def _create_stage_task(
         sum(len(p.files) for p in partitions),
     )
 
+    manifest_task = Task(
+        name="write-stage-partition-manifests",
+        template=manifest_template,
+    )
+    _link_after(deps, manifest_task)
     stage_task: WorkflowTask = stage_template(
         arguments={
             "recipe-id": recipe_config.id,
-            "partition-manifest": "{{item.files}}",
-            "partition-id": "{{item.index}}",
+            PARTITION_MANIFEST_PATH_PARAM: partition_manifest_path_arg(
+                recipe_config.id, "stage-files"
+            ),
+            "partition-id": "{{item.partition_id}}",
         },
-        with_param=stage_partitions_json,
+        with_param=manifest_task.get_parameter("partitions"),
     )
-    return _link_after(deps, stage_task)
+    return _link_after([manifest_task], stage_task)
 
 
 def _create_staged_tiles_discovery(
@@ -982,6 +1082,7 @@ def _create_pvc_listing_task(
             input_pvc_mounts=get_input_pvc_volume_mounts(recipe_config),
             image=VIZ_WORKFLOW_SETUP_IMAGE,
         ),
+        arguments=[Parameter(name="recipe-id", value=recipe_config.id)],
     )
     _link_after(deps, listing_task)
     return listing_task
@@ -992,13 +1093,19 @@ def _create_rasterize_task(
     recipe_config: RecipeConfig,
     staged_tiles_with_param: Any,
     deps: list[WorkflowTask],
-    staged_tiles_manifest_argument: str = "{{item}}",
+    staged_tiles_manifest_argument: str | None = "{{item}}",
+    staged_tiles_manifest_path_argument: str | None = None,
     rasterize_template: WorkflowScript = rasterize_max_z_parallel,
 ) -> WorkflowTask:
     rasterize_task: WorkflowTask = rasterize_template(
         arguments={
             "recipe-id": recipe_config.id,
-            "staged-tiles-manifest": staged_tiles_manifest_argument,
+            **_manifest_arguments(
+                inline_name="staged-tiles-manifest",
+                path_name="staged-tiles-manifest-path",
+                inline_value=staged_tiles_manifest_argument,
+                path_value=staged_tiles_manifest_path_argument,
+            ),
         },
         with_param=staged_tiles_with_param,
     )
@@ -1011,13 +1118,19 @@ def _create_3dtile_task(
     recipe_config: RecipeConfig,
     staged_tiles_with_param: Any,
     deps: list[WorkflowTask],
-    staged_tiles_manifest_argument: str = "{{item}}",
+    staged_tiles_manifest_argument: str | None = "{{item}}",
+    staged_tiles_manifest_path_argument: str | None = None,
     threedtile_template: WorkflowScript = create_3dtile_parallel,
 ) -> None:
     threedtile_task: WorkflowTask = threedtile_template(
         arguments={
             "recipe-id": recipe_config.id,
-            "staged-tiles-manifest": staged_tiles_manifest_argument,
+            **_manifest_arguments(
+                inline_name="staged-tiles-manifest",
+                path_name="staged-tiles-manifest-path",
+                inline_value=staged_tiles_manifest_argument,
+                path_value=staged_tiles_manifest_path_argument,
+            ),
         },
         with_param=staged_tiles_with_param,
     )
@@ -1048,7 +1161,9 @@ def _create_composite_tasks(
             name=f"create-composites-z-{z}",
             arguments={
                 "recipe-id": recipe_config.id,
-                "parent-tiles-manifest": "{{item}}",
+                "parent-tiles-manifest-path": partition_manifest_path_arg(
+                    recipe_config.id, f"parent-tiles-z-{z}"
+                ),
             },
             with_param=discover_parents_task.get_result_as("result"),
         )
@@ -1071,14 +1186,20 @@ def _create_web_tile_tasks(
     deps: list[WorkflowTask],
     raster_anchor: WorkflowTask | None,
     geotiff_with_param: Any | None = None,
-    geotiff_manifest_argument: str = "{{item}}",
+    geotiff_manifest_argument: str | None = "{{item}}",
+    geotiff_manifest_path_argument: str | None = None,
     web_tile_template: WorkflowScript = create_web_tile_parallel,
 ) -> None:
     if geotiff_with_param is not None:
         direct_web_tile_task: WorkflowTask = web_tile_template(
             arguments={
                 "recipe-id": recipe_config.id,
-                "geotiff-manifest": geotiff_manifest_argument,
+                **_manifest_arguments(
+                    inline_name="geotiff-manifest",
+                    path_name="geotiff-manifest-path",
+                    inline_value=geotiff_manifest_argument,
+                    path_value=geotiff_manifest_path_argument,
+                ),
             },
             with_param=geotiff_with_param,
         )
@@ -1100,7 +1221,9 @@ def _create_web_tile_tasks(
     web_tile_task: WorkflowTask = web_tile_template(
         arguments={
             "recipe-id": recipe_config.id,
-            "geotiff-manifest": "{{item}}",
+            "geotiff-manifest-path": partition_manifest_path_arg(
+                recipe_config.id, "geotiffs"
+            ),
         },
         with_param=discover_geotiffs_task.get_result_as("result"),
     )
@@ -1166,13 +1289,9 @@ def make_and_submit_viz_workflow(
     Stage 4  — Convert GeoTIFFs → PNG web tiles                (discovery → with_param)
     Stage 5  — Convert staged vectors → Cesium 3D tiles        (discovery reuse → with_param)
 
-    All stages use Argo ``withParam`` for dynamic fan-out so the number of DAG
-    nodes stays bounded regardless of dataset size.
-
-    For extreme-scale datasets (> ~10 M files) Stage 1 currently embeds the
-    partition manifest in the workflow spec.  A future hardening step writes
-    manifests to the workflow PVC during setup and passes only partition
-    indices via withParam to stay within etcd size limits.
+    Dynamic stages use Argo ``withParam`` with compact manifest references. The
+    full partition manifests are stored on the workflow PVC so large datasets do
+    not bloat workflow parameters or etcd payloads.
 
     Args:
         recipe_config: Recipe configuration with ``workflow.type == "visualization"``.
@@ -1223,7 +1342,10 @@ def make_and_submit_viz_workflow(
             task_func=rasterize_max_z_parallel,
             inputs=[
                 Parameter(name="recipe-id"),
-                Parameter(name="staged-tiles-manifest"),
+                *manifest_inputs(
+                    "staged-tiles-manifest",
+                    "staged-tiles-manifest-path",
+                ),
             ],
             resources=_RASTER_RESOURCES,
             extra_volume_mounts=input_pvc_mounts,
@@ -1238,7 +1360,10 @@ def make_and_submit_viz_workflow(
             task_func=create_3dtile_parallel,
             inputs=[
                 Parameter(name="recipe-id"),
-                Parameter(name="staged-tiles-manifest"),
+                *manifest_inputs(
+                    "staged-tiles-manifest",
+                    "staged-tiles-manifest-path",
+                ),
             ],
             resources=_THREEDTILE_RESOURCES,
             extra_volume_mounts=input_pvc_mounts,
@@ -1253,7 +1378,7 @@ def make_and_submit_viz_workflow(
             task_func=create_web_tile_parallel,
             inputs=[
                 Parameter(name="recipe-id"),
-                Parameter(name="geotiff-manifest"),
+                *manifest_inputs("geotiff-manifest", "geotiff-manifest-path"),
             ],
             resources=_STAGE_RESOURCES,
             extra_volume_mounts=input_pvc_mounts,
@@ -1363,13 +1488,17 @@ EOF"""
 
                 staged_tiles_source_tasks: list[WorkflowTask] = []
                 staged_tiles_with_param: Any | None = None
-                staged_tiles_manifest_argument = "{{item}}"
+                staged_tiles_manifest_argument: str | None = "{{item}}"
+                staged_tiles_manifest_path_argument: str | None = None
                 if pvc_listing_task is not None:
                     staged_tiles_source_tasks = [pvc_listing_task]
                     staged_tiles_with_param = pvc_listing_task.get_parameter(
                         "partitions"
                     )
-                    staged_tiles_manifest_argument = "{{item.files}}"
+                    staged_tiles_manifest_argument = None
+                    staged_tiles_manifest_path_argument = partition_manifest_path_arg(
+                        recipe_config.id, "pvc-inputs"
+                    )
                 if (
                     enable_raster or enable_3dtiles
                 ) and staged_tiles_with_param is None:
@@ -1385,6 +1514,10 @@ EOF"""
                     staged_tiles_with_param = staged_tiles_discovery_task.get_result_as(
                         "result"
                     )
+                    staged_tiles_manifest_argument = None
+                    staged_tiles_manifest_path_argument = partition_manifest_path_arg(
+                        recipe_config.id, "staged-tiles"
+                    )
 
                 rasterize_task = None
                 if enable_raster and staged_tiles_with_param is not None:
@@ -1393,6 +1526,7 @@ EOF"""
                         staged_tiles_with_param=staged_tiles_with_param,
                         deps=staged_tiles_source_tasks,
                         staged_tiles_manifest_argument=staged_tiles_manifest_argument,
+                        staged_tiles_manifest_path_argument=staged_tiles_manifest_path_argument,
                         rasterize_template=rasterize_template,
                     )
 
@@ -1405,6 +1539,7 @@ EOF"""
                         staged_tiles_with_param=staged_tiles_with_param,
                         deps=staged_tiles_source_tasks,
                         staged_tiles_manifest_argument=staged_tiles_manifest_argument,
+                        staged_tiles_manifest_path_argument=staged_tiles_manifest_path_argument,
                         threedtile_template=threedtile_template,
                     )
 
@@ -1434,11 +1569,13 @@ EOF"""
                         if pvc_listing_task is not None and raster_anchor is None
                         else None
                     )
-                    geotiff_manifest_argument = (
-                        "{{item.files}}"
-                        if geotiff_with_param is not None
-                        else "{{item}}"
-                    )
+                    geotiff_manifest_argument: str | None = "{{item}}"
+                    geotiff_manifest_path_argument: str | None = None
+                    if geotiff_with_param is not None:
+                        geotiff_manifest_argument = None
+                        geotiff_manifest_path_argument = partition_manifest_path_arg(
+                            recipe_config.id, "pvc-inputs"
+                        )
                     _create_web_tile_tasks(
                         recipe_config=recipe_config,
                         partition_size=partition_size,
@@ -1446,6 +1583,7 @@ EOF"""
                         raster_anchor=raster_anchor,
                         geotiff_with_param=geotiff_with_param,
                         geotiff_manifest_argument=geotiff_manifest_argument,
+                        geotiff_manifest_path_argument=geotiff_manifest_path_argument,
                         web_tile_template=web_tile_template,
                     )
 

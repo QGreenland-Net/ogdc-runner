@@ -177,6 +177,20 @@ def test_viz_workflow_renders_parallel_dag_with_default_cap(
 
     assert workflow["spec"]["parallelism"] == MAX_PARALLEL_LIMIT
     assert any("withParam" in task for task in tasks)
+    assert "write-stage-partition-manifests" in [task["name"] for task in tasks]
+
+    stage_task = next(task for task in tasks if task["name"] == "stage-files")
+    assert (
+        stage_task["withParam"]
+        == "{{tasks.write-stage-partition-manifests.outputs.parameters.partitions}}"
+    )
+    assert stage_task["arguments"]["parameters"][1] == {
+        "name": "partition-manifest-path",
+        "value": (
+            f"/mnt/workflow/{config.id}/partition-manifests/"
+            "stage-files/partition-{{item.partition_id}}.json"
+        ),
+    }
 
 
 def test_viz_workflow_honors_max_parallelism(
@@ -269,7 +283,7 @@ def test_serial_viz_workflow_renders_pvc_mount_input(
     serial_task = next(task for task in tasks if task["name"] == "run-viz-serial")
     assert (
         serial_task["arguments"]["parameters"][1]["value"]
-        == "{{tasks.list-pvc-files.outputs.parameters.files}}"
+        == "{{tasks.list-pvc-files.outputs.parameters.files-manifest-path}}"
     )
 
     listing_template = _template(workflow, "list-pvc-files")
@@ -355,12 +369,28 @@ def test_parallel_viz_pvc_can_start_at_raster_and_3dtiles(monkeypatch, tmp_path)
         raster_task["withParam"]
         == "{{tasks.list-pvc-files.outputs.parameters.partitions}}"
     )
-    assert raster_task["arguments"]["parameters"][1]["value"] == "{{item.files}}"
+    assert (
+        raster_task["arguments"]["parameters"][1]["name"]
+        == "staged-tiles-manifest-path"
+    )
+    assert (
+        raster_task["arguments"]["parameters"][1]["value"]
+        == f"/mnt/workflow/{config.id}/partition-manifests/pvc-inputs/"
+        "partition-{{item.partition_id}}.json"
+    )
     assert (
         threed_task["withParam"]
         == "{{tasks.list-pvc-files.outputs.parameters.partitions}}"
     )
-    assert threed_task["arguments"]["parameters"][1]["value"] == "{{item.files}}"
+    assert (
+        threed_task["arguments"]["parameters"][1]["name"]
+        == "staged-tiles-manifest-path"
+    )
+    assert (
+        threed_task["arguments"]["parameters"][1]["value"]
+        == f"/mnt/workflow/{config.id}/partition-manifests/pvc-inputs/"
+        "partition-{{item.partition_id}}.json"
+    )
 
     setup_template = _template(workflow, "stage-viz-config")
     setup_script = setup_template["container"]["args"][0]
@@ -401,7 +431,14 @@ def test_parallel_viz_pvc_can_start_at_webtiles(monkeypatch, tmp_path):
         web_tile_task["withParam"]
         == "{{tasks.list-pvc-files.outputs.parameters.partitions}}"
     )
-    assert web_tile_task["arguments"]["parameters"][1]["value"] == "{{item.files}}"
+    assert (
+        web_tile_task["arguments"]["parameters"][1]["name"] == "geotiff-manifest-path"
+    )
+    assert (
+        web_tile_task["arguments"]["parameters"][1]["value"]
+        == f"/mnt/workflow/{config.id}/partition-manifests/pvc-inputs/"
+        "partition-{{item.partition_id}}.json"
+    )
 
     web_tile_template = _template(workflow, "create-web-tiles")
     assert "isinstance(item, dict)" in web_tile_template["script"]["source"]

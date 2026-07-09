@@ -53,18 +53,29 @@ runner:
 
 1. **Partitions** input data based on the configured strategy (e.g., grouping
    files)
-2. **Creates** independent Argo tasks for each partition
-3. **Orchestrates** parallel execution with configurable maximum parallelism
+2. **Writes** retained partition manifests to the workflow PVC
+3. **Creates** independent Argo tasks for each partition
+4. **Orchestrates** parallel execution with configurable maximum parallelism
 
 The {class}`ogdc_runner.parallel.ParallelExecutionOrchestrator` class manages
 this process, creating Argo Container templates and DAG tasks with proper
 dependencies and parameters. Argo handles task scheduling and resource
 allocation, distributing work across available cluster resources.
 
+Partition manifests are stored under
+`/mnt/workflow/{recipe_id}/partition-manifests/` and are not deleted by the
+runner after workflow execution. Argo `withParam` fan-out uses compact partition
+IDs instead of embedding full file lists in workflow parameters. Workers read
+their file lists from the workflow PVC at runtime. This pattern is used for
+parallel shell workflows and for visualization workflow stages that need
+partitioning.
+
 Key modules:
 
 - {mod}`ogdc_runner.parallel`: Orchestration logic for parallel task creation
 - {mod}`ogdc_runner.partitioning`: Partitioning strategies for dividing work
+- {mod}`ogdc_runner.partition_manifests`: Workflow PVC manifest paths and
+  manifest-writer templates
 - {mod}`ogdc_runner.models.parallel_config`: Configuration models for parallel
   execution
 

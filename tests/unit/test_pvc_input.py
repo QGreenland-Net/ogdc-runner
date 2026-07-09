@@ -5,6 +5,7 @@ import os
 import shlex
 import subprocess
 from importlib.resources import files
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
@@ -139,7 +140,7 @@ def test_pvc_listing_template():
     assert raw_outputs is not None
     assert not isinstance(raw_outputs, (str, bytes))
     assert any(o.name == "partitions" for o in raw_outputs)  # type: ignore[union-attr]
-    assert any(o.name == "files" for o in raw_outputs)  # type: ignore[union-attr]
+    assert any(o.name == "files-manifest-path" for o in raw_outputs)  # type: ignore[union-attr]
 
 
 def test_pvc_listing_template_includes_all_pvc_inputs():
@@ -183,7 +184,8 @@ def test_pvc_listing_script_recurses_into_subdirectories(tmp_path):
     ignored_file.touch()
 
     partitions_path = tmp_path / "partitions.json"
-    files_path = tmp_path / "files.json"
+    files_manifest_path_output = tmp_path / "files_manifest_path.txt"
+    manifest_dir = tmp_path / "partition-manifests"
     script = _render_script(
         "list_pvc_inputs.sh",
         {
@@ -201,14 +203,22 @@ def test_pvc_listing_script_recurses_into_subdirectories(tmp_path):
         env={
             **os.environ,
             "PARTITIONS_PATH": str(partitions_path),
-            "FILES_PATH": str(files_path),
+            "FILES_MANIFEST_PATH_OUTPUT": str(files_manifest_path_output),
+            "PARTITION_MANIFEST_DIR": str(manifest_dir),
+            "RECIPE_ID": "test-recipe",
         },
     )
-    listed_files = json.loads(files_path.read_text())
+    files_manifest_path = files_manifest_path_output.read_text()
+    listed_files = json.loads(Path(files_manifest_path).read_text())
     partitions = json.loads(partitions_path.read_text())
 
     assert listed_files == sorted([str(nested_match), str(root_match)])
-    assert partitions == [{"partition_id": 0, "files": listed_files}]
+    assert partitions == [
+        {
+            "partition_id": 0,
+        }
+    ]
+    assert json.loads((manifest_dir / "partition-0.json").read_text()) == listed_files
 
 
 def test_pvc_stage_script_recurses_into_subdirectories(tmp_path):
@@ -337,3 +347,9 @@ def test_parallel_shell_workflow_renders_pvc_inputs(
     _assert_references_existing_claims_only(workflow)
     assert "fetch" not in [task["name"] for task in tasks]
     assert "list-pvc-files" in [task["name"] for task in tasks]
+    cmd_task = next(task for task in tasks if task["name"] == "cmd-0")
+    assert (
+        cmd_task["arguments"]["parameters"][0]["value"]
+        == f"/mnt/workflow/{config.id}/partition-manifests/pvc-inputs/"
+        "partition-{{item.partition_id}}.json"
+    )
