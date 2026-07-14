@@ -1,4 +1,4 @@
-## NEXT_VERSION
+## v0.4.0 (2026-07-14)
 
 - Add parallel execution for `viz-workflow` recipes.
 - Add Keycloak authentication for the OGDC service.
