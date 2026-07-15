@@ -20,10 +20,10 @@ detailed documentation on how to use and contribute to the `ogdc-runner`.
 Cite this software as:
 
 > Trey Stafford, Robyn Marowitz, Rushiraj Nenuji, Matthew B. Jones, Twila
-> Moon. 2025. Open Geospatial Data Cloud (OGDC) Runner: Client tool and API for
+> Moon, Jeanette Clark. 2026. Open Geospatial Data Cloud (OGDC) Runner: Client tool and API for
 > scalable and repeatable geospatial data transformation recipes. (version
-> 0.3.0). Arctic Data Center.
-> [doi:10.18739/A26688M7W](https://doi.org/doi:10.18739/A26688M7W)
+> 0.4.0). Arctic Data Center.
+> [doi:10.18739/A2P26Q57N](https://doi.org/doi:10.18739/A2P26Q57N)
 
 <!-- prettier-ignore-start -->
 [actions-link]:             https://github.com/qgreenland-net/ogdc-runner/actions
