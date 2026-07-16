@@ -1,8 +1,14 @@
-# v0.4.0
+## v0.4.0 (2026-07-14)
 
+- Add parallel execution for `viz-workflow` recipes.
+- Add Keycloak authentication for the OGDC service.
 - Add `pvc_mount` input type for referencing pre-staged data on
   PersistentVolumeClaims (PVCs). Supports both sequential and parallel
   workflows.
+- Add recursive glob discovery for inputs staged on PVCs.
+- Persist partition manifests for parallel runs on workflow PVCs.
+- Add the `set-token` CLI command and token refresh support for service
+  authentication.
 
 # v0.3.0
 
@@ -12,7 +18,7 @@
 - Add `temporary` output type and support retrieval of those outputs from s3
   storage via the `ogdc-runner get-output` CLI.
 - Add DataONE input type for fetching datasets directly from DataONE
-  repositories
+  repositories.
 - Add `parallel-shell` recipe type and related support for executing shell
   recipes in parallel.
 
