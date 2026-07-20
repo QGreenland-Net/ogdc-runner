@@ -58,7 +58,7 @@ WorkflowScript: TypeAlias = Callable[..., WorkflowTask]
 # Viz worker container image.  Override via VIZ_WORKFLOW_IMAGE env var.
 VIZ_WORKFLOW_IMAGE: str = os.environ.get(
     "VIZ_WORKFLOW_IMAGE",
-    "ghcr.io/permafrostdiscoverygateway/viz-workflow:latest",
+    "ghcr.io/permafrostdiscoverygateway/pdgworkflow:latest",
 )
 VIZ_WORKFLOW_IMAGE_PULL_POLICY: str = os.environ.get(
     "VIZ_WORKFLOW_IMAGE_PULL_POLICY",
