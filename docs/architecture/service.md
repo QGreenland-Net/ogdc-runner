@@ -63,6 +63,10 @@ New users can be given access via the keycloak administrator user interface.
 - `OGDC_DB_NAME` (optional): database name, defaults to `ogdc`.
 - `OGDC_SECRET_KEY` (optional): value of the secret key used to encode/decode
   cookies used for authentication.
+- `ACCESS_MODE` (optional): one of `authenticated`, `read_only`, or `open`;
+  defaults to `authenticated`.
+- `OIDC_CLIENT_SECRETS_FILE`: mounted OIDC client JSON path. Required in
+  authenticated mode; changes require a service restart.
 - `OGDC_WORKFLOW_PVC_NAME` (optional): name of the PersistentVolumeClaim mounted
   into workflow pods, defaults to `cephfs-qgnet-ogdc-workflow-pvc`. The
   ogdc-helm chart sets this to `cephfs-${RELEASE_NAME}-workflow-pvc`.

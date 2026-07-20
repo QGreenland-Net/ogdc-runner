@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import os
 from functools import cache
 from pathlib import Path
 
 import pytest
 from sqlmodel import StaticPool, create_engine
+
+# OIDC-specific tests provide their own temporary credentials.
+os.environ.setdefault("ACCESS_MODE", "open")
 
 from ogdc_runner.service import db
 

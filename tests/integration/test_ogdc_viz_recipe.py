@@ -16,7 +16,7 @@ from ogdc_runner.exceptions import OgdcDataAlreadyPublished
 from ogdc_runner.workflow import viz_workflow
 
 DEFAULT_VIZ_WORKFLOW_TEST_IMAGE = (
-    "ghcr.io/permafrostdiscoverygateway/viz-workflow:1.1.0-dev-2"
+    "ghcr.io/permafrostdiscoverygateway/pdgworkflow:latest"
 )
 
 
