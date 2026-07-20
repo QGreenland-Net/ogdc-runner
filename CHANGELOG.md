@@ -1,3 +1,7 @@
+## NEXT_VERSION
+
+- Load OIDC client configuration from a mounted file instead of the image.
+
 ## v0.4.0 (2026-07-14)
 
 - Add parallel execution for `viz-workflow` recipes.
