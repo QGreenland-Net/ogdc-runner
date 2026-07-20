@@ -1,4 +1,4 @@
-## NEXT_VERSION
+## v0.4.1 (2026-07-20)
 
 - Load OIDC client configuration from a mounted file instead of the image.
 

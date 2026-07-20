@@ -7,7 +7,7 @@ authors = [
   { name = "Robyn Marowitz", email = "robyn.marowitz@colorado.edu" },
   { name = "Jeanette Clark", email = "clark@nceas.ucsb.edu" },
 ]
-version = "0.4.0"
+version = "0.4.1"
 description = "Defines OGDC recipe API(s) and submits recipes to OGDC for execution"
 readme = "README.md"
 license.file = "LICENSE"
@@ -94,7 +94,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.bumpversion]
-current_version = "0.4.0"
+current_version = "0.4.1"
 commit = false
 tag = false
 
