@@ -22,7 +22,7 @@ Cite this software as:
 > Trey Stafford, Robyn Marowitz, Rushiraj Nenuji, Matthew B. Jones, Twila
 > Moon, Jeanette Clark. 2026. Open Geospatial Data Cloud (OGDC) Runner: Client tool and API for
 > scalable and repeatable geospatial data transformation recipes. (version
-> 0.4.1). Arctic Data Center.
+> 0.4.2). Arctic Data Center.
 > [doi:10.18739/A2P26Q57N](https://doi.org/doi:10.18739/A2P26Q57N)
 
 <!-- prettier-ignore-start -->
