@@ -1,6 +1,6 @@
 ## v0.4.2 (2026-08-19)
 
-- Fix PyPi publishing issues with github workflow. 
+- Fix PyPi publishing issues with github workflow.
 
 ## v0.4.1 (2026-07-20)
 
