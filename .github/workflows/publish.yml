@@ -39,7 +39,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: "hynek/build-and-inspect-python-package@v2"
+      - uses: "hynek/build-and-inspect-python-package@v3.0.1"
 
   #######################################################################
   # Build Docker
@@ -80,7 +80,7 @@ jobs:
           name: "Packages"
           path: "dist"
 
-      - uses: "pypa/gh-action-pypi-publish@release/v1"
+      - uses: "pypa/gh-action-pypi-publish@release/v1.14.2"
 
   #######################################################################
   # Publish Docker
