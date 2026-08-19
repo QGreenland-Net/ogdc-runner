@@ -1,4 +1,4 @@
-## NEXT_VERSION
+## v0.4.2 (2026-08-19)
 
 - Fix PyPi publishing issues with github workflow. 
 
