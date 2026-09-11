@@ -41,9 +41,14 @@ class Config:
         elif self.env == "dev":
             self.default_url = "https://ogdc.test.dataone.org/api"
             self.access_mode = "authenticated"
-        else:
+        elif self.env == "prod":
             self.default_url = "https://ogdc.dataone.org/api"
             self.access_mode = "authenticated"
+        else:
+            raise ValueError(
+                f"Invalid or missing ENVIRONMENT: {self.env!r}. "
+                "Must be one of 'local', 'dev', or 'prod'."
+            )
 
         self.api_url = os.environ.get("OGDC_API_URL", self.default_url)
 
