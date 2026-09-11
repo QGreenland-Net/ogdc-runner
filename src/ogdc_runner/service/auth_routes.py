@@ -6,7 +6,7 @@ import datetime as dt
 import os
 
 import pydantic
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 
 from ogdc_runner.api import submit_ogdc_recipe
@@ -21,6 +21,8 @@ bearer_schema = HTTPBearer(auto_error=False)
 SCOPE_ADMIN = os.getenv("OGDC_SCOPE_ADMIN", "ogdc:admin")
 
 router = APIRouter(
+    prefix="/workflows",
+    tags=["workflows"],
     # Require that all routes in this module be authenticated via an access
     # token with appropriate scopes
     dependencies=[
@@ -30,36 +32,34 @@ router = APIRouter(
 )
 
 
-class SubmitRecipeRequest(pydantic.BaseModel):
+class WorkflowSubmitRequest(pydantic.BaseModel):
     recipe_path: str
     overwrite: bool = False
 
-
-class SubmitRecipeResponse(pydantic.BaseModel):
+class WorkflowSubmitResponse(pydantic.BaseModel):
     message: str
     recipe_workflow_name: str | None
 
-
-@router.post("/submit")
-def submit(
-    submit_recipe_request: SubmitRecipeRequest,
-    # Ensure submissions require an authenticated user.
-    # _current_user: auth.AuthenticatedUserDependency,
-) -> SubmitRecipeResponse:
+@router.post(
+    "",
+    response_model=WorkflowSubmitResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_workflow(payload: WorkflowSubmitRequest) -> WorkflowSubmitResponse:
     """Submit a recipe to OGDC for execution.
 
     Requires a valid auth token and scope.
     """
     try:
-        with stage_ogdc_recipe(submit_recipe_request.recipe_path) as recipe_dir:
+        with stage_ogdc_recipe(payload.recipe_path) as recipe_dir:
             recipe_workflow_name = submit_ogdc_recipe(
                 recipe_dir=recipe_dir,
                 # Submitting a recipe should never wait - the api should be
                 # responsive and async.
                 wait=False,
-                overwrite=submit_recipe_request.overwrite,
+                overwrite=payload.overwrite,
             )
-            return SubmitRecipeResponse(
+            return WorkflowSubmitResponse(
                 message=f"Successfully submitted recipe with {recipe_workflow_name=}",
                 recipe_workflow_name=recipe_workflow_name,
             )
@@ -70,28 +70,33 @@ def submit(
         ) from e
 
 
-class StatusResponse(pydantic.BaseModel):
+class WorkflowDetailResponse(pydantic.BaseModel):
     recipe_workflow_name: str
     status: str | None
     timestamp: dt.datetime = pydantic.Field(default_factory=dt.datetime.now)
 
 
-@router.get("/status/{recipe_workflow_name}")
-def status(recipe_workflow_name: str) -> StatusResponse:
+@router.get(
+    "/{recipe_workflow_name}",
+    response_model=WorkflowDetailResponse,
+)
+def get_workflow(recipe_workflow_name: str) -> WorkflowDetailResponse:
     """Check an argo workflow's status."""
     status = get_workflow_status(recipe_workflow_name)
-    return StatusResponse(
+    return WorkflowDetailResponse(
         recipe_workflow_name=recipe_workflow_name,
         status=status,
     )
 
 
-class OutputResponse(pydantic.BaseModel):
+class WorkflowOutputResponse(pydantic.BaseModel):
     data_url: str
 
-
-@router.get("/output/{recipe_workflow_name}")
-def get_output(recipe_workflow_name: str) -> OutputResponse:
+@router.get(
+    "/{recipe_workflow_name}/output",
+    response_model=WorkflowOutputResponse,
+)
+def get_workflow_output(recipe_workflow_name: str) -> WorkflowOutputResponse:
     """Get a presigned s3 url for the outputs of the given recipe workflow.
 
     TODO: support other output types. This assumes a temporary output stored on
@@ -105,4 +110,4 @@ def get_output(recipe_workflow_name: str) -> OutputResponse:
             detail=f"The requested output for {recipe_workflow_name} was not found: {e}.",
         ) from e
 
-    return OutputResponse(data_url=s3_location)
+    return WorkflowOutputResponse(data_url=s3_location)

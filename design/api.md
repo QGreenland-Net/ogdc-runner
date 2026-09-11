@@ -17,7 +17,7 @@ Before getting to the actual API design, key resources and parameters are identi
 
 - **`POST /workflows`**
     - **Description:** Submits a new workflow for execution. (Replaces `/submit`).
-    - **Request Body:** `workflow_path` (str), `overwrite` (bool)
+    - **Request Body:** `recipe_path` (str), `overwrite` (bool)
     - **Response:** `message` (str), `recipe_workflow_name` (str)
 - **`GET /workflows`**
     - **Description:** Retrieves a list of workflows submitted by the user.
