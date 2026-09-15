@@ -36,9 +36,11 @@ class WorkflowSubmitRequest(pydantic.BaseModel):
     recipe_path: str
     overwrite: bool = False
 
+
 class WorkflowSubmitResponse(pydantic.BaseModel):
     message: str
     recipe_workflow_name: str | None
+
 
 @router.post(
     "",
@@ -91,6 +93,7 @@ def get_workflow(recipe_workflow_name: str) -> WorkflowDetailResponse:
 
 class WorkflowOutputResponse(pydantic.BaseModel):
     data_url: str
+
 
 @router.get(
     "/{recipe_workflow_name}/output",
