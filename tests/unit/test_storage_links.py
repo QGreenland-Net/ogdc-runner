@@ -7,7 +7,11 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 from ogdc_runner import storage_links
-from ogdc_runner.exceptions import OgdcMissingEnvvar
+from ogdc_runner.exceptions import (
+    OgdcInvalidStorageLink,
+    OgdcMissingEnvvar,
+    OgdcStorageLinkExpired,
+)
 
 SIGNING_KEY = "unit-test-signing-key"
 KEY = "workflow-abc/published_zip.tgz"
@@ -66,3 +70,58 @@ def test_url_fails_closed_without_config(monkeypatch, missing):
 
     with pytest.raises(OgdcMissingEnvvar, match=missing):
         storage_links.build_signed_url(KEY, now=NOW)
+
+
+def test_verify_accepts_valid_link():
+    storage_links.verify(KEY, str(NOW + 60), _signed(), now=NOW)
+
+
+def test_verify_rejects_expired_link():
+    expires = NOW - 1
+
+    with pytest.raises(OgdcStorageLinkExpired):
+        storage_links.verify(KEY, str(expires), _signed(expires=expires), now=NOW)
+
+
+def test_verify_rejects_tampered_signature():
+    with pytest.raises(OgdcInvalidStorageLink):
+        storage_links.verify(KEY, str(NOW + 60), "0" * 64, now=NOW)
+
+
+def test_verify_rejects_signature_for_different_key():
+    with pytest.raises(OgdcInvalidStorageLink):
+        storage_links.verify("other/key.zip", str(NOW + 60), _signed(), now=NOW)
+
+
+def test_verify_rejects_extended_expiry():
+    signature = _signed(expires=NOW - 1)
+
+    # Moving `expires` forward must invalidate the signature.
+    with pytest.raises(OgdcInvalidStorageLink):
+        storage_links.verify(KEY, str(NOW + 3600), signature, now=NOW)
+
+
+@pytest.mark.parametrize("expires", [None, "", "soon", "1.5"])
+def test_verify_rejects_malformed_expiry(expires):
+    with pytest.raises(OgdcInvalidStorageLink):
+        storage_links.verify(KEY, expires, _signed(), now=NOW)
+
+
+def test_verify_rejects_missing_signature():
+    with pytest.raises(OgdcInvalidStorageLink):
+        storage_links.verify(KEY, str(NOW + 60), None, now=NOW)
+
+
+@pytest.mark.parametrize(
+    "key", ["../etc/passwd", "a/../b", "a/..", "/abs/key", "a..b", ""]
+)
+def test_verify_rejects_unsafe_keys_even_if_signed(key):
+    with pytest.raises(OgdcInvalidStorageLink):
+        storage_links.verify(key, str(NOW + 60), _signed(key), now=NOW)
+
+
+def test_verify_fails_closed_without_signing_key(monkeypatch):
+    monkeypatch.delenv("OGDC_STORAGE_LINK_SIGNING_KEY")
+
+    with pytest.raises(OgdcMissingEnvvar):
+        storage_links.verify(KEY, str(NOW + 60), "0" * 64, now=NOW)

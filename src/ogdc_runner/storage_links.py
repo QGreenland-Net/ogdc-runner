@@ -15,7 +15,9 @@ import time
 from urllib.parse import quote
 
 from ogdc_runner.exceptions import (
+    OgdcInvalidStorageLink,
     OgdcMissingEnvvar,
+    OgdcStorageLinkExpired,
 )
 
 # Time in seconds that a link remains valid: 2 hours.
@@ -43,3 +45,31 @@ def build_signed_url(s3_key: str, *, now: float | None = None) -> str:
     expires = int((time.time() if now is None else now) + LINK_TTL_SECONDS)
     signature = sign(s3_key, expires)
     return f"{public_base}/{quote(s3_key)}?expires={expires}&signature={signature}"
+
+
+def verify(
+    s3_key: str,
+    expires: str | None,
+    signature: str | None,
+    *,
+    now: float | None = None,
+) -> None:
+    """Validate a signed link.
+
+    Raises `OgdcInvalidStorageLink` for unsafe keys, malformed parameters, or a
+    bad signature, and `OgdcStorageLinkExpired` for a valid but expired link.
+    """
+    if not s3_key or s3_key.startswith("/") or ".." in s3_key:
+        err_msg = "Invalid storage key."
+        raise OgdcInvalidStorageLink(err_msg)
+    if not expires or not expires.isascii() or not expires.isdigit() or not signature:
+        err_msg = "Invalid storage link parameters."
+        raise OgdcInvalidStorageLink(err_msg)
+
+    expected = sign(s3_key, int(expires))
+    if not hmac.compare_digest(expected.encode(), signature.encode()):
+        err_msg = "Invalid storage link signature."
+        raise OgdcInvalidStorageLink(err_msg)
+    if int(expires) < (time.time() if now is None else now):
+        err_msg = "Storage link has expired."
+        raise OgdcStorageLinkExpired(err_msg)
