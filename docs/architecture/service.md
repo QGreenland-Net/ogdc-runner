@@ -73,3 +73,63 @@ New users can be given access via the keycloak administrator user interface.
 - `ARGO_NAMESPACE` (optional): kubernetes namespace in which argo workflows are
   submitted, defaults to `qgnet`. The ogdc-helm chart sets this to the release
   namespace.
+
+## S3 object storage and `/storage` links
+
+Argo artifacts and `temporary` recipe outputs live in an S3-compatible object
+store. The store is configured through the following environment variables (the
+ogdc-helm chart sets them):
+
+| Variable                        | Meaning                                                                   | Default                                                   |
+| ------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `S3_ENDPOINT_URL`               | S3 API endpoint                                                           | falls back to legacy `INTERNAL_S3_ENDPOINT_URL`; required |
+| `S3_BUCKET`                     | Bucket for argo artifacts and outputs                                     | `argo-workflows`                                          |
+| `S3_REGION`                     | S3 region                                                                 | `us-east-1`                                               |
+| `S3_ADDRESSING_STYLE`           | `path`, `virtual`, or `auto`                                              | `path`                                                    |
+| `S3_SECRET_KEY_ID`              | Static access key ID                                                      | required                                                  |
+| `S3_SECRET_KEY_KEY`             | Static secret access key                                                  | required                                                  |
+| `PUBLIC_S3_ENDPOINT_URL`        | Public base of output links, e.g. `https://ogdc.test.dataone.org/storage` | required to create links                                  |
+| `OGDC_STORAGE_LINK_SIGNING_KEY` | Secret used to HMAC-sign output links                                     | required to create or serve links                         |
+
+### Why output links are served by the service
+
+Output links must stay under `https://<public_host>/storage/...`. An S3
+presigned URL cannot be used for this: the SigV4 signature covers the `Host`
+header and the canonical path, so rewriting the host of a presigned URL (as was
+done for MinIO, which tolerated it) makes real S3 implementations such as Ceph
+RGW reject the request.
+
+Instead, `get_temporary_output_data_url` returns
+
+```text
+{PUBLIC_S3_ENDPOINT_URL}/{s3_key}?expires=<unix>&signature=<hex>
+```
+
+where `signature` is
+`HMAC-SHA256(OGDC_STORAGE_LINK_SIGNING_KEY, "{s3_key}\n{expires}")` and the link
+is valid for 2 hours. The service route `GET /storage/{s3_key}` (see
+{mod}`ogdc_runner.service.storage_routes`) verifies the signature in constant
+time and the expiry, then streams the object from S3 using the service's own
+credentials. The route is unauthenticated: possession of the link is the
+capability. It answers `403` for a bad or malformed link or an unsafe key (`..`
+or a leading `/`), `410` for an expired link, `404` for a missing object, `502`
+for other S3 errors, and `503` if the signing key is not configured. Links are
+never created without a signing key.
+
+The route lives at `/storage` in the application, outside of the authenticated
+routes. Route `/storage` to the service in the ingress without rewriting the
+path. Note that the signature appears in the query string, so access logs of
+proxies in front of the service should not be shared; links expire after 2
+hours.
+
+### Migrating from MinIO
+
+- Rename `INTERNAL_S3_ENDPOINT_URL` to `S3_ENDPOINT_URL` (the old name still
+  works as a fallback).
+- Set `S3_BUCKET`, `S3_REGION` (e.g. `default` for Ceph RGW), and, if needed,
+  `S3_ADDRESSING_STYLE`.
+- Set `OGDC_STORAGE_LINK_SIGNING_KEY`. Without it no output links are created.
+- `PUBLIC_S3_ENDPOINT_URL` now points at the service's `/storage` route rather
+  than at the object store, and must be routed to the service.
+- Links issued before the upgrade (S3 presigned URLs) are not valid with the new
+  route; request a new link via `ogdc-runner get-output`.

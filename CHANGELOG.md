@@ -1,3 +1,12 @@
+## Unreleased
+
+- Configure the S3 client with generic `S3_ENDPOINT_URL`, `S3_BUCKET`,
+  `S3_REGION`, and `S3_ADDRESSING_STYLE` envvars (`INTERNAL_S3_ENDPOINT_URL` is
+  still accepted as a fallback for `S3_ENDPOINT_URL`).
+- Serve temporary output links from the service under `/storage/...` using
+  HMAC-signed, expiring links (`OGDC_STORAGE_LINK_SIGNING_KEY`) instead of
+  host-rewritten S3 presigned URLs, which real S3 backends reject.
+
 ## v0.4.2 (2026-08-19)
 
 - Fix PyPi publishing issues with github workflow.
