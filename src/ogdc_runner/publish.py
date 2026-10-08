@@ -36,6 +36,7 @@ from ogdc_runner.models.recipe_config import (
     RecipeConfig,
     TemporaryRecipeOutput,
 )
+from ogdc_runner.storage_links import build_signed_url
 
 
 def _publish_template_for_pvc(
@@ -320,44 +321,6 @@ def get_s3_client() -> botocore.client.S3:
     )
 
 
-def _get_presigned_s3_url(s3_key: str) -> str:
-    """Get a pre-signed s3 URL for the given s3 key.
-
-    This returns a URL that is only valid for 2 hours, allowing the user to
-    download the data before we clean it up.
-
-    See: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-presigned-urls.html
-    """
-    s3_client = get_s3_client()
-    try:
-        presigned_url = s3_client.generate_presigned_url(
-            "get_object",
-            Params={
-                "Bucket": get_s3_bucket(),
-                "Key": s3_key,
-            },
-            # Time in seconds for the presigned URL to remain valid:
-            # 2 hours.
-            ExpiresIn=60 * 120,
-        )
-        presigned_url = str(presigned_url)
-    except ClientError as e:
-        err_msg = f"Error creating pre-signed url for {s3_key}: {e}"
-        raise OgdcOutputDataRetrievalError(err_msg) from e
-
-    public_s3_endpoint_url = os.environ.get("PUBLIC_S3_ENDPOINT_URL")
-    internal_s3_endpoint_url = os.environ.get("INTERNAL_S3_ENDPOINT_URL")
-    if not all((internal_s3_endpoint_url, public_s3_endpoint_url)):
-        err_msg = "INTERNAL_S3_ENDPOINT_URL and PUBLIC_S3_ENDPOINT_URL must be set."
-        raise OgdcMissingEnvvar(err_msg)
-
-    public_presigned_url = presigned_url.replace(
-        str(internal_s3_endpoint_url), str(public_s3_endpoint_url)
-    )
-
-    return str(public_presigned_url)
-
-
 def _check_s3_key_object_exists(s3_key: str) -> bool:
     """Checks if the object given by the s3 key exists.
 
@@ -391,7 +354,7 @@ def get_temporary_output_data_url(*, workflow_name: str) -> str:
                     assert s3_key is not None
                     s3_key = str(s3_key)
                     _check_s3_key_object_exists(s3_key)
-                    s3_url = _get_presigned_s3_url(s3_key)
+                    s3_url = build_signed_url(s3_key)
                     return s3_url
 
     err_msg = "Failed to find an output s3 location from workflow."
