@@ -8,6 +8,7 @@ import pytest
 from botocore.config import Config
 from botocore.response import StreamingBody
 from botocore.stub import Stubber
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from ogdc_runner import storage_links
@@ -66,6 +67,9 @@ def test_streams_object_for_valid_link(client, stubber):
     assert response.content == BODY
     assert response.headers["content-type"] == "application/zip"
     assert response.headers["content-length"] == str(len(BODY))
+    assert response.headers["content-disposition"].startswith(
+        'attachment; filename="published_zip"'
+    )
 
 
 def test_bad_signature_is_403_and_never_reaches_s3(client, stubber):  # noqa: ARG001
@@ -99,3 +103,24 @@ def test_missing_signing_key_fails_closed_with_503(client, stubber, monkeypatch)
     monkeypatch.delenv("OGDC_STORAGE_LINK_SIGNING_KEY")
 
     assert client.get(path).status_code == 503
+
+
+def test_missing_object_is_404(client, stubber):
+    stubber.add_client_error("get_object", service_error_code="NoSuchKey")
+
+    assert client.get(_link()).status_code == 404
+
+
+def test_unexpected_s3_error_is_502(client, stubber):
+    stubber.add_client_error("get_object", service_error_code="InternalError")
+
+    assert client.get(_link()).status_code == 502
+
+
+def test_route_matches_when_app_has_api_root_path(stubber):  # noqa: ARG001
+    prefixed = FastAPI(root_path="/api")
+    prefixed.include_router(storage_routes.router, prefix="/storage")
+
+    response = TestClient(prefixed).get(f"/storage/{KEY}")
+
+    assert response.status_code == 403

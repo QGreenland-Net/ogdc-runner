@@ -7,6 +7,12 @@ The signed link is the capability: it is minted by the (authenticated)
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from posixpath import basename
+from typing import Any
+from urllib.parse import quote
+
+from botocore.exceptions import ClientError
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from loguru import logger
@@ -20,6 +26,23 @@ from ogdc_runner.exceptions import (
 from ogdc_runner.publish import get_s3_bucket, get_s3_client
 
 router = APIRouter()
+
+_CHUNK_SIZE = 1024 * 1024
+
+
+def _content_disposition(s3_key: str) -> str:
+    name = basename(s3_key)
+    # Header values must be latin-1; offer an ASCII fallback plus RFC 5987 name.
+    fallback = "".join(c if c.isascii() and c.isprintable() else "_" for c in name)
+    fallback = fallback.replace('"', "_").replace("\\", "_")
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(name)}"
+
+
+def _iter_body(body: Any) -> Iterator[bytes]:
+    try:
+        yield from body.iter_chunks(chunk_size=_CHUNK_SIZE)
+    finally:
+        body.close()
 
 
 @router.get("/{s3_key:path}")
@@ -41,9 +64,20 @@ def get_stored_object(
             status_code=503, detail="Storage links are not configured."
         ) from e
 
-    response = get_s3_client().get_object(Bucket=get_s3_bucket(), Key=s3_key)
+    try:
+        response = get_s3_client().get_object(Bucket=get_s3_bucket(), Key=s3_key)
+    except ClientError as e:
+        code = e.response.get("Error", {}).get("Code")
+        if code in ("NoSuchKey", "404"):
+            raise HTTPException(status_code=404, detail="Object not found.") from e
+        logger.error(f"Failed to fetch s3 object {s3_key}: {code}")
+        raise HTTPException(status_code=502, detail="Storage backend error.") from e
+
     return StreamingResponse(
-        response["Body"].iter_chunks(chunk_size=1024 * 1024),
+        _iter_body(response["Body"]),
         media_type=response.get("ContentType", "application/octet-stream"),
-        headers={"Content-Length": str(response["ContentLength"])},
+        headers={
+            "Content-Length": str(response["ContentLength"]),
+            "Content-Disposition": _content_disposition(s3_key),
+        },
     )
