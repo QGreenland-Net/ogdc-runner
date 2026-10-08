@@ -9,9 +9,14 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from loguru import logger
 
 from ogdc_runner import storage_links
-from ogdc_runner.exceptions import OgdcInvalidStorageLink, OgdcStorageLinkExpired
+from ogdc_runner.exceptions import (
+    OgdcInvalidStorageLink,
+    OgdcMissingEnvvar,
+    OgdcStorageLinkExpired,
+)
 from ogdc_runner.publish import get_s3_bucket, get_s3_client
 
 router = APIRouter()
@@ -30,6 +35,11 @@ def get_stored_object(
         raise HTTPException(status_code=410, detail="Link has expired.") from e
     except OgdcInvalidStorageLink as e:
         raise HTTPException(status_code=403, detail="Invalid link.") from e
+    except OgdcMissingEnvvar as e:
+        logger.error(f"Storage links are not configured: {e}")
+        raise HTTPException(
+            status_code=503, detail="Storage links are not configured."
+        ) from e
 
     response = get_s3_client().get_object(Bucket=get_s3_bucket(), Key=s3_key)
     return StreamingResponse(
