@@ -81,3 +81,13 @@ def test_client_requires_credentials(monkeypatch, s3_credentials, missing):  # n
 
     with pytest.raises(OgdcMissingEnvvar, match=missing):
         publish.get_s3_client()
+
+
+def test_bucket_defaults_to_argo_workflows():
+    assert publish.get_s3_bucket() == "argo-workflows"
+
+
+def test_bucket_from_env(monkeypatch):
+    monkeypatch.setenv("S3_BUCKET", "ogdc-data")
+
+    assert publish.get_s3_bucket() == "ogdc-data"

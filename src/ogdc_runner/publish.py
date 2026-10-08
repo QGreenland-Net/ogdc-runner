@@ -281,6 +281,11 @@ def data_already_published(
     )
 
 
+def get_s3_bucket() -> str:
+    """Return the bucket holding argo artifacts and temporary outputs."""
+    return os.environ.get("S3_BUCKET", "argo-workflows")
+
+
 @cache
 def get_s3_client() -> botocore.client.S3:
     """Return an S3 client configured from the `S3_*` environment variables.
@@ -328,7 +333,7 @@ def _get_presigned_s3_url(s3_key: str) -> str:
         presigned_url = s3_client.generate_presigned_url(
             "get_object",
             Params={
-                "Bucket": "argo-workflows",
+                "Bucket": get_s3_bucket(),
                 "Key": s3_key,
             },
             # Time in seconds for the presigned URL to remain valid:
@@ -361,7 +366,7 @@ def _check_s3_key_object_exists(s3_key: str) -> bool:
     """
     s3_client = get_s3_client()
     try:
-        response = s3_client.head_object(Bucket="argo-workflows", Key=s3_key)
+        response = s3_client.head_object(Bucket=get_s3_bucket(), Key=s3_key)
         logger.info(
             f"Found object with key {s3_key}. Size: {response.get('ContentLength')}."
         )
