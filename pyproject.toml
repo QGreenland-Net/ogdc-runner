@@ -172,6 +172,7 @@ module = [
   "boto3",
   "botocore.exceptions",
   "botocore",
+  "botocore.config",
 ]
 ignore_missing_imports = true
 
