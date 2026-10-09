@@ -1,3 +1,8 @@
+## NEXT_VERSION
+
+- Use the `postgresql+psycopg2` SQLAlchemy driver explicitly so the service
+  starts with SQLAlchemy 2.1, where bare `postgresql` selects `psycopg` (v3).
+
 ## v0.4.2 (2026-08-19)
 
 - Fix PyPi publishing issues with github workflow.
