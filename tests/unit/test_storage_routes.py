@@ -124,3 +124,11 @@ def test_route_matches_when_app_has_api_root_path(stubber):  # noqa: ARG001
     response = TestClient(prefixed).get(f"/storage/{KEY}")
 
     assert response.status_code == 403
+
+
+def test_oversized_expires_is_403_not_500(client, stubber):  # noqa: ARG001
+    path = _link().partition("expires=")[0]
+
+    response = client.get(f"{path}expires={'9' * 5000}&signature={'0' * 64}")
+
+    assert response.status_code == 403

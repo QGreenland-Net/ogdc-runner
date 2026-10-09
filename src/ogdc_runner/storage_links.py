@@ -23,6 +23,8 @@ from ogdc_runner.exceptions import (
 # Time in seconds that a link remains valid: 2 hours.
 LINK_TTL_SECONDS = 60 * 120
 
+_MAX_EXPIRES_DIGITS = 12
+
 
 def _require_env(name: str) -> str:
     value = os.environ.get(name)
@@ -62,7 +64,15 @@ def verify(
     if not s3_key or s3_key.startswith("/") or ".." in s3_key:
         err_msg = "Invalid storage key."
         raise OgdcInvalidStorageLink(err_msg)
-    if not expires or not expires.isascii() or not expires.isdigit() or not signature:
+    # Bound the length before `int()`: Python 3.11+ raises `ValueError` for very
+    # long digit strings. 12 digits covers unix times far beyond year 9999.
+    if (
+        not expires
+        or len(expires) > _MAX_EXPIRES_DIGITS
+        or not expires.isascii()
+        or not expires.isdigit()
+        or not signature
+    ):
         err_msg = "Invalid storage link parameters."
         raise OgdcInvalidStorageLink(err_msg)
 

@@ -125,3 +125,11 @@ def test_verify_fails_closed_without_signing_key(monkeypatch):
 
     with pytest.raises(OgdcMissingEnvvar):
         storage_links.verify(KEY, str(NOW + 60), "0" * 64, now=NOW)
+
+
+@pytest.mark.parametrize("digits", [13, 5000])
+def test_verify_rejects_oversized_expiry_before_int_conversion(digits):
+    # Python 3.11+ raises ValueError from `int()` on >4300 digits; that must
+    # surface as an invalid link rather than an unhandled error.
+    with pytest.raises(OgdcInvalidStorageLink):
+        storage_links.verify(KEY, "9" * digits, _signed(), now=NOW)
