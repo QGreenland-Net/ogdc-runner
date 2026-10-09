@@ -1,4 +1,4 @@
-## Unreleased
+## NEXT_VERSION
 
 - Configure the S3 client with generic `S3_ENDPOINT_URL`, `S3_BUCKET`,
   `S3_REGION`, and `S3_ADDRESSING_STYLE` envvars (`INTERNAL_S3_ENDPOINT_URL` is
@@ -6,6 +6,9 @@
 - Serve temporary output links from the service under `/storage/...` using
   HMAC-signed, expiring links (`OGDC_STORAGE_LINK_SIGNING_KEY`) instead of
   host-rewritten S3 presigned URLs, which real S3 backends reject.
+- Harden `/storage`: reject oversized `expires` values with `403`, refuse
+  signing keys shorter than 32 characters or equal to `your-value-here`
+  (`503`), and answer `503`/`502` for unconfigured/unreachable S3.
 
 ## v0.4.2 (2026-08-19)
 
