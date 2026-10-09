@@ -31,7 +31,7 @@ def stubber(monkeypatch):
     )
     monkeypatch.setattr(storage_routes, "get_s3_client", lambda: client)
     monkeypatch.setenv("S3_BUCKET", "ogdc-data")
-    monkeypatch.setenv("OGDC_STORAGE_LINK_SIGNING_KEY", "route-test-key")
+    monkeypatch.setenv("OGDC_STORAGE_LINK_SIGNING_KEY", "route-test-key" * 3)
     monkeypatch.setenv("PUBLIC_S3_ENDPOINT_URL", "https://ogdc.example.test/storage")
     with Stubber(client) as stub:
         yield stub
@@ -132,3 +132,11 @@ def test_oversized_expires_is_403_not_500(client, stubber):  # noqa: ARG001
     response = client.get(f"{path}expires={'9' * 5000}&signature={'0' * 64}")
 
     assert response.status_code == 403
+
+
+@pytest.mark.parametrize("key", ["your-value-here", "x" * 31])
+def test_weak_signing_key_fails_closed_with_503(client, stubber, monkeypatch, key):  # noqa: ARG001
+    path = _link()
+    monkeypatch.setenv("OGDC_STORAGE_LINK_SIGNING_KEY", key)
+
+    assert client.get(path).status_code == 503

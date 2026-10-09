@@ -13,7 +13,7 @@ from ogdc_runner.exceptions import (
     OgdcStorageLinkExpired,
 )
 
-SIGNING_KEY = "unit-test-signing-key"
+SIGNING_KEY = "unit-test-signing-key-0123456789"
 KEY = "workflow-abc/published_zip.tgz"
 NOW = 1_800_000_000
 
@@ -133,3 +133,20 @@ def test_verify_rejects_oversized_expiry_before_int_conversion(digits):
     # surface as an invalid link rather than an unhandled error.
     with pytest.raises(OgdcInvalidStorageLink):
         storage_links.verify(KEY, "9" * digits, _signed(), now=NOW)
+
+
+@pytest.mark.parametrize("key", ["your-value-here", "x" * 31])
+def test_weak_or_placeholder_signing_key_is_refused(monkeypatch, key):
+    monkeypatch.setenv("OGDC_STORAGE_LINK_SIGNING_KEY", key)
+
+    with pytest.raises(OgdcMissingEnvvar, match=r"too short|placeholder") as exc:
+        storage_links.build_signed_url(KEY, now=NOW)
+    assert key not in str(exc.value)
+    with pytest.raises(OgdcMissingEnvvar, match=r"too short|placeholder"):
+        storage_links.verify(KEY, str(NOW + 60), "0" * 64, now=NOW)
+
+
+def test_signing_key_of_32_characters_is_accepted(monkeypatch):
+    monkeypatch.setenv("OGDC_STORAGE_LINK_SIGNING_KEY", "x" * 32)
+
+    storage_links.verify(KEY, str(NOW + 60), storage_links.sign(KEY, NOW + 60), now=NOW)

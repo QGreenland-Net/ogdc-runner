@@ -42,7 +42,7 @@ def s3(monkeypatch):
     fake = FakeS3()
     monkeypatch.setattr(publish, "get_s3_client", lambda: fake)
     monkeypatch.setenv("S3_BUCKET", "ogdc-data")
-    monkeypatch.setenv("OGDC_STORAGE_LINK_SIGNING_KEY", "k")
+    monkeypatch.setenv("OGDC_STORAGE_LINK_SIGNING_KEY", "k" * 32)
     monkeypatch.setenv("PUBLIC_S3_ENDPOINT_URL", "https://ogdc.example.test/storage")
     return fake
 

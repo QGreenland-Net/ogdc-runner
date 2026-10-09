@@ -24,6 +24,9 @@ from ogdc_runner.exceptions import (
 LINK_TTL_SECONDS = 60 * 120
 
 _MAX_EXPIRES_DIGITS = 12
+_SIGNING_KEY_ENVVAR = "OGDC_STORAGE_LINK_SIGNING_KEY"
+_MIN_SIGNING_KEY_LENGTH = 32
+_PLACEHOLDER_SIGNING_KEY = "your-value-here"
 
 
 def _require_env(name: str) -> str:
@@ -34,9 +37,25 @@ def _require_env(name: str) -> str:
     return value
 
 
+def _signing_key() -> bytes:
+    """Return the link signing key, refusing weak or placeholder values.
+
+    Any string is a valid HMAC key, so a short or shipped-placeholder key would
+    make links forgeable. Treat those as unconfigured. Never echo the value.
+    """
+    value = _require_env(_SIGNING_KEY_ENVVAR)
+    if len(value) < _MIN_SIGNING_KEY_LENGTH or value == _PLACEHOLDER_SIGNING_KEY:
+        err_msg = (
+            f"{_SIGNING_KEY_ENVVAR} is too short or is a placeholder; "
+            f"set a random secret of at least {_MIN_SIGNING_KEY_LENGTH} characters."
+        )
+        raise OgdcMissingEnvvar(err_msg)
+    return value.encode()
+
+
 def sign(s3_key: str, expires: int) -> str:
     """Return the hex HMAC-SHA256 signature for the given key and expiry."""
-    signing_key = _require_env("OGDC_STORAGE_LINK_SIGNING_KEY").encode()
+    signing_key = _signing_key()
     message = f"{s3_key}\n{expires}".encode()
     return hmac.new(signing_key, message, hashlib.sha256).hexdigest()
 
