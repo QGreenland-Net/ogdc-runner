@@ -6,12 +6,15 @@ import time
 import boto3
 import pytest
 from botocore.config import Config
+from botocore.exceptions import EndpointConnectionError
 from botocore.response import StreamingBody
 from botocore.stub import Stubber
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from loguru import logger
 
 from ogdc_runner import storage_links
+from ogdc_runner.exceptions import OgdcMissingEnvvar
 from ogdc_runner.service import storage_routes
 from ogdc_runner.service.main import app
 
@@ -140,3 +143,32 @@ def test_weak_signing_key_fails_closed_with_503(client, stubber, monkeypatch, ke
     monkeypatch.setenv("OGDC_STORAGE_LINK_SIGNING_KEY", key)
 
     assert client.get(path).status_code == 503
+
+
+def test_unconfigured_s3_client_is_503(client, stubber, monkeypatch):  # noqa: ARG001
+    def _missing():
+        raise OgdcMissingEnvvar("S3_ENDPOINT_URL must be set.")  # noqa: EM101
+
+    monkeypatch.setattr(storage_routes, "get_s3_client", _missing)
+
+    response = client.get(_link())
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Storage is not configured."
+
+
+def test_unreachable_s3_is_502_and_log_omits_signature(client, stubber, monkeypatch):  # noqa: ARG001
+    messages: list[str] = []
+    monkeypatch.setattr(logger, "error", messages.append)
+
+    class _Client:
+        def get_object(self, **_kwargs):
+            raise EndpointConnectionError(endpoint_url="http://s3.example.test")
+
+    monkeypatch.setattr(storage_routes, "get_s3_client", _Client)
+    path = _link()
+
+    assert client.get(path).status_code == 502
+    signature = path.rpartition("signature=")[2]
+    assert messages
+    assert not any(signature in m or "signature" in m for m in messages)

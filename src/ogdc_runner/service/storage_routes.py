@@ -12,7 +12,7 @@ from posixpath import basename
 from typing import Any
 from urllib.parse import quote
 
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from loguru import logger
@@ -71,6 +71,13 @@ def get_stored_object(
         if code in ("NoSuchKey", "404"):
             raise HTTPException(status_code=404, detail="Object not found.") from e
         logger.error(f"Failed to fetch s3 object {s3_key}: {code}")
+        raise HTTPException(status_code=502, detail="Storage backend error.") from e
+    except OgdcMissingEnvvar as e:
+        logger.error(f"Storage is not configured: {e}")
+        raise HTTPException(status_code=503, detail="Storage is not configured.") from e
+    except BotoCoreError as e:
+        # Only the key and exception type are logged; never the signed query.
+        logger.error(f"Failed to reach s3 for {s3_key}: {type(e).__name__}")
         raise HTTPException(status_code=502, detail="Storage backend error.") from e
 
     return StreamingResponse(
