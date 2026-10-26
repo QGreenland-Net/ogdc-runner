@@ -31,6 +31,7 @@ _CHUNK_SIZE = 1024 * 1024
 
 
 def _content_disposition(s3_key: str) -> str:
+    """Return an `attachment` Content-Disposition header named after the key."""
     name = basename(s3_key)
     # Header values must be latin-1; offer an ASCII fallback plus RFC 5987 name.
     fallback = "".join(c if c.isascii() and c.isprintable() else "_" for c in name)
@@ -39,6 +40,7 @@ def _content_disposition(s3_key: str) -> str:
 
 
 def _iter_body(body: Any) -> Iterator[bytes]:
+    """Yield the S3 body in chunks and always close it, even if the client leaves."""
     try:
         yield from body.iter_chunks(chunk_size=_CHUNK_SIZE)
     finally:
@@ -51,7 +53,12 @@ def get_stored_object(
     expires: str | None = None,
     signature: str | None = None,
 ) -> StreamingResponse:
-    """Stream the object for a valid, unexpired signed link."""
+    """Stream the object for a valid, unexpired signed link.
+
+    Answers `403` for an invalid link, `410` for an expired one, `404` for a
+    missing object, `502` for other S3 failures, and `503` when the signing key
+    or S3 is not configured.
+    """
     try:
         storage_links.verify(s3_key, expires, signature)
     except OgdcStorageLinkExpired as e:

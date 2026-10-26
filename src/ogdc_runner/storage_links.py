@@ -30,6 +30,7 @@ _PLACEHOLDER_SIGNING_KEY = "your-value-here"
 
 
 def _require_env(name: str) -> str:
+    """Return the value of envvar `name`, raising `OgdcMissingEnvvar` if unset or empty."""
     value = os.environ.get(name)
     if not value:
         err_msg = f"{name} must be set."

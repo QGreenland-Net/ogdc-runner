@@ -100,7 +100,10 @@ class WorkflowOutputResponse(pydantic.BaseModel):
     response_model=WorkflowOutputResponse,
 )
 def get_workflow_output(recipe_workflow_name: str) -> WorkflowOutputResponse:
-    """Get a presigned s3 url for the outputs of the given recipe workflow.
+    """Get a signed `/storage` download link for the outputs of the given workflow.
+
+    The link is minted by {func}`ogdc_runner.storage_links.build_signed_url` and
+    expires after {data}`ogdc_runner.storage_links.LINK_TTL_SECONDS`.
 
     TODO: support other output types. This assumes a temporary output stored on
     Argo's artifact s3 storage.
