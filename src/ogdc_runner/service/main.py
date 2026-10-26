@@ -17,7 +17,7 @@ from loguru import logger
 from starlette.middleware.sessions import SessionMiddleware
 
 from ogdc_runner import __version__
-from ogdc_runner.service import auth_routes, db
+from ogdc_runner.service import auth_routes, db, storage_routes
 from ogdc_runner.service.auth import auth_client
 
 
@@ -54,6 +54,9 @@ app.add_middleware(
 )
 
 app.include_router(auth_routes.router)
+# Signed-link downloads: served at the public `/storage/...` path, outside of
+# the authenticated routes (the signed link is the capability).
+app.include_router(storage_routes.router, prefix="/storage")
 
 
 class VersionResponse(pydantic.BaseModel):

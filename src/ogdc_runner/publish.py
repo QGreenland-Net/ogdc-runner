@@ -7,6 +7,7 @@ from functools import cache
 
 import boto3
 import botocore
+from botocore.config import Config
 from botocore.exceptions import ClientError
 from hera.workflows import (
     Artifact,
@@ -35,6 +36,7 @@ from ogdc_runner.models.recipe_config import (
     RecipeConfig,
     TemporaryRecipeOutput,
 )
+from ogdc_runner.storage_links import build_signed_url
 
 
 def _publish_template_for_pvc(
@@ -280,63 +282,43 @@ def data_already_published(
     )
 
 
+def get_s3_bucket() -> str:
+    """Return the bucket holding argo artifacts and temporary outputs."""
+    return os.environ.get("S3_BUCKET", "argo-workflows")
+
+
 @cache
-def _get_s3_client() -> botocore.client.S3:
+def get_s3_client() -> botocore.client.S3:
+    """Return an S3 client configured from the `S3_*` environment variables.
+
+    `S3_ENDPOINT_URL` falls back to the legacy `INTERNAL_S3_ENDPOINT_URL`.
+    """
     s3_secret_access_key_id = os.environ.get("S3_SECRET_KEY_ID")
     s3_secret_access_key = os.environ.get("S3_SECRET_KEY_KEY")
-    internal_s3_endpoint_url = os.environ.get("INTERNAL_S3_ENDPOINT_URL")
-    if not all(
-        (s3_secret_access_key_id, s3_secret_access_key, internal_s3_endpoint_url)
-    ):
-        err_msg = "S3_SECRET_KEY_ID, S3_SECRET_KEY_KEY, and INTERNAL_S3_ENDPOINT_URL must be set."
+    s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL") or os.environ.get(
+        "INTERNAL_S3_ENDPOINT_URL"
+    )
+    required = {
+        "S3_SECRET_KEY_ID": s3_secret_access_key_id,
+        "S3_SECRET_KEY_KEY": s3_secret_access_key,
+        "S3_ENDPOINT_URL": s3_endpoint_url,
+    }
+    missing = [name for name, value in required.items() if not value]
+    if missing:
+        err_msg = f"Missing required environment variable(s): {', '.join(missing)}."
         raise OgdcMissingEnvvar(err_msg)
 
-    s3_client = boto3.client(
+    return boto3.client(
         service_name="s3",
-        endpoint_url=internal_s3_endpoint_url,
+        endpoint_url=s3_endpoint_url,
+        region_name=os.environ.get("S3_REGION", "us-east-1"),
         aws_access_key_id=s3_secret_access_key_id,
         aws_secret_access_key=s3_secret_access_key,
+        config=Config(
+            s3={"addressing_style": os.environ.get("S3_ADDRESSING_STYLE", "path")},
+            signature_version="s3v4",
+        ),
     )
-
-    return s3_client
-
-
-def _get_presigned_s3_url(s3_key: str) -> str:
-    """Get a pre-signed s3 URL for the given s3 key.
-
-    This returns a URL that is only valid for 2 hours, allowing the user to
-    download the data before we clean it up.
-
-    See: https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-presigned-urls.html
-    """
-    s3_client = _get_s3_client()
-    try:
-        presigned_url = s3_client.generate_presigned_url(
-            "get_object",
-            Params={
-                "Bucket": "argo-workflows",
-                "Key": s3_key,
-            },
-            # Time in seconds for the presigned URL to remain valid:
-            # 2 hours.
-            ExpiresIn=60 * 120,
-        )
-        presigned_url = str(presigned_url)
-    except ClientError as e:
-        err_msg = f"Error creating pre-signed url for {s3_key}: {e}"
-        raise OgdcOutputDataRetrievalError(err_msg) from e
-
-    public_s3_endpoint_url = os.environ.get("PUBLIC_S3_ENDPOINT_URL")
-    internal_s3_endpoint_url = os.environ.get("INTERNAL_S3_ENDPOINT_URL")
-    if not all((internal_s3_endpoint_url, public_s3_endpoint_url)):
-        err_msg = "INTERNAL_S3_ENDPOINT_URL and PUBLIC_S3_ENDPOINT_URL must be set."
-        raise OgdcMissingEnvvar(err_msg)
-
-    public_presigned_url = presigned_url.replace(
-        str(internal_s3_endpoint_url), str(public_s3_endpoint_url)
-    )
-
-    return str(public_presigned_url)
 
 
 def _check_s3_key_object_exists(s3_key: str) -> bool:
@@ -345,9 +327,9 @@ def _check_s3_key_object_exists(s3_key: str) -> bool:
     Returns `True` if the object exists, otherwise raises an
     OgdcOutputDataRetrievalError.
     """
-    s3_client = _get_s3_client()
+    s3_client = get_s3_client()
     try:
-        response = s3_client.head_object(Bucket="argo-workflows", Key=s3_key)
+        response = s3_client.head_object(Bucket=get_s3_bucket(), Key=s3_key)
         logger.info(
             f"Found object with key {s3_key}. Size: {response.get('ContentLength')}."
         )
@@ -372,7 +354,7 @@ def get_temporary_output_data_url(*, workflow_name: str) -> str:
                     assert s3_key is not None
                     s3_key = str(s3_key)
                     _check_s3_key_object_exists(s3_key)
-                    s3_url = _get_presigned_s3_url(s3_key)
+                    s3_url = build_signed_url(s3_key)
                     return s3_url
 
     err_msg = "Failed to find an output s3 location from workflow."

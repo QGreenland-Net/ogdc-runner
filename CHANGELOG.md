@@ -1,3 +1,17 @@
+## NEXT_VERSION
+
+- Configure the S3 client with generic `S3_ENDPOINT_URL`, `S3_BUCKET`,
+  `S3_REGION`, and `S3_ADDRESSING_STYLE` envvars (`INTERNAL_S3_ENDPOINT_URL` is
+  still accepted as a fallback for `S3_ENDPOINT_URL`).
+- Serve temporary output links from the service under `/storage/...` using
+  HMAC-signed, expiring links (`OGDC_STORAGE_LINK_SIGNING_KEY`) instead of
+  host-rewritten S3 presigned URLs, which real S3 backends reject.
+- Harden `/storage`: reject oversized `expires` values with `403`, refuse
+  signing keys shorter than 32 characters or equal to `your-value-here` (`503`),
+  and answer `503`/`502` for unconfigured/unreachable S3.
+- Use the `postgresql+psycopg2` SQLAlchemy driver explicitly so the service
+  starts with SQLAlchemy 2.1, where bare `postgresql` selects `psycopg` (v3).
+
 ## v0.4.2 (2026-08-19)
 
 - Fix PyPi publishing issues with github workflow.

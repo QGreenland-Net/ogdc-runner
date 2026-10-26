@@ -77,3 +77,7 @@ def mock_dataone_node_url(monkeypatch):
         "DATAONE_NODE_URL",
         "https://arcticdata.io/metacat/d1/mn",
     )
+    monkeypatch.setenv(
+        "ENVIRONMENT",
+        "local",
+    )
