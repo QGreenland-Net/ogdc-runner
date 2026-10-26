@@ -9,6 +9,8 @@
 - Harden `/storage`: reject oversized `expires` values with `403`, refuse
   signing keys shorter than 32 characters or equal to `your-value-here`
   (`503`), and answer `503`/`502` for unconfigured/unreachable S3.
+- Use the `postgresql+psycopg2` SQLAlchemy driver explicitly so the service
+  starts with SQLAlchemy 2.1, where bare `postgresql` selects `psycopg` (v3).
 
 ## v0.4.2 (2026-08-19)
 
