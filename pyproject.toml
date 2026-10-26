@@ -130,6 +130,10 @@ filterwarnings = [
   "ignore:Using `httpx` with `starlette.testclient` is deprecated:DeprecationWarning",
   # AnyIO deprecation alias
   "ignore:The anyio\\.abc\\.BlockingPortal alias is deprecated:DeprecationWarning",
+  # Recent FastAPI (seen in 0.162) deprecates `FastAPI(root_path=...)` with a
+  # `UserWarning` subclass. The service still sets it from `API_ROOT_PATH`; moving it to
+  # `fastapi run --root-path` needs a coordinated ogdc-helm change.
+  "ignore:The `root_path` parameter is deprecated:UserWarning",
 ]
 log_cli_level = "INFO"
 testpaths = [
