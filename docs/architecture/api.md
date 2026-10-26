@@ -9,13 +9,13 @@ those nouns.
 ## Key Definitions
 
 Before getting to the actual API design, key resources and parameters are
-identified and defined, whether they become endpoints or not. These defnitions
+identified and defined, whether they become endpoints or not. These definitions
 can also be used to refine the `meta.yaml` schema.
 
 - **workflow**: a schedulable job that is specified by a specific recipe
 - **recipe**: a specific configuration and parameterization of one or more
-  executable templates, desined to be executed as a workflow
-- **template**: a re-usable, standalone definition of a task, including
+  executable templates, designed to be executed as a workflow
+- **template**: a reusable, standalone definition of a task, including
   configuration, executable, inputs, and outputs
   - **template-type**: one of shell, visualization, or future templates we might
     add and support with `ogdc-runner` as needed
