@@ -116,8 +116,8 @@ longer than 12 digits) or an unsafe key (`..` or a leading `/`), `410` for an
 expired link, `404` for a missing object, `502` for other S3 errors (including
 an unreachable endpoint), and `503` if the signing key or S3 is not configured.
 The signing key must be at least 32 characters and not the `your-value-here`
-placeholder; otherwise it is treated as not configured. Links are
-never created without a valid signing key.
+placeholder; otherwise it is treated as not configured. Links are never created
+without a valid signing key.
 
 The route lives at `/storage` in the application, outside of the authenticated
 routes. Route `/storage` to the service in the ingress without rewriting the
