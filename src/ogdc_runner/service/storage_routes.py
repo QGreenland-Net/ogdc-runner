@@ -1,8 +1,8 @@
 """Unauthenticated route serving objects behind signed `/storage` links.
 
 The signed link is the capability: it is minted by the (authenticated)
-`/output/{recipe_workflow_name}` route and verified here. See
-{mod}`ogdc_runner.storage_links` for why S3 presigned URLs are not used.
+`/workflows/{recipe_workflow_name}/output` route and verified here. See
+`ogdc_runner.storage_links` for why S3 presigned URLs are not used.
 """
 
 from __future__ import annotations

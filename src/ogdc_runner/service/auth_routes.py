@@ -102,8 +102,8 @@ class WorkflowOutputResponse(pydantic.BaseModel):
 def get_workflow_output(recipe_workflow_name: str) -> WorkflowOutputResponse:
     """Get a signed `/storage` download link for the outputs of the given workflow.
 
-    The link is minted by {func}`ogdc_runner.storage_links.build_signed_url` and
-    expires after {data}`ogdc_runner.storage_links.LINK_TTL_SECONDS`.
+    The link is minted by `ogdc_runner.storage_links.build_signed_url` and
+    expires after `ogdc_runner.storage_links.LINK_TTL_SECONDS` seconds (2 hours).
 
     TODO: support other output types. This assumes a temporary output stored on
     Argo's artifact s3 storage.
