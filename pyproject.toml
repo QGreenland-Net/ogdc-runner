@@ -30,7 +30,7 @@ classifiers = [
 # python project for the CLI and the service?
 dependencies = [
   "click >=8",
-  "pydantic >=2.7.1",
+  "pydantic>=2.7.1",
   "pyyaml>=6.0",
   "loguru",
   "fastapi[standard]",
@@ -39,7 +39,7 @@ dependencies = [
   "requests",
   "sqlmodel",
   # Required by sqlmodel to connect to postgresql
-  "psycopg2-binary",
+  "psycopg[binary]",
   # d1_python package
   "dataone.libclient>=3.5.0",
   # s3 API
@@ -120,7 +120,7 @@ xfail_strict = true
 filterwarnings = [
   "error",
   # Hera still calls Pydantic's deprecated `json()` while submitting workflows.
-  "ignore:The `json` method is deprecated; use `model_dump_json` instead\\.:pydantic.warnings.PydanticDeprecatedSince20:hera\\.workflows\\.service",
+  "ignore:The `json` method is deprecated; use `model_dump_json` instead\\.:DeprecationWarning:hera\\.workflows\\.service",
   # Ignore insecure request warnings in tests. We run against a server that uses
   # a self-signed (unverified) cert in test, so this must be ignored or pytest
   # will raise errors about the insecure connection attempt.
@@ -128,6 +128,12 @@ filterwarnings = [
   # Ignore warnings about httpx being deprecated - this is a super new change (May 2026), better to see how it plays out before doing full refactor
   "ignore:Using `httpx` with `starlette.testclient` is deprecated:UserWarning",
   "ignore:Using `httpx` with `starlette.testclient` is deprecated:DeprecationWarning",
+  # AnyIO deprecation alias
+  "ignore:The anyio\\.abc\\.BlockingPortal alias is deprecated:DeprecationWarning",
+  # FastAPI deprecates `FastAPI(root_path=...)` (seen in 0.162). The app still
+  # needs it to honor API_ROOT_PATH, so ignore the warning rather than change
+  # routing. Category is UserWarning because FastAPIDeprecationWarning subclasses it.
+  "ignore:The `root_path` parameter is deprecated:UserWarning",
 ]
 log_cli_level = "INFO"
 testpaths = [
@@ -225,3 +231,8 @@ isort.required-imports = ["from __future__ import annotations"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
