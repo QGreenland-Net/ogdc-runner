@@ -12,7 +12,13 @@ from urllib.parse import urlparse
 import click
 import requests
 import urllib3
-from dataone.auth import is_token_valid, parse_tokens_dict, refresh_tokens
+from dataone.auth import (
+    ACCESS_MODE_AUTHENTICATED,
+    ACCESS_MODE_OPEN,
+    is_token_valid,
+    parse_tokens_dict,
+    refresh_tokens,
+)
 from pydantic import ValidationError
 
 from ogdc_runner.exceptions import (
@@ -33,17 +39,19 @@ class Config:
         self.env = os.environ.get("ENVIRONMENT")
         self.verify_ssl = True
 
+        # Require authentication by default. Only local development will be "open".
+        self.access_mode = ACCESS_MODE_AUTHENTICATED
+
         if self.env == "local":
             self.default_url = "https://localhost:7443/api"
             self.verify_ssl = False
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            self.access_mode = "open"
+            # Open access mode in local development.
+            self.access_mode = ACCESS_MODE_OPEN
         elif self.env == "dev":
             self.default_url = "https://ogdc.test.dataone.org/api"
-            self.access_mode = "authenticated"
         else:
             self.default_url = "https://ogdc.dataone.org/api"
-            self.access_mode = "authenticated"
 
         self.api_url = os.environ.get("OGDC_API_URL", self.default_url)
 
@@ -114,7 +122,7 @@ def _check_ogdc_api_error(response: requests.Response) -> None:
 def _get_workflow_status(config: Config, workflow_name: str) -> str:
     """Get the given workflow's status as a string."""
     headers = {}
-    if config.access_mode != "open":
+    if config.access_mode != ACCESS_MODE_OPEN:
         headers["Authorization"] = f"Bearer {_get_api_token(config)}"
 
     response = config.session.get(
@@ -248,7 +256,7 @@ def submit(ctx: click.Context, recipe_path: str, wait: bool, overwrite: bool) ->
     config = ctx.obj
 
     headers = {}
-    if config.access_mode != "open":
+    if config.access_mode != ACCESS_MODE_OPEN:
         headers["Authorization"] = f"Bearer {_get_api_token(config)}"
 
     response = config.session.post(
@@ -338,7 +346,7 @@ def _download_output_for_workflow(
 ) -> None:
 
     headers = {}
-    if config.access_mode != "open":
+    if config.access_mode != ACCESS_MODE_OPEN:
         headers["Authorization"] = f"Bearer {_get_api_token(config)}"
 
     response = config.session.get(
