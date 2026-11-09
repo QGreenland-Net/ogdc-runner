@@ -5,6 +5,9 @@
 # networking issue in non-local environments.  For context, see:
 # https://github.com/QGreenland-Net/ogdc-helm/issues/31
 FROM ghcr.io/osgeo/gdal:ubuntu-full-3.13.1
+
+ENV API_ROOT_PATH="/"
+
 # We use and wget to fetch data from remote sources.
 # libpq-dev is required for connecting to postgresql db
 RUN apt update && apt install -y wget rsync pip python3-venv libpq-dev zip netcdf-bin libnetcdf-dev git
@@ -16,4 +19,4 @@ RUN python -m venv .venv && . ./.venv/bin/activate && pip install --editable .
 EXPOSE 8000
 
 # Default to running the production fastapi server
-CMD . ./.venv/bin/activate && fastapi run --port 8000 --host 0.0.0.0 --forwarded-allow-ips="*" src/ogdc_runner/service/main.py
+CMD . ./.venv/bin/activate && fastapi run --root-path "$API_ROOT_PATH" --port 8000 --host 0.0.0.0 --forwarded-allow-ips="*" src/ogdc_runner/service/main.py
