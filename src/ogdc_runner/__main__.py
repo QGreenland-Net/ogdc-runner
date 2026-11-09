@@ -19,6 +19,7 @@ from dataone.auth import (
     parse_tokens_dict,
     refresh_tokens,
 )
+from loguru import logger
 from pydantic import ValidationError
 
 from ogdc_runner.exceptions import (
@@ -52,6 +53,15 @@ class Config:
             self.default_url = "https://ogdc.test.dataone.org/api"
         else:
             self.default_url = "https://ogdc.dataone.org/api"
+
+        # Allow override via `ACCESS_MODE` envvar, which is typically used in
+        # the service definition to set auth workflow.
+        user_access_mode = os.environ.get("ACCESS_MODE")
+        if user_access_mode and user_access_mode != self.access_mode:
+            logger.warning(
+                f"User set ACCESS_MODE={user_access_mode} but default for {self.env} is '{self.access_mode}'."
+            )
+            self.access_mode = user_access_mode
 
         self.api_url = os.environ.get("OGDC_API_URL", self.default_url)
 
