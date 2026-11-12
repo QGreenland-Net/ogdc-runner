@@ -90,46 +90,12 @@ This API is a work in progress.
   - **Description** Re-validate the user session and return a new access token
     using the refresh token.
 
-## Recipe Configuration
+## Potential Recipe Configuration
 
-With the above in mind, it would be beneficial to also be consistent within the
-recipe schema.
+With the above service API in mind, it would be beneficial to also be consistent
+within the recipe schema. See
+[Issue #172](https://github.com/QGreenland-Net/ogdc-runner/issues/172) for ideas
+on how we could update the recipe configuration to match the service API
+definitions.
 
-Example for recipe-type `shell`
-
-```
-name: "Greenland Ice Sheet sea-level contribution"
-version: 1.0.0
-
-recipe:
-  type: "shell"
-  command: "bash -c 'for nc_file in /input_dir/*.nc; do base_name=$(basename "$nc_file" .nc); echo "Processing $nc_file..."; gdal_translate -of GTiff -co COMPRESS=LZW "$nc_file" "/output_dir/${base_name}_epsg3413.tif"; done && echo "Complete! Created $(ls /output_dir/*.tif 2>/dev/null | wc -l) files"'"
-
-inputs:
-  datasets:
-    - type: "dataone"
-      dataset_identifier: "resource_map_doi:10.18739/A29G5GD39"
-      filename: "percent_gris_*.nc"
-
-output:
-  type: "temporary"
-```
-
-Example for recipe-type `visualization`
-
-```
-name: "ADC Visualization workflow"
-
-recipe:
-  type: "visualization"
-
-input:
-  datasets:
-    - type: "url"
-      value: "https://demo.arcticdata.io/tiles/OGDC/QGnet/viz-workflow/ice_basins.gpkg"
-  parameters:
-    config_file: "config.json"
-
-output:
-  type: "local"
-```
+The current recipe configuration is documented in [OGDC Recipes](../recipes.md).
