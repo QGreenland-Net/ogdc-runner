@@ -1,4 +1,4 @@
-# API Design
+# OGDC API v1 Design Guide
 
 This document is to outline the API design for version 1.0.0 of
 `ogdc-workflows`. The goal of the design is to follow RESTful best practices,
