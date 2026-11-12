@@ -12,7 +12,8 @@ This API is a work in progress.
 
 - **workflow**: a schedulable job that is specified by a specific recipe
 - **recipe**: a specific configuration and parameterization of one or more
-  executable templates, designed to be executed as a workflow
+  executable templates, designed to be executed as a workflow. See
+  [OGDC Recipes](../recipes.md).
 - **template**: a reusable, standalone definition of a task, including
   configuration, executable, inputs, and outputs
   - **template-type**: one of shell, visualization, or future templates we might
