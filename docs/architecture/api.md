@@ -40,18 +40,30 @@ This API is a work in progress.
 
 #### Planned:
 
+These API endpoints require that we
+[Track recipe executions in db](https://github.com/QGreenland-Net/ogdc-runner/issues/148).
+
 - **`GET /workflows`**
   - **Description:** Retrieves a list of workflows submitted by the user.
   - **Request Body:** limit, offset
-- **`DELETE /workflows/{recipe_workflow_name}`**
-  - **Description:** Cleanly cancels a pending or running workflow.
 - **`GET /workflows/{recipe_workflow_name}/recipe`**
   - **Description:** Retrieves the exact recipe used to execute the workflow
     (e.g., `meta.yaml` + `recipe.sh`).
 
+- **`DELETE /workflows/{recipe_workflow_name}`**
+  - **Description:** Cleanly cancels a pending or running workflow.
+
 ### 2. Recipes (`/recipes`)
 
 #### Planned:
+
+We expect recipes to be maintained in the
+[ogdc-recipes](https://github.com/QGreenland-Net/ogdc-recipes/) repository, and
+a user can always look there for the latest information about available recipes.
+
+Apsirationally, we would like to register recipes with the system for easy
+queries and history retrieval. Requires
+[Track recipe executions in db](https://github.com/QGreenland-Net/ogdc-runner/issues/148).
 
 - **`GET /recipes`**
   - **Description:** Retrieves a list of all available geospatial processing
@@ -73,6 +85,9 @@ This API is a work in progress.
   - **Description:** Retrieves the current OGDC runner version.
 
 #### Planned:
+
+Requires
+[Make recipe submissions fully async](https://github.com/QGreenland-Net/ogdc-runner/issues/171)
 
 - **`GET /queue`**
   - **Description:** Retrieves a list of pending workflows currently waiting in
