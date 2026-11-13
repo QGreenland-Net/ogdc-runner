@@ -77,11 +77,20 @@ nitpick_ignore = [
     ("py:class", "hera.workflows.models.Volume"),
     ("py:class", "hera.workflows.models.VolumeMount"),
     ("py:class", "sqlalchemy.engine.base.Engine"),
+    ("py:class", "pydantic.Field"),
     # TODO: this one seems wrong...Why are we getting this warning:
     # <unknown>:1: WARNING: py:class reference target not found: list[dict[str [ref.class]
     # There is no other context except that warning
     ("py:class", "list[dict[str"),
 ]
+
+autodoc_default_options = {
+    # Exclude forward references from pydantic models
+    # E.g.,: `WARNING: Cannot resolve forward reference in type annotations of
+    # "ogdc_runner.models.recipe_config.Field" (module pydantic.fields): name
+    # 'JsonValue' is not defined [sphinx_autodoc_typehints.forward_reference]`
+    "exclude-members": "Field,computed_field",
+}
 
 always_document_param_types = True
 

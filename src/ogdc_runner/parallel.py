@@ -11,12 +11,16 @@ The maximum parallelism is controlled at the workflow level, allowing the
 Argo workflow engine to automatically schedule tasks as resources become available.
 
 Example:
+
+.. code-block:: python
+
     orchestrator = ShellParallelExecutionOrchestrator(
         recipe_config=recipe_config,
         execution_function=ExecutionFunction(name="cmd-0", command="process.sh"),
     )
     template = orchestrator.create_execution_template()
     tasks = orchestrator.create_parallel_tasks(template)
+
 """
 
 from __future__ import annotations
