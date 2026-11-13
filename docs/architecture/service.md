@@ -1,9 +1,9 @@
-# OGDC Service API
+# OGDC Service
 
-The `ogdc-runner` service API sits between users of the CLI and
-[Argo Workflows](https://argo-workflows.readthedocs.io/en/latest/). It is
-responsible for translating user recipes into workflows that are submitted to
-and executed by Argo.
+The `ogdc-runner` service provides an [API](./api.md) that sits between users of
+the CLI and [Argo Workflows](https://argo-workflows.readthedocs.io/en/latest/).
+It is responsible for translating user recipes into workflows that are submitted
+to and executed by Argo.
 
 The service interface is defined using [FastAPI](https://fastapi.tiangolo.com/).
 See the
