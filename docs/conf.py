@@ -61,11 +61,17 @@ autodoc_mock_imports = [
 
 
 nitpick_ignore = [
-    ("py:class", "hera.workflows.WorkflowsService"),
-    ("py:class", "hera.workflows.Workflow"),
-    ("py:class", "hera.workflows.Container"),
-    ("py:class", "_io.StringIO"),
     ("py:class", "_io.BytesIO"),
+    ("py:class", "_io.StringIO"),
+    ("py:class", "hera.workflows.Container"),
+    ("py:class", "hera.workflows.Parameter"),
+    ("py:class", "hera.workflows.Task"),
+    ("py:class", "hera.workflows.Workflow"),
+    ("py:class", "hera.workflows.WorkflowsService"),
+    ("py:class", "hera.workflows.models.RetryStrategy"),
+    ("py:class", "hera.workflows.models.Volume"),
+    ("py:class", "hera.workflows.models.VolumeMount"),
+    ("py:class", "sqlalchemy.engine.base.Engine"),
 ]
 
 always_document_param_types = True
