@@ -64,12 +64,6 @@ def test_ci(session: nox.Session) -> None:
     pass
 
 
-@nox.session(requires=["test_ci", "test_integration"])
-def tests(session: nox.Session) -> None:
-    """Run all the tests."""
-    pass
-
-
 @nox.session(reuse_venv=True)
 def docs(session: nox.Session) -> None:
     """Build the docs. Pass "--serve" to serve. Pass "-b linkcheck" to check links."""
@@ -113,6 +107,35 @@ def docs(session: nox.Session) -> None:
         )
     else:
         session.run("sphinx-build", "--keep-going", *shared_args)
+
+
+@nox.session(reuse_venv=True)
+def test_docs(session: nox.Session) -> None:
+    """Test that the docs build successfully."""
+
+    session.install("-e.[docs]")
+
+    session.run("rm", "-rf", "docs/_build/html/", external=True)
+    try:
+        session.run(
+            "sphinx-build",
+            "-b",
+            "html",
+            "-n",
+            "-W",
+            "--keep-going",
+            "docs",
+            "docs/_build/html",
+            env={"ACCESS_MODE": "open"},
+        )
+    finally:
+        session.run("rm", "-rf", "docs/_build/html/", external=True)
+
+
+@nox.session(requires=["test_ci", "test_integration", "test_docs"])
+def tests(session: nox.Session) -> None:
+    """Run all the tests."""
+    pass
 
 
 @nox.session
