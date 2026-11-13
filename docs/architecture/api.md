@@ -62,7 +62,7 @@ We expect recipes to be maintained in the
 [ogdc-recipes](https://github.com/QGreenland-Net/ogdc-recipes/) repository, and
 a user can always look there for the latest information about available recipes.
 
-Apsirationally, we would like to register recipes with the system for easy
+Aspirationally, we would like to register recipes with the system for easy
 queries and history retrieval. Requires
 [Track recipe executions in db](https://github.com/QGreenland-Net/ogdc-runner/issues/148).
 
