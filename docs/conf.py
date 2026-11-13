@@ -60,9 +60,13 @@ autodoc_mock_imports = [
 ]
 
 
+# Ignore references that cannot be resolved by sphinx (mostly 3rd-party
+# libraries)
 nitpick_ignore = [
     ("py:class", "_io.BytesIO"),
     ("py:class", "_io.StringIO"),
+    ("py:class", "fastapi.FastAPI"),
+    ("py:class", "fastapi.Request"),
     ("py:class", "hera.workflows.Container"),
     ("py:class", "hera.workflows.Parameter"),
     ("py:class", "hera.workflows.Task"),
@@ -72,6 +76,10 @@ nitpick_ignore = [
     ("py:class", "hera.workflows.models.Volume"),
     ("py:class", "hera.workflows.models.VolumeMount"),
     ("py:class", "sqlalchemy.engine.base.Engine"),
+    # TODO: this one seems wrong...Why are we getting this warning:
+    # <unknown>:1: WARNING: py:class reference target not found: list[dict[str [ref.class]
+    # There is no other context except that warning
+    ("py:class", "list[dict[str"),
 ]
 
 always_document_param_types = True
