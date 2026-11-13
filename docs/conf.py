@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import subprocess
 import sys
 from pathlib import Path
@@ -109,6 +110,46 @@ def _run_apidoc_cmd(app: Any) -> None:
         ],
         check=True,
     )
+
+    def _install_duplicate_warning_filter() -> None:
+        """Hack: filter out warnings about duplicate references.
+
+        Warnings are produced when we import objects in a module's `__init__.py`
+        to expose via `__all__`. E.g.:
+
+        ```
+        <unknown>:1: WARNING: duplicate object description of
+        ogdc_runner.models.ExecutionFunction.command, other instance in
+        api/ogdc_runner.models, use :no-index: for one of them
+
+        ```
+
+        Because we have autodoc generate all the rst files, we can't add
+        `:no-index:` manually.
+
+        Ignoring this seems to be fine - the docs still render the way I expect
+        them to.
+        """
+
+        class IgnoreDuplicateObjectDescription(logging.Filter):
+            def filter(self, record: logging.LogRecord) -> bool:
+                return (
+                    not record.getMessage()
+                    .lower()
+                    .startswith("duplicate object description of ")
+                )
+
+        sphinx_logger = logging.getLogger("sphinx")
+
+        for handler in sphinx_logger.handlers:
+            if handler.level == logging.WARNING:
+                handler.filters.insert(0, IgnoreDuplicateObjectDescription())
+                return
+
+        err = "Could not find Sphinx's warning handler"
+        raise RuntimeError(err)
+
+    _install_duplicate_warning_filter()
 
 
 def setup(app: Any) -> None:
