@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import subprocess
 import sys
 from pathlib import Path
@@ -60,13 +61,36 @@ autodoc_mock_imports = [
 ]
 
 
+# Ignore references that cannot be resolved by sphinx (mostly 3rd-party
+# libraries)
 nitpick_ignore = [
-    ("py:class", "hera.workflows.WorkflowsService"),
-    ("py:class", "hera.workflows.Workflow"),
-    ("py:class", "hera.workflows.Container"),
-    ("py:class", "_io.StringIO"),
     ("py:class", "_io.BytesIO"),
+    ("py:class", "_io.StringIO"),
+    ("py:class", "fastapi.FastAPI"),
+    ("py:class", "fastapi.Request"),
+    ("py:class", "hera.workflows.Container"),
+    ("py:class", "hera.workflows.Parameter"),
+    ("py:class", "hera.workflows.Task"),
+    ("py:class", "hera.workflows.Workflow"),
+    ("py:class", "hera.workflows.WorkflowsService"),
+    ("py:class", "hera.workflows.models.RetryStrategy"),
+    ("py:class", "hera.workflows.models.Volume"),
+    ("py:class", "hera.workflows.models.VolumeMount"),
+    ("py:class", "sqlalchemy.engine.base.Engine"),
+    ("py:class", "pydantic.Field"),
+    # TODO: this one seems wrong...Why are we getting this warning:
+    # <unknown>:1: WARNING: py:class reference target not found: list[dict[str [ref.class]
+    # There is no other context except that warning
+    ("py:class", "list[dict[str"),
 ]
+
+autodoc_default_options = {
+    # Exclude forward references from pydantic models
+    # E.g.,: `WARNING: Cannot resolve forward reference in type annotations of
+    # "ogdc_runner.models.recipe_config.Field" (module pydantic.fields): name
+    # 'JsonValue' is not defined [sphinx_autodoc_typehints.forward_reference]`
+    "exclude-members": "Field,computed_field",
+}
 
 always_document_param_types = True
 
@@ -95,6 +119,46 @@ def _run_apidoc_cmd(app: Any) -> None:
         ],
         check=True,
     )
+
+    def _install_duplicate_warning_filter() -> None:
+        """Hack: filter out warnings about duplicate references.
+
+        Warnings are produced when we import objects in a module's `__init__.py`
+        to expose via `__all__`. E.g.:
+
+        ```
+        <unknown>:1: WARNING: duplicate object description of
+        ogdc_runner.models.ExecutionFunction.command, other instance in
+        api/ogdc_runner.models, use :no-index: for one of them
+
+        ```
+
+        Because we have autodoc generate all the rst files, we can't add
+        `:no-index:` manually.
+
+        Ignoring this seems to be fine - the docs still render the way I expect
+        them to.
+        """
+
+        class IgnoreDuplicateObjectDescription(logging.Filter):
+            def filter(self, record: logging.LogRecord) -> bool:
+                return (
+                    not record.getMessage()
+                    .lower()
+                    .startswith("duplicate object description of ")
+                )
+
+        sphinx_logger = logging.getLogger("sphinx")
+
+        for handler in sphinx_logger.handlers:
+            if handler.level == logging.WARNING:
+                handler.filters.insert(0, IgnoreDuplicateObjectDescription())
+                return
+
+        err = "Could not find Sphinx's warning handler"
+        raise RuntimeError(err)
+
+    _install_duplicate_warning_filter()
 
 
 def setup(app: Any) -> None:

@@ -157,7 +157,7 @@ def resolve_dataone_input(
 
     Args:
         dataset_identifier: Dataset/package PID
-        filename: Optional - filename pattern to filter objects. Supports wildcards (*, ?)
+        filename: Optional - filename pattern to filter objects. Supports wildcards (`*`, `?`)
 
     Returns:
         List of data objects with URLs and metadata

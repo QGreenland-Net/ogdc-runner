@@ -470,7 +470,7 @@ def OgdcWorkflow(
       to allow sufficient type for the submitter of the recipe to retrieve the
       results. Otherwise this is left unset.
 
-    All other kwargs are passed directly to `argo.workflows.Workflow.
+    All other kwargs are passed directly to `argo.workflows.Workflow`.
     """
     validate_recipe_input_pvcs_allowed(recipe_config)
 

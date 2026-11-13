@@ -51,3 +51,24 @@ jobs:
       - name: "Test package"
         # prettier-ignore
         run: "nox -s test_ci"
+
+  test_docs:
+    name: "Test docs render correctly and without warnings"
+
+    runs-on: "ubuntu-latest"
+
+    steps:
+      - uses: "actions/checkout@v7"
+        with:
+          fetch-depth: 0
+
+      - uses: "actions/setup-python@v7"
+        with:
+          python-version: "3.12"
+          allow-prereleases: true
+
+      - name: "Install docs packages"
+        run: "python -m pip install nox"
+
+      - name: "Test docs build without warnings"
+        run: "nox -s test_docs"
