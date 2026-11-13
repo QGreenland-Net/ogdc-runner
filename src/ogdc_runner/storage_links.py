@@ -1,0 +1,105 @@
+"""Signed, expiring links to objects served by the OGDC service under `/storage`.
+
+Presigned S3 URLs bind the signature to the S3 host and path, so they cannot be
+re-hosted under the public OGDC hostname. Instead, we sign
+`"{s3_key}\\n{expires}"` with an HMAC key that only the service knows, and the
+service streams the object from S3 when a valid link is requested.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import hmac
+import os
+import time
+from urllib.parse import quote
+
+from ogdc_runner.exceptions import (
+    OgdcInvalidStorageLink,
+    OgdcMissingEnvvar,
+    OgdcStorageLinkExpired,
+)
+
+# Time in seconds that a link remains valid: 2 hours.
+LINK_TTL_SECONDS = 60 * 120
+
+_MAX_EXPIRES_DIGITS = 12
+_SIGNING_KEY_ENVVAR = "OGDC_STORAGE_LINK_SIGNING_KEY"
+_MIN_SIGNING_KEY_LENGTH = 32
+_PLACEHOLDER_SIGNING_KEY = "your-value-here"
+
+
+def _require_env(name: str) -> str:
+    """Return the value of envvar `name`, raising `OgdcMissingEnvvar` if unset or empty."""
+    value = os.environ.get(name)
+    if not value:
+        err_msg = f"{name} must be set."
+        raise OgdcMissingEnvvar(err_msg)
+    return value
+
+
+def _signing_key() -> bytes:
+    """Return the link signing key, refusing weak or placeholder values.
+
+    Any string is a valid HMAC key, so a short or shipped-placeholder key would
+    make links forgeable. Treat those as unconfigured. Never echo the value.
+    """
+    value = _require_env(_SIGNING_KEY_ENVVAR)
+    if len(value) < _MIN_SIGNING_KEY_LENGTH or value == _PLACEHOLDER_SIGNING_KEY:
+        err_msg = (
+            f"{_SIGNING_KEY_ENVVAR} is too short or is a placeholder; "
+            f"set a random secret of at least {_MIN_SIGNING_KEY_LENGTH} characters."
+        )
+        raise OgdcMissingEnvvar(err_msg)
+    return value.encode()
+
+
+def sign(s3_key: str, expires: int) -> str:
+    """Return the hex HMAC-SHA256 signature for the given key and expiry."""
+    signing_key = _signing_key()
+    message = f"{s3_key}\n{expires}".encode()
+    return hmac.new(signing_key, message, hashlib.sha256).hexdigest()
+
+
+def build_signed_url(s3_key: str, *, now: float | None = None) -> str:
+    """Return a public, signed link for the given s3 key."""
+    public_base = _require_env("PUBLIC_S3_ENDPOINT_URL").rstrip("/")
+    expires = int((time.time() if now is None else now) + LINK_TTL_SECONDS)
+    signature = sign(s3_key, expires)
+    return f"{public_base}/{quote(s3_key)}?expires={expires}&signature={signature}"
+
+
+def verify(
+    s3_key: str,
+    expires: str | None,
+    signature: str | None,
+    *,
+    now: float | None = None,
+) -> None:
+    """Validate a signed link.
+
+    Raises `OgdcInvalidStorageLink` for unsafe keys, malformed parameters, or a
+    bad signature, and `OgdcStorageLinkExpired` for a valid but expired link.
+    """
+    if not s3_key or s3_key.startswith("/") or ".." in s3_key:
+        err_msg = "Invalid storage key."
+        raise OgdcInvalidStorageLink(err_msg)
+    # Bound the length before `int()`: Python 3.11+ raises `ValueError` for very
+    # long digit strings. 12 digits covers unix times far beyond year 9999.
+    if (
+        not expires
+        or len(expires) > _MAX_EXPIRES_DIGITS
+        or not expires.isascii()
+        or not expires.isdigit()
+        or not signature
+    ):
+        err_msg = "Invalid storage link parameters."
+        raise OgdcInvalidStorageLink(err_msg)
+
+    expected = sign(s3_key, int(expires))
+    if not hmac.compare_digest(expected.encode(), signature.encode()):
+        err_msg = "Invalid storage link signature."
+        raise OgdcInvalidStorageLink(err_msg)
+    if int(expires) < (time.time() if now is None else now):
+        err_msg = "Storage link has expired."
+        raise OgdcStorageLinkExpired(err_msg)

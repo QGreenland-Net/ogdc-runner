@@ -30,7 +30,7 @@ def get_engine() -> sqlalchemy.engine.base.Engine:
 
     engine = create_engine(
         sqlalchemy.engine.URL.create(
-            drivername="postgresql",
+            drivername="postgresql+psycopg2",
             username=db_user,
             password=db_pass,
             host=db_host,
