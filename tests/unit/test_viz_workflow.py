@@ -91,7 +91,10 @@ def _render_viz_workflow(config: RecipeConfig) -> dict[str, Any]:
         return "test-workflow"
 
     with patch("ogdc_runner.workflow.viz_workflow.submit_workflow", fake_submit):
-        assert make_and_submit_viz_workflow(config, wait=False) == "test-workflow"
+        assert (
+            make_and_submit_viz_workflow(recipe_config=config, identifier="test")
+            == "test-workflow"
+        )
 
     return rendered_workflows[0]
 

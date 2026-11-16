@@ -1276,6 +1276,7 @@ def _setup_directories(
 
 
 def make_and_submit_viz_workflow(
+    *,
     recipe_config: RecipeConfig,
     identifier: str,
 ) -> str:

@@ -510,6 +510,7 @@ def _create_sequential_workflow(
 
 
 def make_and_submit_shell_workflow(
+    *,
     recipe_config: RecipeConfig,
     identifier: str,
 ) -> str:

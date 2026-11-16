@@ -72,7 +72,9 @@ def test_parallel_shell_workflow_uses_retained_partition_manifests(
 
     with patch("ogdc_runner.workflow.shell.submit_workflow", fake_submit):
         assert (
-            make_and_submit_shell_workflow(sample_recipe_config, wait=False)
+            make_and_submit_shell_workflow(
+                recipe_config=sample_recipe_config, identifier="test"
+            )
             == "test-workflow"
         )
 
