@@ -399,7 +399,9 @@ def get_workflow_status(identifier: str) -> str | None:
     # try fetching by name first (cheapest operation)
     try:
         workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=identifier)
-        return workflow.status.phase
+        # Note: ignore the type-error here so we can catch the exception below
+        # and try getting the workflow via label-selector instead.
+        return workflow.status.phase  # type: ignore[union-attr]
     except Exception:
         workflows = None
 
@@ -412,7 +414,12 @@ def get_workflow_status(identifier: str) -> str | None:
             return None
 
         # Now 'workflows' is guaranteed to exist (either as None or the response)
-        if workflows and workflows.items and len(workflows.items) > 0:
+        if (
+            workflows  # type: ignore[truthy-bool]
+            and workflows.items
+            and len(workflows.items) > 0
+            and workflows.items[0].status
+        ):
             return workflows.items[0].status.phase
 
     return None
