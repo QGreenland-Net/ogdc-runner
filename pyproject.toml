@@ -52,7 +52,7 @@ dependencies = [
 
 # NOTE: "test" and "dev" are duplicated; why do we need both?
 test = [
-  "mypy ~=1.10.0",
+  "mypy ~=1.15",
   "pytest >=6",
   "pytest-cov >=3",
   "pytest-order",
@@ -183,9 +183,7 @@ module = [
   "boto3",
   "botocore.exceptions",
   "botocore",
-  "botocore.config",
-  "botocore.response",
-  "botocore.stub",
+  "botocore.*",
 ]
 ignore_missing_imports = true
 
