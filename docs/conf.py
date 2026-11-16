@@ -82,6 +82,8 @@ nitpick_ignore = [
     # <unknown>:1: WARNING: py:class reference target not found: list[dict[str [ref.class]
     # There is no other context except that warning
     ("py:class", "list[dict[str"),
+    ("py:class", "botocore.client.S3"),
+    ("py:class", "fastapi.responses.StreamingResponse")
 ]
 
 autodoc_default_options = {
