@@ -7,7 +7,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import botocore.client
+
 sys.path.insert(0, str(Path("../src/").resolve()))
+
+# botocore generates S3 client classes dynamically at runtime; stub it so
+# sphinx-autodoc-typehints can resolve annotations referencing botocore.client.S3
+if not hasattr(botocore.client, "S3"):
+    botocore.client.S3 = type("S3", (), {"__module__": "botocore.client"})  # type: ignore[attr-defined]
+
 
 project = "ogdc-runner"
 copyright = f"{dt.date.today().year}, NSIDC and ADC"
