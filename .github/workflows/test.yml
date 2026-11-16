@@ -37,7 +37,7 @@ jobs:
           allow-prereleases: true
 
       # The MacOS runner does not have the required postgresql binaries that are
-      # required to `pip install` psycopg2, which is required for the API to
+      # required to `pip install` psycopg, which is required for the API to
       # connect to the OGDC postgresql DB.
       - name: "Install Postgresql on macOS"
         if: runner.os == 'macOS'
