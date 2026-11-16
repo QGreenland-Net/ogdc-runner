@@ -11,12 +11,7 @@ from ogdc_runner.workflow.shell import make_and_submit_shell_workflow
 from ogdc_runner.workflow.viz_workflow import make_and_submit_viz_workflow
 
 
-def submit_ogdc_recipe(
-    *,
-    recipe_dir: Path,
-    overwrite: bool,
-    identifier: str
-) -> str:
+def submit_ogdc_recipe(*, recipe_dir: Path, overwrite: bool, identifier: str) -> str:
     """Submit an OGDC recipe for processing via argo workflows.
 
     Args:
@@ -40,14 +35,12 @@ def submit_ogdc_recipe(
     # Check if the recipe is a visualization workflow
     if recipe_config.workflow.type == "visualization":
         return make_and_submit_viz_workflow(
-            recipe_config=recipe_config,
-            identifier=identifier
+            recipe_config=recipe_config, identifier=identifier
         )
 
     # We currently expect all recipes to be "shell"
     shell_recipe_workflow_name = make_and_submit_shell_workflow(
-        recipe_config=recipe_config,
-        identifier=identifier
+        recipe_config=recipe_config, identifier=identifier
     )
 
     return shell_recipe_workflow_name

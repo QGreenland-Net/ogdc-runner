@@ -25,9 +25,9 @@ def stage_ogdc_recipe(recipe_location: str):  # type: ignore[no-untyped-def]
 
     recipe_fs, recipe_fs_path = fsspec.core.url_to_fs(recipe_location)
     recipe_fs.get([recipe_fs_path], str(temp_path), recursive=True)
-    
+
     logger.success(f"staged recipe directory from {recipe_location} to {temp_dir}")
-    
+
     return temp_path
 
 
