@@ -121,10 +121,10 @@ def test_unexpected_s3_error_is_502(client, stubber):
 
 
 def test_route_matches_when_app_has_api_root_path(stubber):  # noqa: ARG001
-    prefixed = FastAPI(root_path="/api")
+    prefixed = FastAPI()
     prefixed.include_router(storage_routes.router, prefix="/storage")
 
-    response = TestClient(prefixed).get(f"/storage/{KEY}")
+    response = TestClient(prefixed, root_path="/api").get(f"/storage/{KEY}")
 
     assert response.status_code == 403
 
