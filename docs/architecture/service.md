@@ -82,7 +82,7 @@ ogdc-helm chart sets them):
 
 | Variable                        | Meaning                                                                   | Default                                                   |
 | ------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `S3_ENDPOINT_URL`               | S3 API endpoint                                                           | falls back to legacy `INTERNAL_S3_ENDPOINT_URL`; required |
+| `S3_ENDPOINT_URL`               | S3 API endpoint                                                           | required                                                  |
 | `S3_BUCKET`                     | Bucket for argo artifacts and outputs                                     | `argo-workflows`                                          |
 | `S3_REGION`                     | S3 region                                                                 | `us-east-1`                                               |
 | `S3_ADDRESSING_STYLE`           | `path`, `virtual`, or `auto`                                              | `path`                                                    |
