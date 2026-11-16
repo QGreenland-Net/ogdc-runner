@@ -83,7 +83,7 @@ nitpick_ignore = [
     # There is no other context except that warning
     ("py:class", "list[dict[str"),
     ("py:class", "botocore.client.S3"),
-    ("py:class", "fastapi.responses.StreamingResponse")
+    ("py:class", "fastapi.responses.StreamingResponse"),
 ]
 
 autodoc_default_options = {
