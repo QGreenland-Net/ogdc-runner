@@ -123,7 +123,7 @@ def _get_workflow_status(config: Config, identifier: str) -> str:
         headers["Authorization"] = f"Bearer {_get_api_token(config)}"
 
     response = config.session.get(
-        url=f"{config.api_url}/status/{identifier}",
+        url=f"{config.api_url}/workflows/{identifier}",
         headers=headers,
     )
 
