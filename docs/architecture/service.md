@@ -1,9 +1,9 @@
-# OGDC Service API
+# OGDC Service
 
-The `ogdc-runner` service API sits between users of the CLI and
-[Argo Workflows](https://argo-workflows.readthedocs.io/en/latest/). It is
-responsible for translating user recipes into workflows that are submitted to
-and executed by Argo.
+The `ogdc-runner` service provides an [API](./api.md) that sits between users of
+the CLI and [Argo Workflows](https://argo-workflows.readthedocs.io/en/latest/).
+It is responsible for translating user recipes into workflows that are submitted
+to and executed by Argo.
 
 The service interface is defined using [FastAPI](https://fastapi.tiangolo.com/).
 See the
@@ -80,16 +80,16 @@ Argo artifacts and `temporary` recipe outputs live in an S3-compatible object
 store. The store is configured through the following environment variables (the
 ogdc-helm chart sets them):
 
-| Variable                        | Meaning                                                                   | Default                                                   |
-| ------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `S3_ENDPOINT_URL`               | S3 API endpoint                                                           | falls back to legacy `INTERNAL_S3_ENDPOINT_URL`; required |
-| `S3_BUCKET`                     | Bucket for argo artifacts and outputs                                     | `argo-workflows`                                          |
-| `S3_REGION`                     | S3 region                                                                 | `us-east-1`                                               |
-| `S3_ADDRESSING_STYLE`           | `path`, `virtual`, or `auto`                                              | `path`                                                    |
-| `S3_SECRET_KEY_ID`              | Static access key ID                                                      | required                                                  |
-| `S3_SECRET_KEY_KEY`             | Static secret access key                                                  | required                                                  |
-| `PUBLIC_S3_ENDPOINT_URL`        | Public base of output links, e.g. `https://ogdc.test.dataone.org/storage` | required to create links                                  |
-| `OGDC_STORAGE_LINK_SIGNING_KEY` | Secret used to HMAC-sign output links                                     | required (>= 32 chars, not a placeholder) for links       |
+| Variable                        | Meaning                                                                   | Default                                             |
+| ------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------- |
+| `S3_ENDPOINT_URL`               | S3 API endpoint                                                           | required                                            |
+| `S3_BUCKET`                     | Bucket for argo artifacts and outputs                                     | `argo-workflows`                                    |
+| `S3_REGION`                     | S3 region                                                                 | `us-east-1`                                         |
+| `S3_ADDRESSING_STYLE`           | `path`, `virtual`, or `auto`                                              | `path`                                              |
+| `S3_SECRET_KEY_ID`              | Static access key ID                                                      | required                                            |
+| `S3_SECRET_KEY_KEY`             | Static secret access key                                                  | required                                            |
+| `PUBLIC_S3_ENDPOINT_URL`        | Public base of output links, e.g. `https://ogdc.test.dataone.org/storage` | required to create links                            |
+| `OGDC_STORAGE_LINK_SIGNING_KEY` | Secret used to HMAC-sign output links                                     | required (>= 32 chars, not a placeholder) for links |
 
 ### Why output links are served by the service
 
@@ -124,16 +124,3 @@ routes. Route `/storage` to the service in the ingress without rewriting the
 path. Note that the signature appears in the query string, so access logs of
 proxies in front of the service should not be shared; links expire after 2
 hours.
-
-### Migrating from MinIO
-
-- Rename `INTERNAL_S3_ENDPOINT_URL` to `S3_ENDPOINT_URL` (the old name still
-  works as a fallback).
-- Set `S3_BUCKET`, `S3_REGION` (e.g. `default` for Ceph RGW), and, if needed,
-  `S3_ADDRESSING_STYLE`.
-- Set `OGDC_STORAGE_LINK_SIGNING_KEY` to a random secret of at least 32
-  characters. Without a valid key no output links are created.
-- `PUBLIC_S3_ENDPOINT_URL` now points at the service's `/storage` route rather
-  than at the object store, and must be routed to the service.
-- Links issued before the upgrade (S3 presigned URLs) are not valid with the new
-  route; request a new link via `ogdc-runner get-output`.

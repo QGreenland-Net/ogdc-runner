@@ -321,10 +321,12 @@ class ShellWorkflow(Workflow):
     Requires that the `recipe_directory` context be set when instantiating
     the class. E.g.,:
 
+    .. code-block:: python
+
         workflow = ShellWorkflow.model_validate(
             {"sh_file": "recipe.sh"},
             context={"recipe_directory": Path("/path/to/recipe_directory")},
-        ),
+        )
 
     """
 
@@ -387,10 +389,12 @@ class VizWorkflow(Workflow):
     Requires that the `recipe_directory` context be set when instantiating
     the class. E.g.,:
 
+    .. code-block:: python
+
         workflow = VizWorkflow.model_validate(
             {"config_file": "config.json"},
             context={"recipe_directory": Path("/path/to/recipe_directory")},
-        ),
+        )
 
     """
 
