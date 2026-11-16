@@ -120,6 +120,12 @@ You can see a preview with:
 nox -s docs -- --serve
 ```
 
+Test that the docs build correctly and without warnings with:
+
+```
+nox -s test_docs
+```
+
 ### Reusing Nox virtual environments
 
 **By default, Nox deletes and recreates virtual environments for every run.**

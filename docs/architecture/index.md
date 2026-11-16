@@ -6,6 +6,7 @@
 
 service.md
 argo.md
+api.md
 ```
 
 ```{mermaid}
