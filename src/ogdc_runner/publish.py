@@ -289,8 +289,7 @@ def get_s3_bucket() -> str:
 
 @cache
 def get_s3_client() -> botocore.client.S3:
-    """Return an S3 client configured from the `S3_*` environment variables.
-    """
+    """Return an S3 client configured from the `S3_*` environment variables."""
     s3_secret_access_key_id = os.environ.get("S3_SECRET_KEY_ID")
     s3_secret_access_key = os.environ.get("S3_SECRET_KEY_KEY")
     s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")

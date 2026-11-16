@@ -80,16 +80,16 @@ Argo artifacts and `temporary` recipe outputs live in an S3-compatible object
 store. The store is configured through the following environment variables (the
 ogdc-helm chart sets them):
 
-| Variable                        | Meaning                                                                   | Default                                                   |
-| ------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `S3_ENDPOINT_URL`               | S3 API endpoint                                                           | required                                                  |
-| `S3_BUCKET`                     | Bucket for argo artifacts and outputs                                     | `argo-workflows`                                          |
-| `S3_REGION`                     | S3 region                                                                 | `us-east-1`                                               |
-| `S3_ADDRESSING_STYLE`           | `path`, `virtual`, or `auto`                                              | `path`                                                    |
-| `S3_SECRET_KEY_ID`              | Static access key ID                                                      | required                                                  |
-| `S3_SECRET_KEY_KEY`             | Static secret access key                                                  | required                                                  |
-| `PUBLIC_S3_ENDPOINT_URL`        | Public base of output links, e.g. `https://ogdc.test.dataone.org/storage` | required to create links                                  |
-| `OGDC_STORAGE_LINK_SIGNING_KEY` | Secret used to HMAC-sign output links                                     | required (>= 32 chars, not a placeholder) for links       |
+| Variable                        | Meaning                                                                   | Default                                             |
+| ------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------- |
+| `S3_ENDPOINT_URL`               | S3 API endpoint                                                           | required                                            |
+| `S3_BUCKET`                     | Bucket for argo artifacts and outputs                                     | `argo-workflows`                                    |
+| `S3_REGION`                     | S3 region                                                                 | `us-east-1`                                         |
+| `S3_ADDRESSING_STYLE`           | `path`, `virtual`, or `auto`                                              | `path`                                              |
+| `S3_SECRET_KEY_ID`              | Static access key ID                                                      | required                                            |
+| `S3_SECRET_KEY_KEY`             | Static secret access key                                                  | required                                            |
+| `PUBLIC_S3_ENDPOINT_URL`        | Public base of output links, e.g. `https://ogdc.test.dataone.org/storage` | required to create links                            |
+| `OGDC_STORAGE_LINK_SIGNING_KEY` | Secret used to HMAC-sign output links                                     | required (>= 32 chars, not a placeholder) for links |
 
 ### Why output links are served by the service
 

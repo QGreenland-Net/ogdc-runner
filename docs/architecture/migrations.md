@@ -1,6 +1,6 @@
 # Migration Information
 
-This document tracks migrations 
+This document tracks migrations
 
 ### from MinIO
 
