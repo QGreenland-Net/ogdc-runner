@@ -518,7 +518,7 @@ def make_and_submit_shell_workflow(
 
     Args:
         recipe_config: Recipe configuration containing workflow details
-        wait: Whether to wait for workflow completion
+        identifier: string representing workflow's identifier label.
 
     Returns:
         Workflow name

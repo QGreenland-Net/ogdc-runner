@@ -16,8 +16,8 @@ def submit_ogdc_recipe(*, recipe_dir: Path, overwrite: bool, identifier: str) ->
 
     Args:
         recipe_dir: Path to the recipe directory
-        wait: Whether to wait for the workflow to complete
         overwrite: Whether to overwrite existing published data
+        identifier: string representing workflow's identifier label.
 
     Returns the name of the OGDC shell recipe submitted to Argo.
     """

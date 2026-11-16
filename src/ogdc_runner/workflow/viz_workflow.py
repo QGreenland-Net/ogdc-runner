@@ -1296,8 +1296,7 @@ def make_and_submit_viz_workflow(
 
     Args:
         recipe_config: Recipe configuration with ``workflow.type == "visualization"``.
-        wait: If ``True``, block until the workflow completes.  Defaults to
-            ``False`` for async submission.
+        identifier: string representing workflow's identifier label.
 
     Returns:
         The Argo workflow name (e.g. ``"my-recipe-visualization-xyz12"``).
