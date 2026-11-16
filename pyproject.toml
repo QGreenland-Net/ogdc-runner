@@ -136,6 +136,11 @@ filterwarnings = [
   # needs it to honor API_ROOT_PATH, so ignore the warning rather than change
   # routing. Category is UserWarning because FastAPIDeprecationWarning subclasses it.
   "ignore:The `root_path` parameter is deprecated:UserWarning",
+  # d1_common (dataone.libclient) uses a non-raw regex string (`b"^\s*$\n"`).
+  # Harmless SyntaxWarning, but "error" above escalates it to a SyntaxError at
+  # import time on Python >=3.14. Leading ".*" because 3.14 reworded the message.
+  # Remove once fixed upstream in d1_python.
+  "ignore:.*invalid escape sequence:SyntaxWarning",
 ]
 log_cli_level = "INFO"
 testpaths = [
