@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import os
 from functools import cache
 from pathlib import Path
 
 import pytest
 from sqlmodel import StaticPool, create_engine
+
+# OIDC-specific tests provide their own temporary credentials.
+os.environ.setdefault("ACCESS_MODE", "open")
 
 from ogdc_runner.service import db
 
@@ -43,8 +47,7 @@ def mock_db(monkeypatch):
     Uses an in-memory sqlite database instead of the live postgresql database.
 
     Ensures required envvars are set:
-        * `OGDC_JWT_SECRET_KEY`
-        * `OGDC_ADMIN_PASSWORD` (set to `password`)
+        * `OGDC_SECRET_KEY`
     """
 
     @cache
@@ -59,9 +62,8 @@ def mock_db(monkeypatch):
         )
 
     monkeypatch.setattr(db, "get_engine", mock_get_engine)
-    monkeypatch.setenv("OGDC_ADMIN_PASSWORD", "password")
     monkeypatch.setenv(
-        "OGDC_JWT_SECRET_KEY",
+        "OGDC_SECRET_KEY",
         "2ae25b5398824129235724f243811d7a335a98339abe4630e4e27d25e4f144a2",
     )
 
@@ -74,4 +76,8 @@ def mock_dataone_node_url(monkeypatch):
     monkeypatch.setenv(
         "DATAONE_NODE_URL",
         "https://arcticdata.io/metacat/d1/mn",
+    )
+    monkeypatch.setenv(
+        "ENVIRONMENT",
+        "local",
     )

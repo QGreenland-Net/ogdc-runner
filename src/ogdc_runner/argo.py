@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
-import time
 from collections.abc import Generator
 from contextlib import contextmanager
+from hashlib import sha256
 from typing import Any
 
 from hera.shared import global_config
@@ -15,13 +16,18 @@ from hera.workflows import (
 )
 from loguru import logger
 
-from ogdc_runner.exceptions import OgdcWorkflowExecutionError
-from ogdc_runner.models.recipe_config import RecipeConfig
+from ogdc_runner.exceptions import OgdcInvalidRecipeConfig, OgdcWorkflowExecutionError
+from ogdc_runner.models.recipe_config import PvcMountInput, RecipeConfig
 
 # Kubernetes names must be no more than 63 characters.
 # Argo appends a 5-character random suffix to generate_name, so we reserve space for it.
 KUBERNETES_NAME_MAX_LENGTH = 63
 ARGO_GENERATED_SUFFIX_LENGTH = 5
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    """Parse a Helm-rendered boolean environment variable."""
+    return os.environ.get(name, str(default)).lower() == "true"
 
 
 def make_generate_name(*, recipe_id: str, suffix: str = "") -> str:
@@ -47,12 +53,151 @@ def make_generate_name(*, recipe_id: str, suffix: str = "") -> str:
     return truncated_id
 
 
+OGDC_WORKFLOW_PVC_CLAIM_NAME = os.environ.get(
+    "OGDC_WORKFLOW_PVC_NAME", "cephfs-qgnet-ogdc-workflow-pvc"
+)
+
 OGDC_WORKFLOW_PVC = models.Volume(
     name="workflow-volume",
     persistent_volume_claim=models.PersistentVolumeClaimVolumeSource(
-        claim_name="cephfs-qgnet-ogdc-workflow-pvc",
+        claim_name=OGDC_WORKFLOW_PVC_CLAIM_NAME,
     ),
 )
+
+
+def _is_workflow_pvc_claim(claim_name: str) -> bool:
+    return claim_name == OGDC_WORKFLOW_PVC_CLAIM_NAME
+
+
+def _input_pvc_volume_name(claim_name: str) -> str:
+    """Deterministic, k8s-safe volume name for an input PVC."""
+    if _is_workflow_pvc_claim(claim_name):
+        return OGDC_WORKFLOW_PVC.name
+    volume_name = f"input-pvc-{claim_name}"
+    if len(volume_name) <= KUBERNETES_NAME_MAX_LENGTH:
+        return volume_name
+
+    digest = sha256(claim_name.encode("utf-8")).hexdigest()[:10]
+    prefix_len = KUBERNETES_NAME_MAX_LENGTH - len("input-pvc-") - len(digest) - 1
+    claim_prefix = claim_name[:prefix_len].rstrip("-")
+    return f"input-pvc-{claim_prefix}-{digest}"
+
+
+def make_input_pvc_volume(claim_name: str) -> models.Volume:
+    """Build an Argo Volume referencing a user-provided input PVC."""
+    return models.Volume(
+        name=_input_pvc_volume_name(claim_name),
+        persistent_volume_claim=models.PersistentVolumeClaimVolumeSource(
+            claim_name=claim_name,
+            read_only=True,
+        ),
+    )
+
+
+def make_input_pvc_volume_mount(pvc_input: PvcMountInput) -> models.VolumeMount:
+    """Build a read-only VolumeMount for an input PVC at `/mnt/data/{claim_name}`."""
+    return models.VolumeMount(
+        name=_input_pvc_volume_name(pvc_input.claim_name),
+        mount_path=pvc_input.mount_path,
+        read_only=True,
+    )
+
+
+def _get_pvc_inputs(recipe_config: RecipeConfig) -> list[PvcMountInput]:
+    return [p for p in recipe_config.input.params if isinstance(p, PvcMountInput)]
+
+
+def get_allowed_input_pvc_claims(
+    raw_allowlist: str | None = None,
+) -> set[str]:
+    """Parse configured input PVC claim names from OGDC_ALLOWED_INPUT_PVCS."""
+    if raw_allowlist is None:
+        raw_allowlist = os.environ.get("OGDC_ALLOWED_INPUT_PVCS", "[]")
+
+    if not raw_allowlist.strip():
+        raw_allowlist = "[]"
+
+    try:
+        allowlist = json.loads(raw_allowlist)
+    except json.JSONDecodeError as e:
+        msg = "OGDC_ALLOWED_INPUT_PVCS must be a JSON array"
+        raise OgdcInvalidRecipeConfig(msg) from e
+
+    if not isinstance(allowlist, list):
+        msg = "OGDC_ALLOWED_INPUT_PVCS must be a JSON array"
+        raise OgdcInvalidRecipeConfig(msg)
+
+    claim_names: set[str] = set()
+    for item in allowlist:
+        claim_name: Any
+        if isinstance(item, str):
+            claim_name = item
+        elif isinstance(item, dict):
+            claim_name = item.get("claimName") or item.get("claim_name")
+        else:
+            msg = (
+                "OGDC_ALLOWED_INPUT_PVCS entries must be strings or objects with "
+                "claimName"
+            )
+            raise OgdcInvalidRecipeConfig(msg)
+
+        if not isinstance(claim_name, str) or not claim_name:
+            msg = "OGDC_ALLOWED_INPUT_PVCS entries must include a non-empty claimName"
+            raise OgdcInvalidRecipeConfig(msg)
+
+        claim_names.add(claim_name)
+
+    claim_names.add(OGDC_WORKFLOW_PVC_CLAIM_NAME)
+    return claim_names
+
+
+def validate_recipe_input_pvcs_allowed(recipe_config: RecipeConfig) -> None:
+    """Reject recipe input PVC claims not configured by the deployment."""
+    requested_claims = {pvc.claim_name for pvc in _get_pvc_inputs(recipe_config)}
+    if not requested_claims:
+        return
+
+    allowed_claims = get_allowed_input_pvc_claims()
+    rejected_claims = sorted(requested_claims - allowed_claims)
+    if rejected_claims:
+        msg = (
+            "Recipe references input PVC claim(s) that are not configured in "
+            f"OGDC_ALLOWED_INPUT_PVCS: {', '.join(rejected_claims)}. "
+            "Ask an operator to add approved claims to the Helm "
+            "ogdc_input_pvcs value."
+        )
+        raise OgdcInvalidRecipeConfig(msg)
+
+
+def get_input_pvc_volumes(recipe_config: RecipeConfig) -> list[models.Volume]:
+    """Return Argo Volumes for every PVC input referenced by the recipe.
+
+    Deduplicates by claim_name so the same PVC referenced twice yields one volume.
+    """
+    seen: set[str] = set()
+    volumes: list[models.Volume] = []
+    for pvc in _get_pvc_inputs(recipe_config):
+        if pvc.claim_name in seen:
+            continue
+        seen.add(pvc.claim_name)
+        if _is_workflow_pvc_claim(pvc.claim_name):
+            continue
+        volumes.append(make_input_pvc_volume(pvc.claim_name))
+    return volumes
+
+
+def get_input_pvc_volume_mounts(
+    recipe_config: RecipeConfig,
+) -> list[models.VolumeMount]:
+    """Return read-only VolumeMounts for every PVC input referenced by the recipe."""
+    seen: set[str] = set()
+    mounts: list[models.VolumeMount] = []
+    for pvc in _get_pvc_inputs(recipe_config):
+        if pvc.claim_name in seen:
+            continue
+        seen.add(pvc.claim_name)
+        mounts.append(make_input_pvc_volume_mount(pvc))
+    return mounts
 
 
 class ArgoConfig:
@@ -66,6 +211,7 @@ class ArgoConfig:
         runner_image: str,
         runner_image_tag: str,
         image_pull_policy: str,
+        workflow_retry_strategy: models.RetryStrategy | None,
     ):
         self.namespace = namespace
         self.service_account_name = service_account_name
@@ -73,6 +219,7 @@ class ArgoConfig:
         self.runner_image = runner_image
         self.runner_image_tag = runner_image_tag
         self.image_pull_policy = image_pull_policy
+        self.workflow_retry_strategy = workflow_retry_strategy
 
     @property
     def full_image_path(self) -> str:
@@ -117,6 +264,19 @@ class ArgoManager:
         )
         logger.info(f"Using ARGO_WORKFLOWS_SERVICE_URL={workflows_service_url}")
 
+        workflow_retry_strategy = None
+        if _env_bool("ARGO_WORKFLOW_RETRY_ENABLED", True):
+            retry_limit = int(os.environ.get("ARGO_WORKFLOW_RETRY_LIMIT", "3"))
+            if retry_limit < 0:
+                err_msg = "ARGO_WORKFLOW_RETRY_LIMIT must be >= 0"
+                raise ValueError(err_msg)
+            workflow_retry_strategy = models.RetryStrategy(
+                limit=models.IntOrString(root=retry_limit),
+                retry_policy=os.environ.get(
+                    "ARGO_WORKFLOW_RETRY_POLICY", "OnTransientError"
+                ),
+            )
+
         return ArgoConfig(
             namespace=os.environ.get("ARGO_NAMESPACE", "qgnet"),
             service_account_name=os.environ.get(
@@ -126,6 +286,7 @@ class ArgoManager:
             runner_image=runner_image,
             runner_image_tag=runner_image_tag,
             image_pull_policy=image_pull_policy,
+            workflow_retry_strategy=workflow_retry_strategy,
         )
 
     def _setup_workflow_service(self) -> WorkflowsService:
@@ -235,13 +396,13 @@ ARGO_WORKFLOW_SERVICE: WorkflowsService = ARGO_MANAGER.workflow_service
 
 def get_workflow_status(identifier: str) -> str | None:
     """Return the given workflow's status (e.g., `'Succeeded'`)"""
-   # try fetching by name first (cheapest operation)
+    # try fetching by name first (cheapest operation)
     try:
         workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=identifier)
         return workflow.status.phase
     except Exception:
-        workflows = None 
-        
+        workflows = None
+
         try:
             workflows = ARGO_WORKFLOW_SERVICE.list_workflows(
                 label_selector=f"identifier={identifier}"
@@ -308,6 +469,7 @@ def OgdcWorkflow(
 
     All other kwargs are passed directly to `argo.workflows.Workflow.
     """
+    validate_recipe_input_pvcs_allowed(recipe_config)
 
     # Merge labels provided by user with `ogdc/persist-workflow-in-archive`.
     labels = {
@@ -338,6 +500,12 @@ def OgdcWorkflow(
             seconds_after_success=60 * 60 * 24 * 7,
         )
         workflow_kwargs["ttl_strategy"] = ttl_strategy
+
+    if (
+        ARGO_MANAGER.config.workflow_retry_strategy is not None
+        and "retry_strategy" not in workflow_kwargs
+    ):
+        workflow_kwargs["retry_strategy"] = ARGO_MANAGER.config.workflow_retry_strategy
 
     with Workflow(
         **workflow_kwargs,

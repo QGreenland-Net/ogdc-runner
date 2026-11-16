@@ -8,6 +8,8 @@ set -eu
 RECIPE_ID="{{inputs.parameters.recipe-id}}"
 PARTITION_ID="{{inputs.parameters.partition-id}}"
 CMD_INDEX="{{inputs.parameters.cmd-index}}"
+FIRST_COMMAND_INPUT_MODE="{first_command_input_mode}"
+PARTITION_MANIFEST_PATH="{{inputs.parameters.partition-manifest-path}}"
 
 # Determine input directory based on command index
 if [ "$CMD_INDEX" -eq 0 ]; then
@@ -23,29 +25,41 @@ mkdir -p "$OUTPUT_DIR"
 # For first command, use partition manifest (original URLs/files)
 # For subsequent commands, discover actual files from previous output
 if [ "$CMD_INDEX" -eq 0 ]; then
-    # Read and parse partition manifest (JSON array of original input files)
-    PARTITION_FILES='{{inputs.parameters.partition-manifest}}'
-    echo "Processing partition with files: $PARTITION_FILES"
+    # Read and parse partition manifest (JSON array of original input files).
+    # Large manifests are stored on the workflow PVC; inline JSON remains
+    # supported for older URL/DataONE partition flows.
+    if [ -n "$PARTITION_MANIFEST_PATH" ]; then
+        echo "Reading partition manifest from: $PARTITION_MANIFEST_PATH"
+        cat "$PARTITION_MANIFEST_PATH" > /tmp/partition-manifest.json
+    else
+        printf '%s' '{{inputs.parameters.partition-manifest}}' > /tmp/partition-manifest.json
+    fi
     echo "Input directory: $INPUT_DIR"
     echo "Output directory: $OUTPUT_DIR"
 
-    # Parse JSON array into individual file paths
-    FILES=$(echo "$PARTITION_FILES" | tr -d '[]"' | tr ',' '\n')
-
     # Process each file in the partition
-    for file in $FILES; do
+    python3 -c 'import json
+from pathlib import Path
+for file_path in json.loads(Path("/tmp/partition-manifest.json").read_text()):
+    print(file_path)
+' > /tmp/partition-files.txt
+
+    while IFS= read -r file; do
         [ -z "$file" ] && continue
 
-        file=$(echo "$file" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         filename=$(basename "$file")
 
         echo "Processing file: $file"
-        export INPUT_FILE="$INPUT_DIR/$filename"
+        if [ "$FIRST_COMMAND_INPUT_MODE" = "mounted-pvc" ]; then
+            export INPUT_FILE="$file"
+        else
+            export INPUT_FILE="$INPUT_DIR/$filename"
+        fi
         export OUTPUT_FILE="$OUTPUT_DIR/$filename"
 
         # Execute user command
         {user_command}
-    done
+    done < /tmp/partition-files.txt
 else
     # For subsequent commands, process all files from previous output directory
     echo "Discovering files from previous command output: $INPUT_DIR"

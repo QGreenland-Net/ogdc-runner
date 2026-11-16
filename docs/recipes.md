@@ -94,6 +94,59 @@ and
 [greenland-ice-sheet](https://github.com/QGreenland-Net/ogdc-recipes/tree/main/recipes/greenland-ice-sheet)
 recipes to see DataONE inputs in practice.
 
+#### PVC Mount Inputs
+
+If your dataset is pre-staged on a Kubernetes PersistentVolumeClaim (PVC), you
+can reference it directly. The PVC is mounted read-only into all workflow
+containers at `/mnt/data/{claim_name}/`:
+
+```yaml
+input:
+  params:
+    - type: pvc_mount
+      claim_name: arctic-dem-pvc
+      path: /tiles/v3/
+      glob: "*.tif"
+```
+
+- **`claim_name`** (required): Name of the PVC in the cluster namespace.
+- **`path`** (required): Subpath within the PVC containing the input files.
+  Parent directory references (`..`) are rejected.
+- **`glob`** (optional, default `"*"`): Recursive glob pattern for file
+  selection. For example, `*.gpkg` matches GeoPackages directly under `path` and
+  in any nested directories.
+
+The `claim_name` must be pre-provisioned by a cluster operator and included in
+the deployment's configured input PVC allowlist. The default OGDC workflow PVC
+claim configured by `OGDC_WORKFLOW_PVC_NAME` is always allowed and can also be
+referenced as a `pvc_mount` input. Recipes that reference any other PVC claim
+outside the allowlist are rejected before workflow submission.
+
+The runner does not create PersistentVolumes or PersistentVolumeClaims for
+`pvc_mount` inputs. It only adds Argo workflow volume references to existing PVC
+claim names.
+
+PVC inputs are exclusive: a recipe may use one or more `pvc_mount` inputs, or it
+may use URL/DataONE inputs, but it cannot combine PVC inputs with URL/DataONE
+inputs in the same recipe.
+
+Recipe scripts read files from the mounted path. For the example above, files
+are accessible at `/mnt/data/arctic-dem-pvc/tiles/v3/**/*.tif`.
+
+PVC inputs work in both sequential and parallel shell and visualization
+workflows. Sequential shell workflows recursively link matching PVC files into
+`/input_dir` so existing shell recipes can keep using `/input_dir/...` paths.
+Sequential visualization workflows recursively enumerate matching PVC files at
+runtime and call `workflow.stage(path)` for each path in the input manifest.
+Parallel workflows recursively enumerate files matching the glob pattern at
+runtime, write retained partition manifests to the workflow PVC, and distribute
+those partitions automatically. For visualization workflows, the retained PVC
+manifests feed staging when `enable_stager` is true. When `enable_stager` is
+false, the same manifests can feed rasterization, 3D tile generation, or web
+tile generation directly, depending on the enabled viz workflow stages.
+
+See {class}`ogdc_runner.models.recipe_config.PvcMountInput` for details.
+
 #### `output`
 
 {class}`ogdc_runner.models.recipe_config.RecipeOutput` is the base class
@@ -177,25 +230,115 @@ example.
 
 ### Visualization Workflow
 
-The `visualization` workflow takes a geospatial data file as input and produces
-3D web-tiles of the data for visualization in a web-map.
+The `visualization` workflow takes geospatial data files as input and produces
+cloud optimized tiled outputs for analysis, visualization and archival. This
+workflow is designed for large geospatial datasets that require specialized
+processing to be displayed efficiently in web-based map applications.
 
 See {class}`ogdc_runner.models.recipe_config.VizWorkflow` for details on
 configuration options.
 
-```{warning}
-This section of the documentation is incomplete!
-**TODO**: more detail / link to viz workflow documentation.
-```
+#### Overview
+
+The visualization workflow orchestrates a multi-stage pipeline that transforms
+geospatial data through several processing steps:
+
+1. **Staging**: Large vector files are sliced into smaller, tiled pieces that
+   correspond to tiles in a defined Tile Matrix Set (TMS). This step also
+   handles data standardization, deduplication, and property management.
+
+2. **Rasterization**: Vector tiles are converted to raster formats (GeoTIFFs and
+   PNGs), with statistics calculated as specified in the configuration.
+
+3. **3D Tile Creation**: Vector data is converted to Cesium 3D tiles format,
+   enabling efficient web-based visualization of large polygon datasets.
+
+The workflow produces four output formats:
+
+- **GeoPackages** (vector): High-resolution, lossless archival format
+- **GeoTIFFs** (raster): Multi-resolution raster data with calculated statistics
+- **PNG Web Tiles**: Pre-rendered raster tiles with palettes for quick
+  visualization
+- **Cesium 3D Tiles**: Vector tiles for interactive 3D visualization with
+  attribute data pop-ups
+
+#### Configuration
+
+In addition to `meta.yaml`, `visualization` workflows require a `config.json`
+file that defines:
+
+- Input data source and format
+- Tile Matrix Set (TMS) for tiling strategy
+- Statistical calculations to perform
+- Color palettes for visualization
+- Output specifications
+
+The following configuration options are specific to the `visualization` workflow
+in `meta.yaml`:
+
+##### `config_file`
+
+The path to the JSON configuration file (default: `"config.json"`).
+
+Example: `"my_custom_config.json"`
+
+##### `batch_size`
+
+The number of tiles to process in parallel (default: `250`). Increasing this
+value can improve performance on high-performance computing systems with
+sufficient resources.
+
+Example: `500`
+
+#### Core Packages
+
+The visualization workflow is powered by several specialized Python packages:
+
+- **viz-workflow**: The main orchestrator that coordinates configuration
+  management and workflow processing.
+
+- **viz-staging**: Prepares vector data by slicing large files into TMS-aligned
+  tiles, re-projecting data, handling deduplication, and managing file paths.
+
+- **viz-raster**: Converts vector tiles to raster formats (GeoTIFFs for archival
+  and PNGs for web display), with configurable statistics calculation.
+
+- **viz-3dtiles**: Wraps the py3dtiles library to create Cesium 3D tilesets,
+  building hierarchical JSON structures and reading shapefiles.
+
+#### Input Requirements
+
+The visualization workflow accepts vector geospatial files as input:
+
+- Shapefiles (.shp)
+- GeoPackages (.gpkg)
+- GeoJSON (.geojson)
+
+Raster input support (GeoTIFF) is planned for future releases.
+
+#### Use Cases
+
+The visualization workflow is best suited for:
+
+- Large geospatial vector datasets requiring multi-resolution tiling
+- Data that needs both web visualization and archival formats
+- Datasets with complex attribute information to be explored interactively
+- Applications requiring 3D visualization of polygon or point cloud data
 
 For an example of a recipe using the `visualization` workflow, we recommend
 taking a look at the
 [ogdc-recipes viz-workflow recipe](https://github.com/QGreenland-Net/ogdc-recipes/tree/main/recipes/viz-workflow)
 example.
 
-## Parallel Execution
+Additional detailed documentation and examples are available in the
+[Permafrost Discovery Gateway viz-info repository](https://github.com/PermafrostDiscoveryGateway/viz-info).
 
-Currently only `shell` workflows support parallel execution for processing
+<!-- prettier-ignore-start -->
+(parallel-execution)=
+## Parallel Execution
+<!-- prettier-ignore-end -->
+
+`shell` and `visualization` workflows support parallel execution for processing
 multiple input files concurrently. Parallel execution distributes work across
 multiple Argo workflow tasks, enabling efficient processing of large datasets.
 
@@ -245,9 +388,22 @@ independent tasks that can run concurrently. The maximum parallelism is
 controlled at the workflow level, allowing Argo to automatically schedule tasks
 as cluster resources become available.
 
+For partitioned workflows, the full file lists for each partition are written to
+retained JSON manifests on the workflow PVC:
+
+```text
+/mnt/workflow/{recipe_id}/partition-manifests/{stage}/partition-{partition_id}.json
+```
+
+Argo fan-out parameters only carry compact partition IDs and manifest path
+references. This keeps large file lists out of the workflow spec and Argo
+controller state while preserving the manifests on PVC for provenance and
+debugging.
+
 Each parallel task:
 
-- Receives a partition of input files via workflow parameters
+- Receives a partition ID and reads its file list from a manifest on the
+  workflow PVC
 - Executes the same command independently for **each file** in its partition
 - Writes outputs to isolated directories (one per partition)
 - Runs in a separate container with its own resource allocation
@@ -258,4 +414,49 @@ in the partition. The runner sets environment variables (`$INPUT_FILE` and
 `$OUTPUT_FILE`) for each file, and your command processes them one at a time
 within the partition. You don't need to handle the partition splitting - the
 orchestrator does this automatically.
+```
+
+### PVC Parallel Execution
+
+When using `pvc_mount` inputs with parallel execution, the runner cannot
+enumerate input files at submit time because it does not mount the PVC. Instead,
+partitioning happens **inside the cluster at workflow runtime**:
+
+1. The runner builds a workflow containing a `list-pvc-files` container step and
+   submits it to Argo. The workflow references pre-existing PVC claims and does
+   not include `volumeClaimTemplates` or create storage resources.
+2. At runtime, `list-pvc-files` runs on a pod that mounts the input PVC,
+   recursively enumerates files matching the `glob` pattern, and groups them
+   into partitions of `partition_size`.
+3. The listing step writes full partition manifests under
+   `/mnt/workflow/{recipe_id}/partition-manifests/pvc-inputs/` and outputs a
+   compact JSON list like `[{"partition_id": 0}, ...]`.
+4. Argo reads that compact JSON via `with_param` and spawns one parallel task
+   per partition. Each task reads its full file list from the retained manifest
+   on the workflow PVC.
+
+```yaml
+input:
+  params:
+    - type: pvc_mount
+      claim_name: arctic-dem-pvc
+      path: /tiles/v3/
+      glob: "*.tif"
+workflow:
+  type: shell
+  parallel:
+    enabled: true
+    partition_strategy: files
+    partition_size: 4
+```
+
+At `CMD_INDEX=0`, `$INPUT_FILE` is set to the full PVC path (e.g.,
+`/mnt/data/arctic-dem-pvc/tiles/v3/tile_001.tif`). For subsequent commands,
+`$INPUT_FILE` reads from the previous command's output directory as normal.
+
+```{note}
+For URL/DataONE inputs, the runner knows every input at submit time and creates
+the initial partition manifests before fan-out starts. For PVC inputs, the
+runner has no access to the PVC filesystem, so the listing step inside the
+workflow handles discovery and writes the manifests at runtime.
 ```

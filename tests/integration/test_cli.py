@@ -1,6 +1,6 @@
 """Integration tests that assert the CLI can be used to successfully submit recipes.
 
-Requires that the `OGDC_API_USERNAME` and `OGDC_API_PASSWORD` be set.
+Requires running on a local cluster with access_mode: "open" set in the chart.
 """
 
 from __future__ import annotations

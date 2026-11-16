@@ -21,7 +21,7 @@ def test_submit_ogdc_recipe_with_invalid_dir(tmp_path):
 def test_submit_ogdc_recipe(test_shell_workflow_recipe_directory):
     """Test that an ogdc recipe can be submitted and executed successfully."""
 
-    # Note: `overwrite` is set here to ensure that outptus from a previous test
+    # Note: `overwrite` is set here to ensure that outputs from a previous test
     # run are overwritten. This is not ideal. Tests that create data should
     # cleanup after themselves.
     submit_ogdc_recipe(

@@ -19,12 +19,16 @@ from ogdc_runner.models.parallel_config import (
 from ogdc_runner.models.recipe_config import (
     DataOneInput,
     ParallelConfig,
+    PvcMountInput,
     UrlInput,
 )
 
+# Used when parallel_config is absent or partition_size is not set.
+_DEFAULT_PARTITION_SIZE = 1000
+
 
 def create_partitions(
-    inputs: Sequence[DataOneInput | UrlInput] | Sequence[Path],
+    inputs: Sequence[DataOneInput | UrlInput | PvcMountInput] | Sequence[Path],
     execution_function: ExecutionFunction,
     parallel_config: ParallelConfig | None = None,
 ) -> list[FilePartition]:
@@ -59,12 +63,15 @@ def create_partitions(
 
 
 def _extract_file_paths(
-    inputs: Sequence[DataOneInput | UrlInput] | Sequence[Path],
+    inputs: Sequence[DataOneInput | UrlInput | PvcMountInput] | Sequence[Path],
 ) -> list[str]:
     """Extract file paths or URLs from inputs.
 
     Handles both InputParam objects (from recipe config) and Path objects
     (from dynamic discovery), converting them to string paths.
+
+    PVC inputs are skipped — file enumeration happens at workflow runtime via
+    an in-workflow listing step, so there is nothing to extract here.
 
     Args:
         inputs: List of input parameters or Path objects
@@ -79,8 +86,15 @@ def _extract_file_paths(
     if isinstance(inputs[0], Path):
         return [str(p) for p in inputs]
 
-    # InputParam objects have a value attribute
-    return [str(param.value) for param in inputs if hasattr(param, "value")]
+    # InputParam objects: UrlInput carries a single .value URL; DataOneInput
+    # carries one or more resolved objects each with a "url" key.
+    paths: list[str] = []
+    for param in inputs:
+        if isinstance(param, UrlInput):
+            paths.append(str(param.value))
+        elif isinstance(param, DataOneInput):
+            paths.extend(obj["url"] for obj in param.resolved_objects)
+    return paths
 
 
 def _validate_files(files: list[str], function_name: str) -> None:
@@ -101,15 +115,18 @@ def _validate_files(files: list[str], function_name: str) -> None:
 def _get_partition_size(parallel_config: ParallelConfig | None) -> int:
     """Determine the number of files per partition.
 
+    Uses ``parallel_config.partition_size`` when set; otherwise falls back
+    to ``_DEFAULT_PARTITION_SIZE`` (1000).
+
     Args:
-        parallel_config: Optional parallel configuration
+        parallel_config: Optional parallel execution configuration
 
     Returns:
-        Number of files per partition (minimum 1)
+        Number of files per partition
     """
-    if parallel_config and parallel_config.partition_size:
-        return max(1, parallel_config.partition_size)
-    return 1
+    if parallel_config is not None and parallel_config.partition_size is not None:
+        return parallel_config.partition_size
+    return _DEFAULT_PARTITION_SIZE
 
 
 def _create_file_partitions(

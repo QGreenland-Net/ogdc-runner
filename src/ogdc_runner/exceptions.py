@@ -59,3 +59,15 @@ class OgdcDataOneError(OgdcRunnerException):
     """Exception raised when DataONE operations fail."""
 
     pass
+
+
+class OgdcInvalidStorageLink(OgdcRunnerException):
+    """Exception raised when a signed `/storage` link is malformed or forged."""
+
+    pass
+
+
+class OgdcStorageLinkExpired(OgdcRunnerException):
+    """Exception raised when a correctly signed `/storage` link has expired."""
+
+    pass

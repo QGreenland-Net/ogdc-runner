@@ -1,3 +1,37 @@
+## NEXT_VERSION
+
+- Configure the S3 client with generic `S3_ENDPOINT_URL`, `S3_BUCKET`,
+  `S3_REGION`, and `S3_ADDRESSING_STYLE` envvars (`INTERNAL_S3_ENDPOINT_URL` is
+  still accepted as a fallback for `S3_ENDPOINT_URL`).
+- Serve temporary output links from the service under `/storage/...` using
+  HMAC-signed, expiring links (`OGDC_STORAGE_LINK_SIGNING_KEY`) instead of
+  host-rewritten S3 presigned URLs, which real S3 backends reject.
+- Harden `/storage`: reject oversized `expires` values with `403`, refuse
+  signing keys shorter than 32 characters or equal to `your-value-here` (`503`),
+  and answer `503`/`502` for unconfigured/unreachable S3.
+- Use the `postgresql+psycopg2` SQLAlchemy driver explicitly so the service
+  starts with SQLAlchemy 2.1, where bare `postgresql` selects `psycopg` (v3).
+
+## v0.4.2 (2026-08-19)
+
+- Fix PyPi publishing issues with github workflow.
+
+## v0.4.1 (2026-07-20)
+
+- Load OIDC client configuration from a mounted file instead of the image.
+
+## v0.4.0 (2026-07-14)
+
+- Add parallel execution for `viz-workflow` recipes.
+- Add Keycloak authentication for the OGDC service.
+- Add `pvc_mount` input type for referencing pre-staged data on
+  PersistentVolumeClaims (PVCs). Supports both sequential and parallel
+  workflows.
+- Add recursive glob discovery for inputs staged on PVCs.
+- Persist partition manifests for parallel runs on workflow PVCs.
+- Add the `set-token` CLI command and token refresh support for service
+  authentication.
+
 # v0.3.0
 
 - Create service interface for ogdc-runner.
@@ -6,7 +40,7 @@
 - Add `temporary` output type and support retrieval of those outputs from s3
   storage via the `ogdc-runner get-output` CLI.
 - Add DataONE input type for fetching datasets directly from DataONE
-  repositories
+  repositories.
 - Add `parallel-shell` recipe type and related support for executing shell
   recipes in parallel.
 
