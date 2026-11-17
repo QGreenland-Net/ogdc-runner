@@ -447,7 +447,7 @@ def OgdcWorkflow(
     name: str,
     archive_workflow: bool,
     **kwargs: Any,
-) -> Generator[Workflow, None, None]:
+) -> Generator[Workflow]:
     """Contexts manager that yields an argo workflow with configuration driven by `recipe_config`.
 
     kwargs:

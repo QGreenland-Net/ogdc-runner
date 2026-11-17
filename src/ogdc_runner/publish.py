@@ -6,7 +6,7 @@ import os
 from functools import cache
 
 import boto3
-import botocore
+from botocore.client import BaseClient
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from hera.workflows import (
@@ -288,7 +288,7 @@ def get_s3_bucket() -> str:
 
 
 @cache
-def get_s3_client() -> botocore.client.S3:
+def get_s3_client() -> BaseClient:
     """Return an S3 client configured from the `S3_*` environment variables."""
     s3_secret_access_key_id = os.environ.get("S3_SECRET_KEY_ID")
     s3_secret_access_key = os.environ.get("S3_SECRET_KEY_KEY")
