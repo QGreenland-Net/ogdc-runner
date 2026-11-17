@@ -30,7 +30,7 @@ def get_engine() -> sqlalchemy.engine.base.Engine:
 
     engine = create_engine(
         sqlalchemy.engine.URL.create(
-            drivername="postgresql+psycopg2",
+            drivername="postgresql+psycopg",
             username=db_user,
             password=db_pass,
             host=db_host,
@@ -42,7 +42,7 @@ def get_engine() -> sqlalchemy.engine.base.Engine:
 
 
 # Create a FastAPI dependency on the database session.
-def _get_session() -> Generator[Session, None, None]:
+def _get_session() -> Generator[Session]:
     """Yield a database session for FastAPI routes."""
     with Session(get_engine()) as session:
         yield session

@@ -7,7 +7,6 @@ from ogdc_runner.exceptions import OgdcMissingEnvvar
 
 S3_ENVVARS = (
     "S3_ENDPOINT_URL",
-    "INTERNAL_S3_ENDPOINT_URL",
     "S3_BUCKET",
     "S3_REGION",
     "S3_ADDRESSING_STYLE",
@@ -52,21 +51,6 @@ def test_client_honors_region_and_addressing_style(monkeypatch, s3_credentials):
 
     assert client.meta.region_name == "default"
     assert client.meta.config.s3["addressing_style"] == "virtual"
-
-
-def test_client_falls_back_to_legacy_internal_endpoint(monkeypatch, s3_credentials):  # noqa: ARG001
-    monkeypatch.setenv("INTERNAL_S3_ENDPOINT_URL", "http://legacy.example.test:9000")
-
-    assert (
-        publish.get_s3_client().meta.endpoint_url == "http://legacy.example.test:9000"
-    )
-
-
-def test_s3_endpoint_url_wins_over_legacy(monkeypatch, s3_credentials):  # noqa: ARG001
-    monkeypatch.setenv("S3_ENDPOINT_URL", "http://new.example.test")
-    monkeypatch.setenv("INTERNAL_S3_ENDPOINT_URL", "http://legacy.example.test")
-
-    assert publish.get_s3_client().meta.endpoint_url == "http://new.example.test"
 
 
 def test_client_requires_endpoint(s3_credentials):  # noqa: ARG001

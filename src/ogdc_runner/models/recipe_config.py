@@ -321,10 +321,12 @@ class ShellWorkflow(Workflow):
     Requires that the `recipe_directory` context be set when instantiating
     the class. E.g.,:
 
+    .. code-block:: python
+
         workflow = ShellWorkflow.model_validate(
             {"sh_file": "recipe.sh"},
             context={"recipe_directory": Path("/path/to/recipe_directory")},
-        ),
+        )
 
     """
 
@@ -387,10 +389,12 @@ class VizWorkflow(Workflow):
     Requires that the `recipe_directory` context be set when instantiating
     the class. E.g.,:
 
+    .. code-block:: python
+
         workflow = VizWorkflow.model_validate(
             {"config_file": "config.json"},
             context={"recipe_directory": Path("/path/to/recipe_directory")},
-        ),
+        )
 
     """
 
@@ -476,7 +480,7 @@ class RecipeConfig(RecipeMeta):
     # This is where the rest of the config was set from.
     recipe_directory: Path
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @cached_property
     def id(self) -> str:
         k8s_name = self.name.lower().replace(" ", "-")

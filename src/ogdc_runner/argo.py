@@ -465,7 +465,7 @@ def OgdcWorkflow(
     identifier: str | None = None,
     archive_workflow: bool = False,
     **kwargs: Any,
-) -> Generator[Workflow, None, None]:
+) -> Generator[Workflow]:
     """Contexts manager that yields an argo workflow with configuration driven by `recipe_config`.
 
     kwargs:
@@ -488,7 +488,7 @@ def OgdcWorkflow(
       to allow sufficient type for the submitter of the recipe to retrieve the
       results. Otherwise this is left unset.
 
-    All other kwargs are passed directly to `argo.workflows.Workflow.
+    All other kwargs are passed directly to `argo.workflows.Workflow`.
     """
     validate_recipe_input_pvcs_allowed(recipe_config)
 
