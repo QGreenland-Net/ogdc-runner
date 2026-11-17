@@ -62,7 +62,7 @@ def _submit_recipe_and_clean(
         shutil.rmtree(recipe_dir)
 
 
-def _placeholder():
+def _placeholder() -> None:
     """Temporary placeholder for background task"""
     pass
 
