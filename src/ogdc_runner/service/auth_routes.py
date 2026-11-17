@@ -62,6 +62,11 @@ def _submit_recipe_and_clean(
         shutil.rmtree(recipe_dir)
 
 
+def _placeholder():
+    """Temporary placeholder for background task"""
+    pass
+
+
 @router.post(
     "",
     response_model=WorkflowSubmitResponse,
@@ -79,9 +84,22 @@ def create_workflow(
         recipe_dir = stage_ogdc_recipe(payload.recipe_path)
 
         identifier = str(uuid.uuid4())
-        # use background_tasks to run the submission logic
-        background_tasks.add_task(
-            _submit_recipe_and_clean,
+
+        # TODO: submit the recipe and cleanup the recipe dir as a background
+        # task! This work depends on
+        # https://github.com/QGreenland-Net/ogdc-runner/issues/148
+        # background_tasks.add_task(
+        #     _submit_recipe_and_clean,
+        #     recipe_dir=recipe_dir,
+        #     overwrite=payload.overwrite,
+        #     identifier=identifier,
+        # )
+
+        # Use a placeholder for now to demonstrate how this should work.
+        background_tasks.add_task(_placeholder)
+
+        # And run the submission in a synchronous fashion:
+        _submit_recipe_and_clean(
             recipe_dir=recipe_dir,
             overwrite=payload.overwrite,
             identifier=identifier,
