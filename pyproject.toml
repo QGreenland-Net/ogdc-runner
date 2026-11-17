@@ -11,7 +11,7 @@ version = "0.4.2"
 description = "Defines OGDC recipe API(s) and submits recipes to OGDC for execution"
 readme = "README.md"
 license.file = "LICENSE"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 classifiers = [
   "Development Status :: 1 - Planning",
   "Intended Audience :: Science/Research",
@@ -21,8 +21,8 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering",
   "Typing :: Typed",
 ]
@@ -52,7 +52,7 @@ dependencies = [
 
 # NOTE: "test" and "dev" are duplicated; why do we need both?
 test = [
-  "mypy ~=1.10.0",
+  "mypy ~=1.15",
   "pytest >=6",
   "pytest-cov >=3",
   "pytest-order",
@@ -130,6 +130,11 @@ filterwarnings = [
   "ignore:Using `httpx` with `starlette.testclient` is deprecated:DeprecationWarning",
   # AnyIO deprecation alias
   "ignore:The anyio\\.abc\\.BlockingPortal alias is deprecated:DeprecationWarning",
+  # d1_common (dataone.libclient) uses a non-raw regex string (`b"^\s*$\n"`).
+  # Harmless SyntaxWarning, but "error" above escalates it to a SyntaxError at
+  # import time on Python >=3.14. Leading ".*" because 3.14 reworded the message.
+  # Remove once fixed upstream in d1_python.
+  "ignore:.*invalid escape sequence:SyntaxWarning",
 ]
 log_cli_level = "INFO"
 testpaths = [
@@ -149,7 +154,7 @@ report.exclude_also = [
 
 [tool.mypy]
 files = ["src", "tests"]
-python_version = "3.11"
+python_version = "3.13"
 warn_unused_configs = true
 strict = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
@@ -174,13 +179,14 @@ module = [
   "boto3",
   "botocore.exceptions",
   "botocore",
+  "botocore.*",
 ]
 ignore_missing_imports = true
 
 
 [tool.ruff]
 src = ["src"]
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
 extend-select = [
@@ -223,7 +229,7 @@ isort.required-imports = ["from __future__ import annotations"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["T20"]
 "noxfile.py" = ["T20"]
-"**/recipe_config.py" = ["UP007"]
+"**/recipe_config.py" = ["UP007", "UP040"]
 
 [tool.hatch.metadata]
 allow-direct-references = true

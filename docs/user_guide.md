@@ -16,7 +16,7 @@ pip install ogdc-runner
 ```
 
 ```{note}
-If the installation fails with a message about `psycopg2` failing to build, you
+If the installation fails with a message about `psycopg` failing to build, you
 may need to install the postgresql dev kit/client on your machine first.
 
 E.g., on Ubuntu: `apt install libpq-dev`.
