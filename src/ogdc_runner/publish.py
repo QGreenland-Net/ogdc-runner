@@ -161,8 +161,8 @@ def check_for_existing_pvc_published_data(
 ) -> bool:
     """Execute argo workflow that checks if the given recipe has published data to PVC.
 
-    Returns `True` if data have already been published for the given recipe,
-    otherwise `False`.
+    Waits for the workflow to complete and returns `True` if data have already
+    been published for the given recipe, otherwise `False`.
     """
     with OgdcWorkflow(
         recipe_config=recipe_config,
@@ -201,8 +201,6 @@ def check_for_existing_pvc_published_data(
     # wait for the workflow to complete.
     workflow_name = submit_workflow(workflow=w)
 
-    # TODO: need to think about how to make this part of the workflow submission
-    # process async.
     wait_for_workflow_completion(workflow_name)
 
     # If overwrite is not True, we need to check the result of the
