@@ -6,6 +6,7 @@ import datetime as dt
 import os
 import shutil
 import uuid
+from pathlib import Path
 
 import pydantic
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -44,6 +45,23 @@ class WorkflowSubmitResponse(pydantic.BaseModel):
     recipe_identifier: str | None
 
 
+def _submit_recipe_and_clean(
+    recipe_dir: Path,
+    overwrite: bool,
+    identifier: str,
+) -> None:
+    """Submits the given recipe for execution and then cleans up the staged recipe."""
+    try:
+        submit_ogdc_recipe(
+            recipe_dir=recipe_dir,
+            overwrite=overwrite,
+            identifier=identifier,
+        )
+    finally:
+        # Always cleanup the staged recipe directory
+        shutil.rmtree(recipe_dir)
+
+
 @router.post(
     "",
     response_model=WorkflowSubmitResponse,
@@ -63,14 +81,11 @@ def create_workflow(
         identifier = str(uuid.uuid4())
         # use background_tasks to run the submission logic
         background_tasks.add_task(
-            submit_ogdc_recipe,
+            _submit_recipe_and_clean,
             recipe_dir=recipe_dir,
             overwrite=payload.overwrite,
             identifier=identifier,
         )
-
-        # schedule the cleanup to run after the submission
-        background_tasks.add_task(shutil.rmtree, recipe_dir)
 
         # return a generic success message immediately
         return WorkflowSubmitResponse(
