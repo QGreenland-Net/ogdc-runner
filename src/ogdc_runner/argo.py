@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from hashlib import sha256
@@ -423,6 +424,19 @@ def get_workflow_status(identifier: str) -> str | None:
             return workflows.items[0].status.phase
 
     return None
+
+
+def wait_for_workflow_completion(identifier: str) -> None:
+    while True:
+        status = get_workflow_status(identifier)
+        if status:
+            logger.info(f"Workflow status: {status}")
+            # Terminal states
+            if status == "Failed":
+                raise OgdcWorkflowExecutionError(f"Workflow with {identifier=} failed.")
+            if status == "Succeeded":
+                return
+        time.sleep(5)
 
 
 def submit_workflow(workflow: Workflow) -> str:
