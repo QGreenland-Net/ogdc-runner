@@ -1276,8 +1276,9 @@ def _setup_directories(
 
 
 def make_and_submit_viz_workflow(
+    *,
     recipe_config: RecipeConfig,
-    wait: bool = False,
+    identifier: str,
 ) -> str:
     """Create and submit a parallel Argo workflow for viz processing on K8s.
 
@@ -1295,8 +1296,7 @@ def make_and_submit_viz_workflow(
 
     Args:
         recipe_config: Recipe configuration with ``workflow.type == "visualization"``.
-        wait: If ``True``, block until the workflow completes.  Defaults to
-            ``False`` for async submission.
+        identifier: string representing workflow's identifier label.
 
     Returns:
         The Argo workflow name (e.g. ``"my-recipe-visualization-xyz12"``).
@@ -1389,6 +1389,7 @@ def make_and_submit_viz_workflow(
 
     with OgdcWorkflow(
         name="visualization",
+        identifier=identifier,
         recipe_config=recipe_config,
         archive_workflow=True,
         entrypoint="main",
@@ -1587,5 +1588,5 @@ EOF"""
                         web_tile_template=web_tile_template,
                     )
 
-        workflow_name: str = submit_workflow(w, wait=wait)
+        workflow_name: str = submit_workflow(w)
     return workflow_name

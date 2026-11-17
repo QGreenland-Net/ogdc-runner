@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import shutil
+import uuid
+from pathlib import Path
 
 import pydantic
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 
 from ogdc_runner.api import submit_ogdc_recipe
@@ -39,7 +42,29 @@ class WorkflowSubmitRequest(pydantic.BaseModel):
 
 class WorkflowSubmitResponse(pydantic.BaseModel):
     message: str
-    recipe_workflow_name: str | None
+    recipe_identifier: str | None
+
+
+def _submit_recipe_and_clean(
+    recipe_dir: Path,
+    overwrite: bool,
+    identifier: str,
+) -> None:
+    """Submits the given recipe for execution and then cleans up the staged recipe."""
+    try:
+        submit_ogdc_recipe(
+            recipe_dir=recipe_dir,
+            overwrite=overwrite,
+            identifier=identifier,
+        )
+    finally:
+        # Always cleanup the staged recipe directory
+        shutil.rmtree(recipe_dir)
+
+
+def _placeholder() -> None:
+    """Temporary placeholder for background task"""
+    pass
 
 
 @router.post(
@@ -47,46 +72,66 @@ class WorkflowSubmitResponse(pydantic.BaseModel):
     response_model=WorkflowSubmitResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def create_workflow(payload: WorkflowSubmitRequest) -> WorkflowSubmitResponse:
+def create_workflow(
+    payload: WorkflowSubmitRequest,
+    background_tasks: BackgroundTasks,
+) -> WorkflowSubmitResponse:
     """Submit a recipe to OGDC for execution.
 
     Requires a valid auth token and scope.
     """
     try:
-        with stage_ogdc_recipe(payload.recipe_path) as recipe_dir:
-            recipe_workflow_name = submit_ogdc_recipe(
-                recipe_dir=recipe_dir,
-                # Submitting a recipe should never wait - the api should be
-                # responsive and async.
-                wait=False,
-                overwrite=payload.overwrite,
-            )
-            return WorkflowSubmitResponse(
-                message=f"Successfully submitted recipe with {recipe_workflow_name=}",
-                recipe_workflow_name=recipe_workflow_name,
-            )
+        recipe_dir = stage_ogdc_recipe(payload.recipe_path)
+
+        identifier = str(uuid.uuid4())
+
+        # TODO: submit the recipe and cleanup the recipe dir as a background
+        # task! This work depends on
+        # https://github.com/QGreenland-Net/ogdc-runner/issues/148
+        # background_tasks.add_task(
+        #     _submit_recipe_and_clean,
+        #     recipe_dir=recipe_dir,
+        #     overwrite=payload.overwrite,
+        #     identifier=identifier,
+        # )
+
+        # Use a placeholder for now to demonstrate how this should work.
+        background_tasks.add_task(_placeholder)
+
+        # And run the submission in a synchronous fashion:
+        _submit_recipe_and_clean(
+            recipe_dir=recipe_dir,
+            overwrite=payload.overwrite,
+            identifier=identifier,
+        )
+
+        # return a generic success message immediately
+        return WorkflowSubmitResponse(
+            message="Recipe submission accepted.",
+            recipe_identifier=identifier,
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to submit recipe with error: {e}.",
+            detail=f"Failed to initiate submission: {e}.",
         ) from e
 
 
 class WorkflowDetailResponse(pydantic.BaseModel):
-    recipe_workflow_name: str
+    identifier: str
     status: str | None
     timestamp: dt.datetime = pydantic.Field(default_factory=dt.datetime.now)
 
 
 @router.get(
-    "/{recipe_workflow_name}",
+    "/{identifier}",
     response_model=WorkflowDetailResponse,
 )
-def get_workflow(recipe_workflow_name: str) -> WorkflowDetailResponse:
+def get_workflow(identifier: str) -> WorkflowDetailResponse:
     """Check an argo workflow's status."""
-    status = get_workflow_status(recipe_workflow_name)
+    status = get_workflow_status(identifier)
     return WorkflowDetailResponse(
-        recipe_workflow_name=recipe_workflow_name,
+        identifier=identifier,
         status=status,
     )
 

@@ -395,31 +395,51 @@ ARGO_MANAGER: ArgoManager = ArgoManager()
 ARGO_WORKFLOW_SERVICE: WorkflowsService = ARGO_MANAGER.workflow_service
 
 
-def get_workflow_status(workflow_name: str) -> str | None:
+def get_workflow_status(identifier: str) -> str | None:
     """Return the given workflow's status (e.g., `'Succeeded'`)"""
-    workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=workflow_name)
+    # try fetching by name first (cheapest operation)
+    try:
+        workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=identifier)
+        # Note: ignore the type-error here so we can catch the exception below
+        # and try getting the workflow via label-selector instead.
+        return workflow.status.phase  # type: ignore[union-attr]
+    except Exception:
+        workflows = None
 
-    status: str | None = workflow.status.phase  # type: ignore[union-attr]
+        try:
+            workflows = ARGO_WORKFLOW_SERVICE.list_workflows(
+                label_selector=f"identifier={identifier}"
+            )
+        except Exception as e:
+            print(f"Argo API communication failed: {e}")
+            return None
 
-    return status
+        # Now 'workflows' is guaranteed to exist (either as None or the response)
+        if (
+            workflows  # type: ignore[truthy-bool]
+            and workflows.items
+            and len(workflows.items) > 0
+            and workflows.items[0].status
+        ):
+            return workflows.items[0].status.phase
+
+    return None
 
 
-def wait_for_workflow_completion(workflow_name: str) -> None:
+def wait_for_workflow_completion(identifier: str) -> None:
     while True:
-        status = get_workflow_status(workflow_name)
+        status = get_workflow_status(identifier)
         if status:
             logger.info(f"Workflow status: {status}")
             # Terminal states
             if status == "Failed":
-                raise OgdcWorkflowExecutionError(
-                    f"Workflow with name {workflow_name} failed."
-                )
+                raise OgdcWorkflowExecutionError(f"Workflow with {identifier=} failed.")
             if status == "Succeeded":
                 return
         time.sleep(5)
 
 
-def submit_workflow(workflow: Workflow, *, wait: bool = False) -> str:
+def submit_workflow(workflow: Workflow) -> str:
     """Submit the given workflow and return its name as a str."""
     workflow.create()
 
@@ -434,9 +454,6 @@ def submit_workflow(workflow: Workflow, *, wait: bool = False) -> str:
 
     logger.success(f"Successfully submitted workflow with name {workflow_name}")
 
-    if wait:
-        wait_for_workflow_completion(workflow_name)
-
     return workflow_name
 
 
@@ -445,7 +462,8 @@ def OgdcWorkflow(
     *,
     recipe_config: RecipeConfig,
     name: str,
-    archive_workflow: bool,
+    identifier: str | None = None,
+    archive_workflow: bool = False,
     **kwargs: Any,
 ) -> Generator[Workflow]:
     """Contexts manager that yields an argo workflow with configuration driven by `recipe_config`.
@@ -479,6 +497,9 @@ def OgdcWorkflow(
         **kwargs.pop("labels", {}),
         "ogdc/persist-workflow-in-archive": "true" if archive_workflow else "false",
     }
+
+    if identifier:
+        labels["identifier"] = identifier
 
     workflow_kwargs = {
         # user kwargs first. This ensures that configurations set by this

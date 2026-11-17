@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from ogdc_runner.api import submit_ogdc_recipe
+from ogdc_runner.argo import wait_for_workflow_completion
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished, OgdcInvalidRecipeDir
 
 
@@ -14,7 +15,7 @@ def test_submit_ogdc_recipe_with_invalid_dir(tmp_path):
         submit_ogdc_recipe(
             recipe_dir=Path(tmp_path / "nonexistent"),
             overwrite=True,
-            wait=True,
+            identifier="test",
         )
 
 
@@ -27,8 +28,9 @@ def test_submit_ogdc_recipe(test_shell_workflow_recipe_directory):
     submit_ogdc_recipe(
         recipe_dir=test_shell_workflow_recipe_directory,
         overwrite=True,
-        wait=True,
+        identifier="test",
     )
+    wait_for_workflow_completion(identifier="test")
 
 
 @pytest.mark.order(after="test_submit_ogdc_recipe")
@@ -41,5 +43,5 @@ def test_submit_ogdc_recipe_fails_already_published(
         submit_ogdc_recipe(
             recipe_dir=test_shell_workflow_recipe_directory,
             overwrite=False,
-            wait=True,
+            identifier="test",
         )

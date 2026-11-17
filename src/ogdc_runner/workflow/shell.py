@@ -510,14 +510,15 @@ def _create_sequential_workflow(
 
 
 def make_and_submit_shell_workflow(
+    *,
     recipe_config: RecipeConfig,
-    wait: bool,
+    identifier: str,
 ) -> str:
     """Create and submit an argo workflow based on a shell recipe.
 
     Args:
         recipe_config: Recipe configuration containing workflow details
-        wait: Whether to wait for workflow completion
+        identifier: string representing workflow's identifier label.
 
     Returns:
         Workflow name
@@ -531,6 +532,7 @@ def make_and_submit_shell_workflow(
 
     with OgdcWorkflow(
         name="shell",
+        identifier=identifier,
         recipe_config=recipe_config,
         archive_workflow=True,
         entrypoint="main",
@@ -542,4 +544,4 @@ def make_and_submit_shell_workflow(
         else:
             _create_sequential_workflow(recipe_config, commands)
 
-    return submit_workflow(w, wait=wait)
+    return submit_workflow(w)

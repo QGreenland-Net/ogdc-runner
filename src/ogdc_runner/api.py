@@ -11,18 +11,13 @@ from ogdc_runner.workflow.shell import make_and_submit_shell_workflow
 from ogdc_runner.workflow.viz_workflow import make_and_submit_viz_workflow
 
 
-def submit_ogdc_recipe(
-    *,
-    recipe_dir: Path,
-    wait: bool,
-    overwrite: bool,
-) -> str:
+def submit_ogdc_recipe(*, recipe_dir: Path, overwrite: bool, identifier: str) -> str:
     """Submit an OGDC recipe for processing via argo workflows.
 
     Args:
         recipe_dir: Path to the recipe directory
-        wait: Whether to wait for the workflow to complete
         overwrite: Whether to overwrite existing published data
+        identifier: string representing workflow's identifier label.
 
     Returns the name of the OGDC shell recipe submitted to Argo.
     """
@@ -34,20 +29,19 @@ def submit_ogdc_recipe(
         recipe_config=recipe_config,
         overwrite=overwrite,
     ):
+        # TODO: update status to indicate that the recipe is already published..
         err_msg = f"Data for recipe {recipe_config.id} have already been published."
         raise OgdcDataAlreadyPublished(err_msg)
 
     # Check if the recipe is a visualization workflow
     if recipe_config.workflow.type == "visualization":
         return make_and_submit_viz_workflow(
-            recipe_config=recipe_config,
-            wait=wait,
+            recipe_config=recipe_config, identifier=identifier
         )
 
-    # We currently expect all recipes to be "shell"
+    # We currently expect all other recipes to be "shell"
     shell_recipe_workflow_name = make_and_submit_shell_workflow(
-        recipe_config=recipe_config,
-        wait=wait,
+        recipe_config=recipe_config, identifier=identifier
     )
 
     return shell_recipe_workflow_name

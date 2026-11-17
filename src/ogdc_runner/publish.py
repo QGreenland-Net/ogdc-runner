@@ -24,6 +24,7 @@ from ogdc_runner.argo import (
     OGDC_WORKFLOW_PVC,
     OgdcWorkflow,
     submit_workflow,
+    wait_for_workflow_completion,
 )
 from ogdc_runner.exceptions import (
     OgdcMissingEnvvar,
@@ -151,7 +152,7 @@ def remove_existing_published_data(
         with Steps(name="steps"):
             overwrite_template()
 
-    submit_workflow(workflow=w, wait=True)
+    submit_workflow(workflow=w)
 
 
 def check_for_existing_pvc_published_data(
@@ -160,8 +161,8 @@ def check_for_existing_pvc_published_data(
 ) -> bool:
     """Execute argo workflow that checks if the given recipe has published data to PVC.
 
-    Returns `True` if data have already been published for the given recipe,
-    otherwise `False`.
+    Waits for the workflow to complete and returns `True` if data have already
+    been published for the given recipe, otherwise `False`.
     """
     with OgdcWorkflow(
         recipe_config=recipe_config,
@@ -198,7 +199,9 @@ def check_for_existing_pvc_published_data(
             check_dir_template()
 
     # wait for the workflow to complete.
-    workflow_name = submit_workflow(workflow=w, wait=True)
+    workflow_name = submit_workflow(workflow=w)
+
+    wait_for_workflow_completion(workflow_name)
 
     # If overwrite is not True, we need to check the result of the
     # `check-already-published` step to see if the data have been published or

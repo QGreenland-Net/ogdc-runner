@@ -269,7 +269,10 @@ def _render_shell_workflow(config: Any) -> dict[str, Any]:
         return "test-workflow"
 
     with patch("ogdc_runner.workflow.shell.submit_workflow", fake_submit):
-        assert make_and_submit_shell_workflow(config, wait=False) == "test-workflow"
+        assert (
+            make_and_submit_shell_workflow(recipe_config=config, identifier="test")
+            == "test-workflow"
+        )
 
     return rendered_workflows[0]
 

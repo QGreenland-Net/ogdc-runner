@@ -77,11 +77,12 @@ def test_submit_ogdc_viz_recipe(
     submit_ogdc_viz_recipe,
 ):
     """Test that an ogdc visualization recipe can be submitted and executed successfully."""
-    submit_ogdc_viz_recipe(
+    wf_name = submit_ogdc_viz_recipe(
         recipe_dir=viz_recipe_directory,
         overwrite=False,
-        wait=True,
+        identifier="test",
     )
+    argo.wait_for_workflow_completion(wf_name)
 
 
 @pytest.mark.order(after="test_submit_ogdc_viz_recipe")
@@ -95,5 +96,5 @@ def test_submit_ogdc_viz_recipe_fails_already_published(
         submit_ogdc_viz_recipe(
             recipe_dir=viz_recipe_directory,
             overwrite=False,
-            wait=True,
+            identifier="test",
         )
