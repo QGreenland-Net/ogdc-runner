@@ -29,9 +29,7 @@ def submit_ogdc_recipe(*, recipe_dir: Path, overwrite: bool, identifier: str) ->
         recipe_config=recipe_config,
         overwrite=overwrite,
     ):
-        # TODO: if this condition is encountered then the recipe workflow will
-        # never be submitted and the user will not be able to get a meaningful
-        # status.
+        # TODO: update status to indicate that the recipe is already published..
         err_msg = f"Data for recipe {recipe_config.id} have already been published."
         raise OgdcDataAlreadyPublished(err_msg)
 
