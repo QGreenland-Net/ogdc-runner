@@ -24,6 +24,7 @@ from ogdc_runner.argo import (
     OGDC_WORKFLOW_PVC,
     OgdcWorkflow,
     submit_workflow,
+    wait_for_workflow_completion,
 )
 from ogdc_runner.exceptions import (
     OgdcMissingEnvvar,
@@ -199,6 +200,10 @@ def check_for_existing_pvc_published_data(
 
     # wait for the workflow to complete.
     workflow_name = submit_workflow(workflow=w)
+
+    # TODO: need to think about how to make this part of the workflow submission
+    # process async.
+    wait_for_workflow_completion(workflow_name)
 
     # If overwrite is not True, we need to check the result of the
     # `check-already-published` step to see if the data have been published or
