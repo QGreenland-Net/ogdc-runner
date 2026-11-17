@@ -5,10 +5,11 @@ from functools import cache
 from pathlib import Path
 
 import pytest
+from dataone.auth import ACCESS_MODE_OPEN
 from sqlmodel import StaticPool, create_engine
 
 # OIDC-specific tests provide their own temporary credentials.
-os.environ.setdefault("ACCESS_MODE", "open")
+os.environ.setdefault("ACCESS_MODE", ACCESS_MODE_OPEN)
 
 from ogdc_runner.service import db
 
@@ -76,4 +77,8 @@ def mock_dataone_node_url(monkeypatch):
     monkeypatch.setenv(
         "DATAONE_NODE_URL",
         "https://arcticdata.io/metacat/d1/mn",
+    )
+    monkeypatch.setenv(
+        "ENVIRONMENT",
+        "local",
     )

@@ -46,7 +46,6 @@ app = FastAPI(
     version=__version__,
     title="Open Geospatial Data Cloud (OGDC) API",
     lifespan=lifespan,
-    root_path=os.environ.get("API_ROOT_PATH", "/"),
 )
 
 app.add_middleware(
