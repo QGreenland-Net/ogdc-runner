@@ -8,6 +8,7 @@
 - Harden `/storage`: reject oversized `expires` values with `403`, refuse
   signing keys shorter than 32 characters or equal to `your-value-here` (`503`),
   and answer `503`/`502` for unconfigured/unreachable S3.
+- Add identifier label to each argo workflow submitted for a recipe.
 
 ## v0.4.2 (2026-08-19)
 
