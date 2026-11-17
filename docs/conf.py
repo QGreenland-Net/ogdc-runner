@@ -92,6 +92,7 @@ nitpick_ignore = [
     ("py:class", "list[dict[str"),
     ("py:class", "botocore.client.S3"),
     ("py:class", "botocore.client.BaseClient"),
+    ("py:class", "fastapi.BackgroundTasks"),
     ("py:class", "fastapi.responses.StreamingResponse"),
 ]
 
