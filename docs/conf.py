@@ -91,6 +91,7 @@ nitpick_ignore = [
     # There is no other context except that warning
     ("py:class", "list[dict[str"),
     ("py:class", "botocore.client.S3"),
+    ("py:class", "botocore.client.BaseClient"),
     ("py:class", "fastapi.responses.StreamingResponse"),
 ]
 

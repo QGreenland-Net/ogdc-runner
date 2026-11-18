@@ -354,7 +354,6 @@ def validate_all_recipes(recipes_location: str, ref: str) -> None:
 def _download_output_for_workflow(
     config: Config, workflow_name: str, output_dir: Path
 ) -> None:
-
     headers = {}
     if config.access_mode != ACCESS_MODE_OPEN:
         headers["Authorization"] = f"Bearer {_get_api_token(config)}"

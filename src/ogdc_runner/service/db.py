@@ -42,7 +42,7 @@ def get_engine() -> sqlalchemy.engine.base.Engine:
 
 
 # Create a FastAPI dependency on the database session.
-def _get_session() -> Generator[Session, None, None]:
+def _get_session() -> Generator[Session]:
     """Yield a database session for FastAPI routes."""
     with Session(get_engine()) as session:
         yield session
