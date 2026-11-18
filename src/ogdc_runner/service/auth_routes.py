@@ -6,18 +6,23 @@ import datetime as dt
 import os
 import shutil
 import uuid
-from pathlib import Path
 
 import pydantic
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 
 from ogdc_runner.api import submit_ogdc_recipe
-from ogdc_runner.argo import get_workflow_status
 from ogdc_runner.exceptions import OgdcOutputDataRetrievalError
 from ogdc_runner.publish import get_temporary_output_data_url
 from ogdc_runner.recipe import stage_ogdc_recipe
 from ogdc_runner.service.auth import auth_client
+from ogdc_runner.service.db import SessionDependency, get_db_session
+from ogdc_runner.service.orders import (
+    Order,
+    OrderStatus,
+    get_order_status,
+    update_order_status,
+)
 
 bearer_schema = HTTPBearer(auto_error=False)
 
@@ -46,25 +51,30 @@ class WorkflowSubmitResponse(pydantic.BaseModel):
 
 
 def _submit_recipe_and_clean(
-    recipe_dir: Path,
+    recipe_path: str,
     overwrite: bool,
     identifier: str,
 ) -> None:
     """Submits the given recipe for execution and then cleans up the staged recipe."""
+    staged_recipe_dir = stage_ogdc_recipe(recipe_path)
     try:
         submit_ogdc_recipe(
-            recipe_dir=recipe_dir,
+            recipe_dir=staged_recipe_dir,
             overwrite=overwrite,
             identifier=identifier,
         )
+    except Exception as e:
+        # Get the order record and update it with "Failed" status.
+        with get_db_session() as session:
+            update_order_status(
+                order_id=identifier,
+                order_status=OrderStatus.FAILED,
+                session=session,
+            )
+        raise e
     finally:
         # Always cleanup the staged recipe directory
-        shutil.rmtree(recipe_dir)
-
-
-def _placeholder() -> None:
-    """Temporary placeholder for background task"""
-    pass
+        shutil.rmtree(staged_recipe_dir)
 
 
 @router.post(
@@ -75,32 +85,28 @@ def _placeholder() -> None:
 def create_workflow(
     payload: WorkflowSubmitRequest,
     background_tasks: BackgroundTasks,
+    session: SessionDependency,
 ) -> WorkflowSubmitResponse:
     """Submit a recipe to OGDC for execution.
 
     Requires a valid auth token and scope.
     """
+    identifier = str(uuid.uuid4())
+
     try:
-        recipe_dir = stage_ogdc_recipe(payload.recipe_path)
+        # Register the submission
+        session.add(
+            Order(
+                id=identifier,
+                status=OrderStatus.SUBMITTED,
+            )
+        )
+        session.commit()
 
-        identifier = str(uuid.uuid4())
-
-        # TODO: submit the recipe and cleanup the recipe dir as a background
-        # task! This work depends on
-        # https://github.com/QGreenland-Net/ogdc-runner/issues/148
-        # background_tasks.add_task(
-        #     _submit_recipe_and_clean,
-        #     recipe_dir=recipe_dir,
-        #     overwrite=payload.overwrite,
-        #     identifier=identifier,
-        # )
-
-        # Use a placeholder for now to demonstrate how this should work.
-        background_tasks.add_task(_placeholder)
-
-        # And run the submission in a synchronous fashion:
-        _submit_recipe_and_clean(
-            recipe_dir=recipe_dir,
+        # Background task to run the recipe submission logic.
+        background_tasks.add_task(
+            _submit_recipe_and_clean,
+            recipe_path=payload.recipe_path,
             overwrite=payload.overwrite,
             identifier=identifier,
         )
@@ -111,6 +117,7 @@ def create_workflow(
             recipe_identifier=identifier,
         )
     except Exception as e:
+        # TODO: try to update the db here if the id was added??
         raise HTTPException(
             status_code=500,
             detail=f"Failed to initiate submission: {e}.",
@@ -119,7 +126,7 @@ def create_workflow(
 
 class WorkflowDetailResponse(pydantic.BaseModel):
     identifier: str
-    status: str | None
+    status: OrderStatus
     timestamp: dt.datetime = pydantic.Field(default_factory=dt.datetime.now)
 
 
@@ -127,9 +134,12 @@ class WorkflowDetailResponse(pydantic.BaseModel):
     "/{identifier}",
     response_model=WorkflowDetailResponse,
 )
-def get_workflow(identifier: str) -> WorkflowDetailResponse:
-    """Check an argo workflow's status."""
-    status = get_workflow_status(identifier)
+def get_workflow(
+    identifier: str,
+    session: SessionDependency,
+) -> WorkflowDetailResponse:
+    """Check an OGDC workflow's status."""
+    status = get_order_status(session=session, order_id=identifier)
     return WorkflowDetailResponse(
         identifier=identifier,
         status=status,

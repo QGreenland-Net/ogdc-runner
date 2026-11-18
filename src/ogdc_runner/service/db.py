@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Generator
+from contextlib import contextmanager
 from functools import cache
 from typing import Annotated
 
@@ -49,6 +50,8 @@ def _get_session() -> Generator[Session]:
 
 
 SessionDependency = Annotated[Session, Depends(_get_session)]
+
+get_db_session = contextmanager(_get_session)
 
 
 def close_db() -> None:

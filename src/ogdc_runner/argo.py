@@ -10,11 +10,14 @@ from typing import Any
 
 from hera.shared import global_config
 from hera.workflows import (
+    ConfigMapEnv,
     Container,
+    SecretEnv,
     Workflow,
     WorkflowsService,
     models,
 )
+from hera.workflows.models import LifecycleHook
 from loguru import logger
 
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig, OgdcWorkflowExecutionError
@@ -457,6 +460,33 @@ def submit_workflow(workflow: Workflow) -> str:
     return workflow_name
 
 
+def _update_status_template(order_id: str) -> Container:
+    # TODO: get release name from envvar?
+    release_name = "qgnet-ogdc"
+    return Container(
+        name="update-order-status",
+        command=[".venv/bin/python", "-m", "ogdc_runner.service.update_order_status"],
+        args=["--order-id", order_id, "--workflow-status", "{{workflow.status}}"],
+        env=[
+            SecretEnv(
+                name="OGDC_DB_USERNAME",
+                secret_name=f"{release_name}-db-postgres-secrets",
+                secret_key="username",
+            ),
+            SecretEnv(
+                name="OGDC_DB_PASSWORD",
+                secret_name=f"{release_name}-db-postgres-secrets",
+                secret_key="password",
+            ),
+            ConfigMapEnv(
+                name="OGDC_DB_HOST",
+                config_map_name=f"{release_name}-ogdc-service-config",
+                config_map_key="OGDC_DB_HOST",
+            ),
+        ],
+    )
+
+
 @contextmanager
 def OgdcWorkflow(
     *,
@@ -500,6 +530,15 @@ def OgdcWorkflow(
 
     if identifier:
         labels["identifier"] = identifier
+        status_template = _update_status_template(order_id=identifier)
+        kwargs["hooks"] = {
+            "running": LifecycleHook(
+                expression='workflow.status == "Running"',
+                template=status_template.name,
+            ),
+            "exit": LifecycleHook(template=status_template.name),
+        }
+        kwargs["templates"] = [status_template]
 
     workflow_kwargs = {
         # user kwargs first. This ensures that configurations set by this
