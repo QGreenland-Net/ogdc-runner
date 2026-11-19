@@ -23,7 +23,7 @@ model.
 
 An example recipe `meta.yml` is shown below:
 
-```{literalinclude} ../tests/test_recipe_dir/meta.yml
+```{literalinclude} ../tests/test_shell_workflow_recipe_dir/meta.yml
 :language: yaml
 ```
 
@@ -204,7 +204,7 @@ or `ogr2ogr` commands to perform e.g., reprojection or subsetting.
 
 An example of a `recipe.sh` file is shown below:
 
-```{literalinclude} ../tests/test_recipe_dir/recipe.sh
+```{literalinclude} ../tests/test_shell_workflow_recipe_dir/recipe.sh
 :language: sh
 ```
 

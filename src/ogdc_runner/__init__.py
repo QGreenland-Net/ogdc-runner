@@ -14,6 +14,6 @@ try:
     )  # Use your package's name as registered on PyPI
 except PackageNotFoundError:
     # This block handles cases where the package is imported but not yet installed (e.g., development mode)
-    __version__ = "0.4.1"
+    __version__ = "0.4.2"
 
 __all__ = ["__version__"]
