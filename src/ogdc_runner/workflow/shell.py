@@ -512,7 +512,7 @@ def _create_sequential_workflow(
 def make_and_submit_shell_workflow(
     *,
     recipe_config: RecipeConfig,
-    identifier: str,
+    identifier: str | None,
 ) -> str:
     """Create and submit an argo workflow based on a shell recipe.
 

@@ -80,7 +80,6 @@ def test_submit_ogdc_viz_recipe(
     wf_name = submit_ogdc_viz_recipe(
         recipe_dir=viz_recipe_directory,
         overwrite=False,
-        identifier="test",
     )
     argo.wait_for_workflow_completion(wf_name)
 
@@ -96,5 +95,4 @@ def test_submit_ogdc_viz_recipe_fails_already_published(
         submit_ogdc_viz_recipe(
             recipe_dir=viz_recipe_directory,
             overwrite=False,
-            identifier="test",
         )

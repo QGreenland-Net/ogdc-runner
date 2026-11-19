@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import enum
+import uuid
 from typing import Self
 
 from loguru import logger
@@ -52,6 +53,24 @@ def _get_order(*, session: Session, order_id: str) -> Order:
         raise RuntimeError(f"Order with {order_id=} not found.")
 
     return order_record
+
+
+def create_order(*, session: Session) -> Order:
+    """Create and return a new Order with the "SUBMITTED" status."""
+    identifier = str(uuid.uuid4())
+
+    new_order = Order(
+        id=identifier,
+        status=OrderStatus.SUBMITTED,
+    )
+    # Register the submission
+    session.add(new_order)
+    session.commit()
+    # After commit, ensure the order object is in memory so that we can use
+    # e.g., `order.id` later.
+    session.refresh(new_order)
+
+    return new_order
 
 
 def update_order_status(

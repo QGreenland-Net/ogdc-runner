@@ -5,7 +5,6 @@ from __future__ import annotations
 import datetime as dt
 import os
 import shutil
-import uuid
 
 import pydantic
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -20,6 +19,7 @@ from ogdc_runner.service.db import SessionDependency, get_db_session
 from ogdc_runner.service.orders import (
     Order,
     OrderStatus,
+    create_order,
     get_order_status,
     update_order_status,
 )
@@ -53,7 +53,7 @@ class WorkflowSubmitResponse(pydantic.BaseModel):
 def _submit_recipe_and_clean(
     recipe_path: str,
     overwrite: bool,
-    identifier: str,
+    order: Order,
 ) -> None:
     """Submits the given recipe for execution and then cleans up the staged recipe."""
     staged_recipe_dir = stage_ogdc_recipe(recipe_path)
@@ -61,13 +61,13 @@ def _submit_recipe_and_clean(
         submit_ogdc_recipe(
             recipe_dir=staged_recipe_dir,
             overwrite=overwrite,
-            identifier=identifier,
+            identifier=order.id,
         )
     except Exception as e:
         # Get the order record and update it with "Failed" status.
         with get_db_session() as session:
             update_order_status(
-                order_id=identifier,
+                order_id=order.id,
                 order_status=OrderStatus.FAILED,
                 session=session,
             )
@@ -91,30 +91,20 @@ def create_workflow(
 
     Requires a valid auth token and scope.
     """
-    identifier = str(uuid.uuid4())
-
     try:
-        # Register the submission
-        session.add(
-            Order(
-                id=identifier,
-                status=OrderStatus.SUBMITTED,
-            )
-        )
-        session.commit()
-
+        order = create_order(session=session)
         # Background task to run the recipe submission logic.
         background_tasks.add_task(
             _submit_recipe_and_clean,
             recipe_path=payload.recipe_path,
             overwrite=payload.overwrite,
-            identifier=identifier,
+            order=order,
         )
 
         # return a generic success message immediately
         return WorkflowSubmitResponse(
             message="Recipe submission accepted.",
-            recipe_identifier=identifier,
+            recipe_identifier=order.id,
         )
     except Exception as e:
         # TODO: try to update the db here if the id was added??

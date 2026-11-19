@@ -1278,7 +1278,7 @@ def _setup_directories(
 def make_and_submit_viz_workflow(
     *,
     recipe_config: RecipeConfig,
-    identifier: str,
+    identifier: str | None,
 ) -> str:
     """Create and submit a parallel Argo workflow for viz processing on K8s.
 

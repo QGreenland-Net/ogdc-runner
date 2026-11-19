@@ -9,7 +9,8 @@ from ogdc_runner.argo import wait_for_workflow_completion
 
 
 def test_temporary_output_recipe(
-    test_temp_output_recipe_directory, tmpdir, monkeypatch
+    test_temp_output_recipe_directory,
+    tmpdir,
 ):
     """Test that an ogdc recipe with a temporary output can be submitted, executes successfully, and outputs are accessible for download as a zip package.
 
@@ -24,7 +25,6 @@ def test_temporary_output_recipe(
     database is complete, the separation of this test from
     `test_submit_ogdc_recipe` can be removed.
     """
-    monkeypatch.setenv("ENVIRONMENT", "local")
     tmpdir_path = Path(tmpdir)
 
     # Note: `overwrite` is set here to ensure that outputs from a previous test
@@ -33,10 +33,9 @@ def test_temporary_output_recipe(
     workflow_name = submit_ogdc_recipe(
         recipe_dir=test_temp_output_recipe_directory,
         overwrite=True,
-        identifier="test",
     )
 
-    wait_for_workflow_completion(identifier="test")
+    wait_for_workflow_completion(identifier=workflow_name)
 
     # retrieve the data and assert that it is correct.
     config = Config()

@@ -15,7 +15,6 @@ def test_submit_ogdc_recipe_with_invalid_dir(tmp_path):
         submit_ogdc_recipe(
             recipe_dir=Path(tmp_path / "nonexistent"),
             overwrite=True,
-            identifier="test",
         )
 
 
@@ -25,12 +24,11 @@ def test_submit_ogdc_recipe(test_shell_workflow_recipe_directory):
     # Note: `overwrite` is set here to ensure that outputs from a previous test
     # run are overwritten. This is not ideal. Tests that create data should
     # cleanup after themselves.
-    submit_ogdc_recipe(
+    wf_name = submit_ogdc_recipe(
         recipe_dir=test_shell_workflow_recipe_directory,
         overwrite=True,
-        identifier="test",
     )
-    wait_for_workflow_completion(identifier="test")
+    wait_for_workflow_completion(wf_name)
 
 
 @pytest.mark.order(after="test_submit_ogdc_recipe")
@@ -43,5 +41,4 @@ def test_submit_ogdc_recipe_fails_already_published(
         submit_ogdc_recipe(
             recipe_dir=test_shell_workflow_recipe_directory,
             overwrite=False,
-            identifier="test",
         )
