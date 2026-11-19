@@ -10,7 +10,7 @@ from hera.workflows import Container
 from ogdc_runner.argo import (
     OGDC_WORKFLOW_PVC,
     OGDC_WORKFLOW_PVC_CLAIM_NAME,
-    OgdcWorkflow,
+    OgdcRecipeWorkflow,
     get_allowed_input_pvc_claims,
     get_input_pvc_volume_mounts,
     get_input_pvc_volumes,
@@ -141,15 +141,16 @@ def test_ARGO_MANAGER_update_image(monkeypatch):
     assert Container().image_pull_policy == "Always"
 
 
-def test_OgdcWorfklow_no_archive(test_shell_workflow_recipe_directory):
+def test_OgdcWorfklow_no_archive(test_shell_workflow_recipe_directory, mock_order_id):
     recipe_config = get_recipe_config(
         test_shell_workflow_recipe_directory, check_urls=False
     )
     workflow_name = "test"
 
-    with OgdcWorkflow(
+    with OgdcRecipeWorkflow(
         recipe_config=recipe_config,
         name=workflow_name,
+        order_id=mock_order_id,
         archive_workflow=False,
     ) as w:
         assert w.generate_name == f"{recipe_config.id}-{workflow_name}-"
@@ -158,30 +159,34 @@ def test_OgdcWorfklow_no_archive(test_shell_workflow_recipe_directory):
         assert w.labels["ogdc/persist-workflow-in-archive"] == "false"
 
 
-def test_OgdcWorfklow_with_archive(test_shell_workflow_recipe_directory):
+def test_OgdcWorfklow_with_archive(test_shell_workflow_recipe_directory, mock_order_id):
     recipe_config = get_recipe_config(
         test_shell_workflow_recipe_directory, check_urls=False
     )
     workflow_name = "test"
 
-    with OgdcWorkflow(
+    with OgdcRecipeWorkflow(
         recipe_config=recipe_config,
         name=workflow_name,
+        order_id=mock_order_id,
         archive_workflow=True,
     ) as w:
         assert w.labels
         assert w.labels["ogdc/persist-workflow-in-archive"] == "true"
 
 
-def test_OgdcWorfklow_with_temp_output(test_temp_output_recipe_directory):
+def test_OgdcWorfklow_with_temp_output(
+    test_temp_output_recipe_directory, mock_order_id
+):
     recipe_config = get_recipe_config(
         test_temp_output_recipe_directory, check_urls=False
     )
     workflow_name = "test"
 
-    with OgdcWorkflow(
+    with OgdcRecipeWorkflow(
         recipe_config=recipe_config,
         name=workflow_name,
+        order_id=mock_order_id,
         archive_workflow=False,
     ) as w:
         # Expect 7 days for recipes with temporary output type.
@@ -189,9 +194,10 @@ def test_OgdcWorfklow_with_temp_output(test_temp_output_recipe_directory):
         assert w.ttl_strategy.seconds_after_success == 60 * 60 * 24 * 7
 
 
-def test_OgdcWorkflow_allows_configured_input_pvc(
+def test_OgdcRecipeWorkflow_allows_configured_input_pvc(
     monkeypatch,
     test_shell_workflow_recipe_directory,
+    mock_order_id,
 ):
     monkeypatch.setenv(
         "OGDC_ALLOWED_INPUT_PVCS",
@@ -204,19 +210,21 @@ def test_OgdcWorkflow_allows_configured_input_pvc(
         params=[PvcMountInput(claim_name="ogdc-test-pvc", path="/data/")]
     )
 
-    with OgdcWorkflow(
+    with OgdcRecipeWorkflow(
         recipe_config=recipe_config,
         name="test",
+        order_id=mock_order_id,
         archive_workflow=False,
     ) as w:
         assert w.generate_name == f"{recipe_config.id}-test-"
 
 
 @pytest.mark.parametrize("allowlist_env", [None, "", "[]"])
-def test_OgdcWorkflow_allows_default_workflow_pvc_as_input(
+def test_OgdcRecipeWorkflow_allows_default_workflow_pvc_as_input(
     monkeypatch,
     test_shell_workflow_recipe_directory,
     allowlist_env,
+    mock_order_id,
 ):
     if allowlist_env is None:
         monkeypatch.delenv("OGDC_ALLOWED_INPUT_PVCS", raising=False)
@@ -238,17 +246,19 @@ def test_OgdcWorkflow_allows_default_workflow_pvc_as_input(
     assert mounts[0].mount_path == f"/mnt/data/{OGDC_WORKFLOW_PVC_CLAIM_NAME}"
     assert mounts[0].read_only is True
 
-    with OgdcWorkflow(
+    with OgdcRecipeWorkflow(
         recipe_config=recipe_config,
         name="test",
+        order_id=mock_order_id,
         archive_workflow=False,
     ) as w:
         assert w.generate_name == f"{recipe_config.id}-test-"
 
 
-def test_OgdcWorkflow_rejects_unconfigured_input_pvc(
+def test_OgdcRecipeWorkflow_rejects_unconfigured_input_pvc(
     monkeypatch,
     test_shell_workflow_recipe_directory,
+    mock_order_id,
 ):
     monkeypatch.setenv(
         "OGDC_ALLOWED_INPUT_PVCS",
@@ -263,9 +273,10 @@ def test_OgdcWorkflow_rejects_unconfigured_input_pvc(
 
     with (
         pytest.raises(OgdcInvalidRecipeConfig, match="ogdc-test-pvc"),
-        OgdcWorkflow(
+        OgdcRecipeWorkflow(
             recipe_config=recipe_config,
             name="test",
+            order_id=mock_order_id,
             archive_workflow=False,
         ),
     ):
@@ -273,10 +284,11 @@ def test_OgdcWorkflow_rejects_unconfigured_input_pvc(
 
 
 @pytest.mark.parametrize("allowlist_env", [None, "[]"])
-def test_OgdcWorkflow_rejects_input_pvc_when_allowlist_missing_or_empty(
+def test_OgdcRecipeWorkflow_rejects_input_pvc_when_allowlist_missing_or_empty(
     monkeypatch,
     test_shell_workflow_recipe_directory,
     allowlist_env,
+    mock_order_id,
 ):
     if allowlist_env is None:
         monkeypatch.delenv("OGDC_ALLOWED_INPUT_PVCS", raising=False)
@@ -292,9 +304,10 @@ def test_OgdcWorkflow_rejects_input_pvc_when_allowlist_missing_or_empty(
 
     with (
         pytest.raises(OgdcInvalidRecipeConfig, match="OGDC_ALLOWED_INPUT_PVCS"),
-        OgdcWorkflow(
+        OgdcRecipeWorkflow(
             recipe_config=recipe_config,
             name="test",
+            order_id=mock_order_id,
             archive_workflow=False,
         ),
     ):

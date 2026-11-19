@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import datetime as dt
 import enum
-from typing import Self
+import uuid
+from typing import NewType, Self, cast
 
 from loguru import logger
 from sqlmodel import Field, Session, SQLModel
@@ -52,6 +53,26 @@ def _get_order(*, session: Session, order_id: str) -> Order:
         raise RuntimeError(f"Order with {order_id=} not found.")
 
     return order_record
+
+
+OrderId = NewType("OrderId", str)
+
+
+def create_order(*, session: Session) -> OrderId:
+    """Create a new Order with the "SUBMITTED" status and return it's ID."""
+    order_id = str(uuid.uuid4())
+
+    new_order = Order(
+        id=order_id,
+        status=OrderStatus.SUBMITTED,
+    )
+    # Register the submission
+    session.add(new_order)
+    session.commit()
+
+    order_id = cast(OrderId, order_id)
+
+    return order_id
 
 
 def update_order_status(

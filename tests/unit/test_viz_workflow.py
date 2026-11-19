@@ -18,6 +18,7 @@ from ogdc_runner.models.recipe_config import (
     VizWorkflow,
 )
 from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.service.orders import OrderId
 from ogdc_runner.workflow.viz_workflow import make_and_submit_viz_workflow
 
 
@@ -82,7 +83,7 @@ def test_get_viz_config_json_invalid_json(tmp_path):
         )
 
 
-def _render_viz_workflow(config: RecipeConfig) -> dict[str, Any]:
+def _render_viz_workflow(config: RecipeConfig, order_id: OrderId) -> dict[str, Any]:
     rendered_workflows: list[dict[str, Any]] = []
 
     def fake_submit(workflow: Any, wait: bool = False) -> str:
@@ -92,7 +93,10 @@ def _render_viz_workflow(config: RecipeConfig) -> dict[str, Any]:
 
     with patch("ogdc_runner.workflow.viz_workflow.submit_workflow", fake_submit):
         assert (
-            make_and_submit_viz_workflow(recipe_config=config, identifier="test")
+            make_and_submit_viz_workflow(
+                recipe_config=config,
+                order_id=order_id,
+            )
             == "test-workflow"
         )
 
@@ -156,11 +160,12 @@ def _make_direct_pvc_viz_config(
 
 def test_viz_workflow_renders_serial_dag_when_parallel_disabled(
     test_viz_workflow_recipe_directory,
+    mock_order_id,
 ):
     config = get_recipe_config(
         recipe_directory=test_viz_workflow_recipe_directory,
     )
-    workflow = _render_viz_workflow(config)
+    workflow = _render_viz_workflow(config, mock_order_id)
     tasks = _main_dag_tasks(workflow)
 
     assert "parallelism" not in workflow["spec"]
@@ -170,12 +175,13 @@ def test_viz_workflow_renders_serial_dag_when_parallel_disabled(
 
 def test_viz_workflow_renders_parallel_dag_with_default_cap(
     test_viz_workflow_recipe_directory,
+    mock_order_id,
 ):
     config = get_recipe_config(
         recipe_directory=test_viz_workflow_recipe_directory,
     )
     config.workflow.parallel = ParallelConfig(enabled=True)
-    workflow = _render_viz_workflow(config)
+    workflow = _render_viz_workflow(config, mock_order_id)
     tasks = _main_dag_tasks(workflow)
 
     assert workflow["spec"]["parallelism"] == MAX_PARALLEL_LIMIT
@@ -198,12 +204,13 @@ def test_viz_workflow_renders_parallel_dag_with_default_cap(
 
 def test_viz_workflow_honors_max_parallelism(
     test_viz_workflow_recipe_directory,
+    mock_order_id,
 ):
     config = get_recipe_config(
         recipe_directory=test_viz_workflow_recipe_directory,
     )
     config.workflow.parallel = ParallelConfig(enabled=True, max_parallelism=17)
-    workflow = _render_viz_workflow(config)
+    workflow = _render_viz_workflow(config, mock_order_id)
 
     assert workflow["spec"]["parallelism"] == 17
 
@@ -211,6 +218,7 @@ def test_viz_workflow_honors_max_parallelism(
 def test_viz_workflow_renders_pvc_mount_input(
     monkeypatch,
     test_viz_workflow_recipe_directory,
+    mock_order_id,
 ):
     monkeypatch.setenv(
         "OGDC_ALLOWED_INPUT_PVCS",
@@ -230,7 +238,7 @@ def test_viz_workflow_renders_pvc_mount_input(
         ]
     )
 
-    workflow = _render_viz_workflow(config)
+    workflow = _render_viz_workflow(config, mock_order_id)
     tasks = _main_dag_tasks(workflow)
 
     _assert_references_existing_claims_only(workflow)
@@ -259,6 +267,7 @@ def test_viz_workflow_renders_pvc_mount_input(
 def test_serial_viz_workflow_renders_pvc_mount_input(
     monkeypatch,
     test_viz_workflow_recipe_directory,
+    mock_order_id,
 ):
     monkeypatch.setenv("OGDC_ALLOWED_INPUT_PVCS", '["ogdc-test-pvc"]')
     config = get_recipe_config(
@@ -274,7 +283,7 @@ def test_serial_viz_workflow_renders_pvc_mount_input(
         ]
     )
 
-    workflow = _render_viz_workflow(config)
+    workflow = _render_viz_workflow(config, mock_order_id)
     tasks = _main_dag_tasks(workflow)
 
     _assert_references_existing_claims_only(workflow)
@@ -307,6 +316,7 @@ def test_serial_viz_workflow_renders_pvc_mount_input(
 def test_viz_pvc_mounts_do_not_leak_to_later_non_pvc_render(
     monkeypatch,
     test_viz_workflow_recipe_directory,
+    mock_order_id,
 ):
     monkeypatch.setenv("OGDC_ALLOWED_INPUT_PVCS", '["ogdc-test-pvc"]')
     pvc_config = get_recipe_config(
@@ -323,7 +333,7 @@ def test_viz_pvc_mounts_do_not_leak_to_later_non_pvc_render(
         ]
     )
 
-    pvc_workflow = _render_viz_workflow(pvc_config)
+    pvc_workflow = _render_viz_workflow(pvc_config, mock_order_id)
     pvc_stage_template = _template(pvc_workflow, "stage-files")
     pvc_stage_mounts = {
         mount["name"] for mount in pvc_stage_template["script"]["volumeMounts"]
@@ -334,7 +344,7 @@ def test_viz_pvc_mounts_do_not_leak_to_later_non_pvc_render(
         recipe_directory=test_viz_workflow_recipe_directory,
     )
     plain_config.workflow.parallel = ParallelConfig(enabled=True, partition_size=10)
-    plain_workflow = _render_viz_workflow(plain_config)
+    plain_workflow = _render_viz_workflow(plain_config, mock_order_id)
     plain_stage_template = _template(plain_workflow, "stage-files")
     plain_stage_mounts = {
         mount["name"] for mount in plain_stage_template["script"]["volumeMounts"]
@@ -343,7 +353,9 @@ def test_viz_pvc_mounts_do_not_leak_to_later_non_pvc_render(
     assert plain_stage_mounts == {"workflow-volume"}
 
 
-def test_parallel_viz_pvc_can_start_at_raster_and_3dtiles(monkeypatch, tmp_path):
+def test_parallel_viz_pvc_can_start_at_raster_and_3dtiles(
+    monkeypatch, tmp_path, mock_order_id
+):
     monkeypatch.setenv("OGDC_ALLOWED_INPUT_PVCS", '["ogdc-test-pvc"]')
     config = _make_direct_pvc_viz_config(
         tmp_path,
@@ -358,7 +370,7 @@ def test_parallel_viz_pvc_can_start_at_raster_and_3dtiles(monkeypatch, tmp_path)
         },
     )
 
-    workflow = _render_viz_workflow(config)
+    workflow = _render_viz_workflow(config, mock_order_id)
     tasks = _main_dag_tasks(workflow)
     task_names = [task["name"] for task in tasks]
 
@@ -408,7 +420,7 @@ def test_parallel_viz_pvc_can_start_at_raster_and_3dtiles(monkeypatch, tmp_path)
     assert "input-pvc-ogdc-test-pvc" in threed_mounts
 
 
-def test_parallel_viz_pvc_can_start_at_webtiles(monkeypatch, tmp_path):
+def test_parallel_viz_pvc_can_start_at_webtiles(monkeypatch, tmp_path, mock_order_id):
     monkeypatch.setenv("OGDC_ALLOWED_INPUT_PVCS", '["ogdc-test-pvc"]')
     config = _make_direct_pvc_viz_config(
         tmp_path,
@@ -421,7 +433,7 @@ def test_parallel_viz_pvc_can_start_at_webtiles(monkeypatch, tmp_path):
         },
     )
 
-    workflow = _render_viz_workflow(config)
+    workflow = _render_viz_workflow(config, mock_order_id)
     tasks = _main_dag_tasks(workflow)
     task_names = [task["name"] for task in tasks]
 

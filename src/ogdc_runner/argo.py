@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from hashlib import sha256
 from typing import Any
 
+import hera.workflows.models as workflow_models
 from hera.shared import global_config
 from hera.workflows import (
     ConfigMapEnv,
@@ -17,11 +18,11 @@ from hera.workflows import (
     WorkflowsService,
     models,
 )
-from hera.workflows.models import LifecycleHook
 from loguru import logger
 
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig, OgdcWorkflowExecutionError
 from ogdc_runner.models.recipe_config import PvcMountInput, RecipeConfig
+from ogdc_runner.service.orders import OrderId
 
 # Kubernetes names must be no more than 63 characters.
 # Argo appends a 5-character random suffix to generate_name, so we reserve space for it.
@@ -34,7 +35,7 @@ def _env_bool(name: str, default: bool) -> bool:
     return os.environ.get(name, str(default)).lower() == "true"
 
 
-def make_generate_name(*, recipe_id: str, suffix: str = "") -> str:
+def make_generate_name(*, identifier: str, suffix: str = "") -> str:
     """Create a workflow generate_name, truncating recipe_id if necessary.
 
     Kubernetes names must be no more than 63 characters. Argo appends a 5-character
@@ -42,7 +43,8 @@ def make_generate_name(*, recipe_id: str, suffix: str = "") -> str:
     truncates the recipe_id as needed to ensure the final name stays within the limit.
 
     Args:
-        recipe_id: The recipe identifier to use as the base name
+        identifier: The workflow identifier to use as the base name (e.g.,
+                    `recipe_id` or `order_id`)
         suffix: The suffix to append (e.g., "remove-existing-data")
 
     Returns:
@@ -51,7 +53,7 @@ def make_generate_name(*, recipe_id: str, suffix: str = "") -> str:
     # Reserve space for Argo's generated suffix
     max_generate_name_length = KUBERNETES_NAME_MAX_LENGTH - ARGO_GENERATED_SUFFIX_LENGTH
     max_id_length = max_generate_name_length - len(suffix)
-    truncated_id = recipe_id[:max_id_length]
+    truncated_id = identifier[:max_id_length]
     if suffix:
         return f"{truncated_id}-{suffix}-"
     return truncated_id
@@ -398,45 +400,55 @@ ARGO_MANAGER: ArgoManager = ArgoManager()
 ARGO_WORKFLOW_SERVICE: WorkflowsService = ARGO_MANAGER.workflow_service
 
 
-def get_workflow_status(identifier: str) -> str | None:
-    """Return the given workflow's status (e.g., `'Succeeded'`)"""
-    # try fetching by name first (cheapest operation)
+def get_workflows_for_order(order_id: OrderId) -> list[workflow_models.Workflow]:
+    """Get a list of workflows associated with the given OrderID."""
+    workflows = ARGO_WORKFLOW_SERVICE.list_workflows(
+        label_selector=f"order_id={order_id}"
+    )
+    if workflows.items:
+        return workflows.items
+    return []
+
+
+def get_recipe_workflows_for_order(order_id: OrderId) -> list[workflow_models.Workflow]:
+    """Get a list of recipe-labeled workflows associated with the given OrderID.
+
+    It is currently assumed that one recipe workflow is associated with each
+    order and that workflow is responsible for executing the logic of the user's
+    recipe.
+    """
+    workflows = ARGO_WORKFLOW_SERVICE.list_workflows(
+        label_selector=f"order_id={order_id},ogdc/recipe-workflow=true"
+    )
+    if workflows.items:
+        return workflows.items
+    return []
+
+
+def get_workflow_status(workflow_name: str) -> str | None:
+    """Return the named workflow's status (e.g., `'Succeeded'`).
+
+    Returns `None` if no matching workflow with a status is found.
+    """
     try:
-        workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=identifier)
+        workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=workflow_name)
         # Note: ignore the type-error here so we can catch the exception below
         # and try getting the workflow via label-selector instead.
         return workflow.status.phase  # type: ignore[union-attr]
     except Exception:
-        workflows = None
-
-        try:
-            workflows = ARGO_WORKFLOW_SERVICE.list_workflows(
-                label_selector=f"identifier={identifier}"
-            )
-        except Exception as e:
-            print(f"Argo API communication failed: {e}")
-            return None
-
-        # Now 'workflows' is guaranteed to exist (either as None or the response)
-        if (
-            workflows  # type: ignore[truthy-bool]
-            and workflows.items
-            and len(workflows.items) > 0
-            and workflows.items[0].status
-        ):
-            return workflows.items[0].status.phase
-
-    return None
+        return None
 
 
-def wait_for_workflow_completion(identifier: str) -> None:
+def wait_for_workflow_completion(workflow_name: str) -> None:
     while True:
-        status = get_workflow_status(identifier)
+        status = get_workflow_status(workflow_name)
         if status:
             logger.info(f"Workflow status: {status}")
             # Terminal states
             if status == "Failed":
-                raise OgdcWorkflowExecutionError(f"Workflow with {identifier=} failed.")
+                raise OgdcWorkflowExecutionError(
+                    f"Workflow with name '{workflow_name}' failed."
+                )
             if status == "Succeeded":
                 return
         time.sleep(5)
@@ -490,9 +502,65 @@ def _update_status_template(order_id: str) -> Container:
 @contextmanager
 def OgdcWorkflow(
     *,
+    name: str,
+    order_id: OrderId,
+    **kwargs: Any,
+) -> Generator[Workflow]:
+    """Contexts manager that yields an argo workflow for the OGDC.
+
+    Recipe workflows - those that execute the logic of a user's order - should
+    use the `OgdcRecipeWorkflow`, which drives configuration based on the
+    provided `recipe_config`.
+
+    kwargs:
+
+        - `name`: name of this workflow. Used with the order ID to generate a
+          name for the argo workflow.
+
+    This context manager sets the following on argo.workflows.Workflow:
+
+    * `generate_name`: based on recipe ID and the `name`.
+    * `workflows_service`: uses the ogdc's configured Argo workflows service
+    * `ttl_strategy`: Set to 7 days if the recipe's output type is `temporary`
+      to allow sufficient type for the submitter of the recipe to retrieve the
+      results. Otherwise this is left unset.
+
+    All other kwargs are passed directly to `argo.workflows.Workflow`.
+    """
+    labels = {
+        **kwargs.pop("labels", {}),
+        # TODO: preface this with `ogdc/`?
+        "order_id": order_id,
+    }
+
+    workflow_kwargs = {
+        "generate_name": make_generate_name(
+            identifier=order_id,
+            suffix=name.replace(" ", "-"),
+        ),
+        "workflows_service": ARGO_WORKFLOW_SERVICE,
+        "labels": labels,
+        **kwargs,
+    }
+
+    if (
+        ARGO_MANAGER.config.workflow_retry_strategy is not None
+        and "retry_strategy" not in workflow_kwargs
+    ):
+        workflow_kwargs["retry_strategy"] = ARGO_MANAGER.config.workflow_retry_strategy
+
+    with Workflow(
+        **workflow_kwargs,
+    ) as w:
+        yield w
+
+
+@contextmanager
+def OgdcRecipeWorkflow(
+    *,
     recipe_config: RecipeConfig,
     name: str,
-    identifier: str | None = None,
+    order_id: OrderId,
     archive_workflow: bool = False,
     **kwargs: Any,
 ) -> Generator[Workflow]:
@@ -525,20 +593,39 @@ def OgdcWorkflow(
     # Merge labels provided by user with `ogdc/persist-workflow-in-archive`.
     labels = {
         **kwargs.pop("labels", {}),
+        # Label to indicate that this is a recipe workflow - it is executing the
+        # logic of the user's recipe.
+        "ogdc/recipe-workflow": "true",
         "ogdc/persist-workflow-in-archive": "true" if archive_workflow else "false",
+        # Label the workflow with the recipe's identifier
+        "ogdc/recipe-id": recipe_config.id,
     }
 
-    if identifier:
-        labels["identifier"] = identifier
-        status_template = _update_status_template(order_id=identifier)
-        kwargs["hooks"] = {
-            "running": LifecycleHook(
-                expression='workflow.status == "Running"',
-                template=status_template.name,
-            ),
-            "exit": LifecycleHook(template=status_template.name),
-        }
-        kwargs["templates"] = [status_template]
+    # Update the order's status with lifecycle hooks.
+    status_template = _update_status_template(order_id=order_id)
+    hooks = {
+        **kwargs.pop("hooks", {}),
+        # TODO: I tried using the running lifecycle hook but ran into some odd
+        # behavior. I noticed that the main workflow logic got ran 3 times and
+        # that the "running" hook was also run 3 times. This seems to interact
+        # with the retry policy in some way, but it isn't clear what's causing
+        # the retries/multiple runs, even though no clear errors occur (I see
+        # status updated to "running", and pods exit successfully).
+        # Removing this and having python directly update the status appears to
+        # work fine, and I don't see any retries/duplicate run behavior.
+        # It may also be worth considering adding the "running" step as an
+        # initial phase to recipe workflows like we have a publish step at the
+        # end?
+        # "running": workflow_models.LifecycleHook(
+        #     expression='workflow.status == "Running"',
+        #     template=status_template.name,
+        # ),
+        "exit": workflow_models.LifecycleHook(template=status_template.name),
+    }
+    templates = [
+        *kwargs.pop("templates", []),
+        status_template,
+    ]
 
     workflow_kwargs = {
         # user kwargs first. This ensures that configurations set by this
@@ -546,11 +633,12 @@ def OgdcWorkflow(
         **kwargs,
         # OGDC-specific behavior that we want to be consistent about.
         "generate_name": make_generate_name(
-            recipe_id=recipe_config.id,
+            identifier=recipe_config.id,
             suffix=name.replace(" ", "-"),
         ),
-        "workflows_service": ARGO_WORKFLOW_SERVICE,
         "labels": labels,
+        "hooks": hooks,
+        "templates": templates,
     }
 
     if recipe_config.output.type == "temporary":
@@ -561,13 +649,9 @@ def OgdcWorkflow(
         )
         workflow_kwargs["ttl_strategy"] = ttl_strategy
 
-    if (
-        ARGO_MANAGER.config.workflow_retry_strategy is not None
-        and "retry_strategy" not in workflow_kwargs
-    ):
-        workflow_kwargs["retry_strategy"] = ARGO_MANAGER.config.workflow_retry_strategy
-
-    with Workflow(
+    with OgdcWorkflow(
+        name=name,
+        order_id=order_id,
         **workflow_kwargs,
     ) as w:
         yield w

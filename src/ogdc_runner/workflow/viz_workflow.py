@@ -23,7 +23,7 @@ from hera.workflows.models import (
 from ogdc_runner.argo import (
     ARGO_MANAGER,
     OGDC_WORKFLOW_PVC,
-    OgdcWorkflow,
+    OgdcRecipeWorkflow,
     get_input_pvc_volume_mounts,
     get_input_pvc_volumes,
     submit_workflow,
@@ -48,6 +48,7 @@ from ogdc_runner.partition_manifests import (
     partition_manifest_records,
 )
 from ogdc_runner.partitioning import create_partitions
+from ogdc_runner.service.orders import OrderId
 
 # ruff: noqa: PLC0415
 
@@ -1278,7 +1279,7 @@ def _setup_directories(
 def make_and_submit_viz_workflow(
     *,
     recipe_config: RecipeConfig,
-    identifier: str,
+    order_id: OrderId,
 ) -> str:
     """Create and submit a parallel Argo workflow for viz processing on K8s.
 
@@ -1296,7 +1297,7 @@ def make_and_submit_viz_workflow(
 
     Args:
         recipe_config: Recipe configuration with ``workflow.type == "visualization"``.
-        identifier: string representing workflow's identifier label.
+        order_id: string representing the workflow's associated order ID.
 
     Returns:
         The Argo workflow name (e.g. ``"my-recipe-visualization-xyz12"``).
@@ -1387,9 +1388,9 @@ def make_and_submit_viz_workflow(
         else create_web_tile_parallel,
     )
 
-    with OgdcWorkflow(
+    with OgdcRecipeWorkflow(
         name="visualization",
-        identifier=identifier,
+        order_id=order_id,
         recipe_config=recipe_config,
         archive_workflow=True,
         entrypoint="main",

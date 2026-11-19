@@ -75,12 +75,13 @@ def submit_ogdc_viz_recipe(monkeypatch):
 def test_submit_ogdc_viz_recipe(
     viz_recipe_directory,
     submit_ogdc_viz_recipe,
+    test_order_id,
 ):
     """Test that an ogdc visualization recipe can be submitted and executed successfully."""
     wf_name = submit_ogdc_viz_recipe(
         recipe_dir=viz_recipe_directory,
         overwrite=False,
-        identifier="test",
+        order_id=test_order_id,
     )
     argo.wait_for_workflow_completion(wf_name)
 
@@ -89,6 +90,7 @@ def test_submit_ogdc_viz_recipe(
 def test_submit_ogdc_viz_recipe_fails_already_published(
     viz_recipe_directory,
     submit_ogdc_viz_recipe,
+    test_order_id,
 ):
     """Test that the ogdc viz recipe has been published and an exception is raised
     on re-submission (without overwrite option)."""
@@ -96,5 +98,5 @@ def test_submit_ogdc_viz_recipe_fails_already_published(
         submit_ogdc_viz_recipe(
             recipe_dir=viz_recipe_directory,
             overwrite=False,
-            identifier="test",
+            order_id=test_order_id,
         )

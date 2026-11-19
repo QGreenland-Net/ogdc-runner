@@ -7,19 +7,25 @@ from pathlib import Path
 from ogdc_runner.exceptions import OgdcDataAlreadyPublished
 from ogdc_runner.publish import data_already_published
 from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.service.orders import OrderId
 from ogdc_runner.workflow.shell import make_and_submit_shell_workflow
 from ogdc_runner.workflow.viz_workflow import make_and_submit_viz_workflow
 
 
-def submit_ogdc_recipe(*, recipe_dir: Path, overwrite: bool, identifier: str) -> str:
+def submit_ogdc_recipe(
+    *,
+    recipe_dir: Path,
+    overwrite: bool,
+    order_id: OrderId,
+) -> str:
     """Submit an OGDC recipe for processing via argo workflows.
 
     Args:
         recipe_dir: Path to the recipe directory
         overwrite: Whether to overwrite existing published data
-        identifier: string representing workflow's identifier label.
+        order_id: OGDC Order ID associated with this recipe submission.
 
-    Returns the name of the OGDC shell recipe submitted to Argo.
+    Returns the name of the OGDC recipe submitted to Argo.
     """
     # Get the recipe configuration
     recipe_config = get_recipe_config(recipe_dir)
@@ -28,6 +34,7 @@ def submit_ogdc_recipe(*, recipe_dir: Path, overwrite: bool, identifier: str) ->
     if data_already_published(
         recipe_config=recipe_config,
         overwrite=overwrite,
+        order_id=order_id,
     ):
         # TODO: update status to indicate that the recipe is already published..
         err_msg = f"Data for recipe {recipe_config.id} have already been published."
@@ -36,12 +43,12 @@ def submit_ogdc_recipe(*, recipe_dir: Path, overwrite: bool, identifier: str) ->
     # Check if the recipe is a visualization workflow
     if recipe_config.workflow.type == "visualization":
         return make_and_submit_viz_workflow(
-            recipe_config=recipe_config, identifier=identifier
+            recipe_config=recipe_config,
+            order_id=order_id,
         )
 
     # We currently expect all other recipes to be "shell"
-    shell_recipe_workflow_name = make_and_submit_shell_workflow(
-        recipe_config=recipe_config, identifier=identifier
+    return make_and_submit_shell_workflow(
+        recipe_config=recipe_config,
+        order_id=order_id,
     )
-
-    return shell_recipe_workflow_name

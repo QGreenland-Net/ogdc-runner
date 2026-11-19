@@ -129,14 +129,14 @@ def _check_ogdc_api_error(response: requests.Response) -> None:
         raise OgdcServiceApiError(err_msg)
 
 
-def _get_workflow_status(config: Config, identifier: str) -> str:
+def _get_workflow_status(config: Config, order_id: str) -> str:
     """Get the given workflow's status as a string."""
     headers = {}
     if config.access_mode != ACCESS_MODE_OPEN:
         headers["Authorization"] = f"Bearer {_get_api_token(config)}"
 
     response = config.session.get(
-        url=f"{config.api_url}/workflows/{identifier}",
+        url=f"{config.api_url}/workflows/{order_id}",
         headers=headers,
     )
 
@@ -149,7 +149,7 @@ def _get_workflow_status(config: Config, identifier: str) -> str:
 
 def _wait_for_workflow_completion(
     config: Config,
-    identifier: str,
+    order_id: str,
     timeout_seconds: int = 1800,  # 30 minute default
     error_threshold: int = 5,  # max consecutive API errors
 ) -> None:
@@ -157,17 +157,17 @@ def _wait_for_workflow_completion(
     start_time = time.time()
     consecutive_errors = 0
 
-    print(f"Monitoring workflow: {identifier}")
+    print(f"Monitoring order: {order_id}")
 
     while True:
         # global timeout
         if time.time() - start_time > timeout_seconds:
             raise TimeoutError(
-                f"Monitor for {identifier} timed out after {timeout_seconds}s."
+                f"Monitor for {order_id} timed out after {timeout_seconds}s."
             )
 
         try:
-            status = _get_workflow_status(config, identifier)
+            status = _get_workflow_status(config, order_id)
             consecutive_errors = 0  # reset on success
         except Exception as e:
             consecutive_errors += 1
@@ -180,7 +180,7 @@ def _wait_for_workflow_completion(
 
         timestamp = f"{dt.datetime.now():%Y-%m-%d@%H:%M:%S}"
         display_status = status if status else "Initializing..."
-        print(f"[{timestamp}] ID: {identifier} | Status: {display_status}")
+        print(f"[{timestamp}] ID: {order_id} | Status: {display_status}")
 
         if status == "Succeeded":
             print("Workflow completed successfully.")
@@ -188,7 +188,7 @@ def _wait_for_workflow_completion(
 
         if status in ("Failed", "Error"):
             raise OgdcWorkflowExecutionError(
-                f"Workflow {identifier} terminated with status: {status}"
+                f"Workflow {order_id} terminated with status: {status}"
             )
         time.sleep(5)
 
@@ -310,7 +310,7 @@ def submit(ctx: click.Context, recipe_path: str, wait: bool, overwrite: bool) ->
     print(response.json()["message"])
 
     if wait:
-        identifier = response.json()["recipe_identifier"]
+        identifier = response.json()["order_id"]
         print("Waiting for completion...")
         _wait_for_workflow_completion(config, identifier)
 
@@ -379,15 +379,17 @@ def validate_all_recipes(recipes_location: str, ref: str) -> None:
         sys.exit(1)
 
 
-def _download_output_for_workflow(
-    config: Config, workflow_name: str, output_dir: Path
+def _download_output_for_order(
+    config: Config,
+    order_id: str,
+    output_dir: Path,
 ) -> None:
     headers = {}
     if config.access_mode != ACCESS_MODE_OPEN:
         headers["Authorization"] = f"Bearer {_get_api_token(config)}"
 
     response = config.session.get(
-        url=f"{config.api_url}/workflows/{workflow_name}/output",
+        url=f"{config.api_url}/workflows/{order_id}/output",
         headers=headers,
     )
 
@@ -410,7 +412,7 @@ def _download_output_for_workflow(
 
 @cli.command
 @click.argument(
-    "workflow_name",
+    "order_id",
     required=True,
     type=str,
 )
@@ -423,7 +425,7 @@ def _download_output_for_workflow(
     ),
 )
 @click.pass_context
-def get_output(ctx: click.Context, workflow_name: str, output_dir: Path) -> None:
-    """Get the temporary output for the given workflow."""
+def get_output(ctx: click.Context, order_id: str, output_dir: Path) -> None:
+    """Get the temporary output for the given order."""
     config = ctx.obj
-    _download_output_for_workflow(config, workflow_name, output_dir)
+    _download_output_for_order(config, order_id, output_dir)

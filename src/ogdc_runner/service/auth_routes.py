@@ -5,21 +5,24 @@ from __future__ import annotations
 import datetime as dt
 import os
 import shutil
-import uuid
+from typing import cast
 
 import pydantic
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
+from loguru import logger
 
 from ogdc_runner.api import submit_ogdc_recipe
+from ogdc_runner.argo import get_recipe_workflows_for_order
 from ogdc_runner.exceptions import OgdcOutputDataRetrievalError
 from ogdc_runner.publish import get_temporary_output_data_url
 from ogdc_runner.recipe import stage_ogdc_recipe
 from ogdc_runner.service.auth import auth_client
 from ogdc_runner.service.db import SessionDependency, get_db_session
 from ogdc_runner.service.orders import (
-    Order,
+    OrderId,
     OrderStatus,
+    create_order,
     get_order_status,
     update_order_status,
 )
@@ -47,13 +50,13 @@ class WorkflowSubmitRequest(pydantic.BaseModel):
 
 class WorkflowSubmitResponse(pydantic.BaseModel):
     message: str
-    recipe_identifier: str | None
+    order_id: str
 
 
 def _submit_recipe_and_clean(
     recipe_path: str,
     overwrite: bool,
-    identifier: str,
+    order_id: OrderId,
 ) -> None:
     """Submits the given recipe for execution and then cleans up the staged recipe."""
     staged_recipe_dir = stage_ogdc_recipe(recipe_path)
@@ -61,13 +64,22 @@ def _submit_recipe_and_clean(
         submit_ogdc_recipe(
             recipe_dir=staged_recipe_dir,
             overwrite=overwrite,
-            identifier=identifier,
+            order_id=order_id,
         )
+        # TODO: this update could technically happen after "success" is achieved
+        # in submission above, although unlikely. Should guard against
+        # unexpected status transitions.
+        with get_db_session() as session:
+            update_order_status(
+                order_id=order_id,
+                order_status=OrderStatus.RUNNING,
+                session=session,
+            )
     except Exception as e:
         # Get the order record and update it with "Failed" status.
         with get_db_session() as session:
             update_order_status(
-                order_id=identifier,
+                order_id=order_id,
                 order_status=OrderStatus.FAILED,
                 session=session,
             )
@@ -91,30 +103,20 @@ def create_workflow(
 
     Requires a valid auth token and scope.
     """
-    identifier = str(uuid.uuid4())
-
     try:
-        # Register the submission
-        session.add(
-            Order(
-                id=identifier,
-                status=OrderStatus.SUBMITTED,
-            )
-        )
-        session.commit()
-
+        order_id = create_order(session=session)
         # Background task to run the recipe submission logic.
         background_tasks.add_task(
             _submit_recipe_and_clean,
             recipe_path=payload.recipe_path,
             overwrite=payload.overwrite,
-            identifier=identifier,
+            order_id=order_id,
         )
 
         # return a generic success message immediately
         return WorkflowSubmitResponse(
             message="Recipe submission accepted.",
-            recipe_identifier=identifier,
+            order_id=order_id,
         )
     except Exception as e:
         # TODO: try to update the db here if the id was added??
@@ -125,23 +127,23 @@ def create_workflow(
 
 
 class WorkflowDetailResponse(pydantic.BaseModel):
-    identifier: str
+    order_id: str
     status: OrderStatus
     timestamp: dt.datetime = pydantic.Field(default_factory=dt.datetime.now)
 
 
 @router.get(
-    "/{identifier}",
+    "/{order_id}",
     response_model=WorkflowDetailResponse,
 )
 def get_workflow(
-    identifier: str,
+    order_id: str,
     session: SessionDependency,
 ) -> WorkflowDetailResponse:
     """Check an OGDC workflow's status."""
-    status = get_order_status(session=session, order_id=identifier)
+    status = get_order_status(session=session, order_id=order_id)
     return WorkflowDetailResponse(
-        identifier=identifier,
+        order_id=order_id,
         status=status,
     )
 
@@ -151,10 +153,10 @@ class WorkflowOutputResponse(pydantic.BaseModel):
 
 
 @router.get(
-    "/{recipe_workflow_name}/output",
+    "/{order_id}/output",
     response_model=WorkflowOutputResponse,
 )
-def get_workflow_output(recipe_workflow_name: str) -> WorkflowOutputResponse:
+def get_workflow_output(order_id: str) -> WorkflowOutputResponse:
     """Get a signed `/storage` download link for the outputs of the given workflow.
 
     The link is minted by `ogdc_runner.storage_links.build_signed_url` and
@@ -164,11 +166,25 @@ def get_workflow_output(recipe_workflow_name: str) -> WorkflowOutputResponse:
     Argo's artifact s3 storage.
     """
     try:
-        s3_location = get_temporary_output_data_url(workflow_name=recipe_workflow_name)
+        order_id = cast(OrderId, order_id)
+        recipe_workflows = get_recipe_workflows_for_order(order_id)
+        if (
+            recipe_workflows
+            and len(recipe_workflows) == 1
+            and recipe_workflows[0].metadata.name
+        ):
+            recipe_workflow_name = recipe_workflows[0].metadata.name
+            s3_location = get_temporary_output_data_url(
+                workflow_name=recipe_workflow_name
+            )
+        else:
+            err_msg = f"Could not find matching workflow output for {order_id=}: {recipe_workflows=}"
+            logger.error(err_msg)
+            raise OgdcOutputDataRetrievalError(err_msg)
     except OgdcOutputDataRetrievalError as e:
         raise HTTPException(
             status_code=404,
-            detail=f"The requested output for {recipe_workflow_name} was not found: {e}.",
+            detail=f"The requested output for {order_id} was not found: {e}.",
         ) from e
 
     return WorkflowOutputResponse(data_url=s3_location)
