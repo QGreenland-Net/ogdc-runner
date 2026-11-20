@@ -141,7 +141,7 @@ def test_ARGO_MANAGER_update_image(monkeypatch):
     assert Container().image_pull_policy == "Always"
 
 
-def test_OgdcWorfklow_no_archive(test_shell_workflow_recipe_directory):
+def test_OgdcWorfklow_no_archive(test_shell_workflow_recipe_directory, mock_order_id):
     recipe_config = get_recipe_config(
         test_shell_workflow_recipe_directory, check_urls=False
     )
@@ -150,6 +150,7 @@ def test_OgdcWorfklow_no_archive(test_shell_workflow_recipe_directory):
     with OgdcWorkflow(
         recipe_config=recipe_config,
         name=workflow_name,
+        order_id=mock_order_id,
         archive_workflow=False,
     ) as w:
         assert w.generate_name == f"{recipe_config.id}-{workflow_name}-"
@@ -158,7 +159,7 @@ def test_OgdcWorfklow_no_archive(test_shell_workflow_recipe_directory):
         assert w.labels["ogdc/persist-workflow-in-archive"] == "false"
 
 
-def test_OgdcWorfklow_with_archive(test_shell_workflow_recipe_directory):
+def test_OgdcWorfklow_with_archive(test_shell_workflow_recipe_directory, mock_order_id):
     recipe_config = get_recipe_config(
         test_shell_workflow_recipe_directory, check_urls=False
     )
@@ -167,13 +168,16 @@ def test_OgdcWorfklow_with_archive(test_shell_workflow_recipe_directory):
     with OgdcWorkflow(
         recipe_config=recipe_config,
         name=workflow_name,
+        order_id=mock_order_id,
         archive_workflow=True,
     ) as w:
         assert w.labels
         assert w.labels["ogdc/persist-workflow-in-archive"] == "true"
 
 
-def test_OgdcWorfklow_with_temp_output(test_temp_output_recipe_directory):
+def test_OgdcWorfklow_with_temp_output(
+    test_temp_output_recipe_directory, mock_order_id
+):
     recipe_config = get_recipe_config(
         test_temp_output_recipe_directory, check_urls=False
     )
@@ -182,6 +186,7 @@ def test_OgdcWorfklow_with_temp_output(test_temp_output_recipe_directory):
     with OgdcWorkflow(
         recipe_config=recipe_config,
         name=workflow_name,
+        order_id=mock_order_id,
         archive_workflow=False,
     ) as w:
         # Expect 7 days for recipes with temporary output type.
@@ -192,6 +197,7 @@ def test_OgdcWorfklow_with_temp_output(test_temp_output_recipe_directory):
 def test_OgdcWorkflow_allows_configured_input_pvc(
     monkeypatch,
     test_shell_workflow_recipe_directory,
+    mock_order_id,
 ):
     monkeypatch.setenv(
         "OGDC_ALLOWED_INPUT_PVCS",
@@ -207,6 +213,7 @@ def test_OgdcWorkflow_allows_configured_input_pvc(
     with OgdcWorkflow(
         recipe_config=recipe_config,
         name="test",
+        order_id=mock_order_id,
         archive_workflow=False,
     ) as w:
         assert w.generate_name == f"{recipe_config.id}-test-"
@@ -217,6 +224,7 @@ def test_OgdcWorkflow_allows_default_workflow_pvc_as_input(
     monkeypatch,
     test_shell_workflow_recipe_directory,
     allowlist_env,
+    mock_order_id,
 ):
     if allowlist_env is None:
         monkeypatch.delenv("OGDC_ALLOWED_INPUT_PVCS", raising=False)
@@ -241,6 +249,7 @@ def test_OgdcWorkflow_allows_default_workflow_pvc_as_input(
     with OgdcWorkflow(
         recipe_config=recipe_config,
         name="test",
+        order_id=mock_order_id,
         archive_workflow=False,
     ) as w:
         assert w.generate_name == f"{recipe_config.id}-test-"
@@ -249,6 +258,7 @@ def test_OgdcWorkflow_allows_default_workflow_pvc_as_input(
 def test_OgdcWorkflow_rejects_unconfigured_input_pvc(
     monkeypatch,
     test_shell_workflow_recipe_directory,
+    mock_order_id,
 ):
     monkeypatch.setenv(
         "OGDC_ALLOWED_INPUT_PVCS",
@@ -266,6 +276,7 @@ def test_OgdcWorkflow_rejects_unconfigured_input_pvc(
         OgdcWorkflow(
             recipe_config=recipe_config,
             name="test",
+            order_id=mock_order_id,
             archive_workflow=False,
         ),
     ):
@@ -277,6 +288,7 @@ def test_OgdcWorkflow_rejects_input_pvc_when_allowlist_missing_or_empty(
     monkeypatch,
     test_shell_workflow_recipe_directory,
     allowlist_env,
+    mock_order_id,
 ):
     if allowlist_env is None:
         monkeypatch.delenv("OGDC_ALLOWED_INPUT_PVCS", raising=False)
@@ -295,6 +307,7 @@ def test_OgdcWorkflow_rejects_input_pvc_when_allowlist_missing_or_empty(
         OgdcWorkflow(
             recipe_config=recipe_config,
             name="test",
+            order_id=mock_order_id,
             archive_workflow=False,
         ),
     ):

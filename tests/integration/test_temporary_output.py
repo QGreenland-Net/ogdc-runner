@@ -11,6 +11,7 @@ from ogdc_runner.argo import wait_for_workflow_completion
 def test_temporary_output_recipe(
     test_temp_output_recipe_directory,
     tmpdir,
+    test_order_id,
 ):
     """Test that an ogdc recipe with a temporary output can be submitted, executes successfully, and outputs are accessible for download as a zip package.
 
@@ -33,9 +34,10 @@ def test_temporary_output_recipe(
     workflow_name = submit_ogdc_recipe(
         recipe_dir=test_temp_output_recipe_directory,
         overwrite=True,
+        order_id=test_order_id,
     )
 
-    wait_for_workflow_completion(identifier=workflow_name)
+    wait_for_workflow_completion(workflow_name=workflow_name)
 
     # retrieve the data and assert that it is correct.
     config = Config()

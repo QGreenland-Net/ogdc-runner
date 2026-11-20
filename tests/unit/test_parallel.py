@@ -62,6 +62,7 @@ def test_orchestrator_creates_correct_partitions(sample_recipe_config):
 
 def test_parallel_shell_workflow_uses_retained_partition_manifests(
     sample_recipe_config,
+    mock_order_id,
 ):
     rendered_workflows: list[dict[str, Any]] = []
 
@@ -73,7 +74,8 @@ def test_parallel_shell_workflow_uses_retained_partition_manifests(
     with patch("ogdc_runner.workflow.shell.submit_workflow", fake_submit):
         assert (
             make_and_submit_shell_workflow(
-                recipe_config=sample_recipe_config, identifier="test"
+                recipe_config=sample_recipe_config,
+                order_id=mock_order_id,
             )
             == "test-workflow"
         )

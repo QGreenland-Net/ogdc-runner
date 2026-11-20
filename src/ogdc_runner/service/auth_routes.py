@@ -17,7 +17,7 @@ from ogdc_runner.recipe import stage_ogdc_recipe
 from ogdc_runner.service.auth import auth_client
 from ogdc_runner.service.db import SessionDependency, get_db_session
 from ogdc_runner.service.orders import (
-    Order,
+    OrderId,
     OrderStatus,
     create_order,
     get_order_status,
@@ -47,13 +47,13 @@ class WorkflowSubmitRequest(pydantic.BaseModel):
 
 class WorkflowSubmitResponse(pydantic.BaseModel):
     message: str
-    recipe_identifier: str | None
+    order_id: str
 
 
 def _submit_recipe_and_clean(
     recipe_path: str,
     overwrite: bool,
-    order: Order,
+    order_id: OrderId,
 ) -> None:
     """Submits the given recipe for execution and then cleans up the staged recipe."""
     staged_recipe_dir = stage_ogdc_recipe(recipe_path)
@@ -61,13 +61,13 @@ def _submit_recipe_and_clean(
         submit_ogdc_recipe(
             recipe_dir=staged_recipe_dir,
             overwrite=overwrite,
-            identifier=order.id,
+            order_id=order_id,
         )
     except Exception as e:
         # Get the order record and update it with "Failed" status.
         with get_db_session() as session:
             update_order_status(
-                order_id=order.id,
+                order_id=order_id,
                 order_status=OrderStatus.FAILED,
                 session=session,
             )
@@ -92,19 +92,19 @@ def create_workflow(
     Requires a valid auth token and scope.
     """
     try:
-        order = create_order(session=session)
+        order_id = create_order(session=session)
         # Background task to run the recipe submission logic.
         background_tasks.add_task(
             _submit_recipe_and_clean,
             recipe_path=payload.recipe_path,
             overwrite=payload.overwrite,
-            order=order,
+            order_id=order_id,
         )
 
         # return a generic success message immediately
         return WorkflowSubmitResponse(
             message="Recipe submission accepted.",
-            recipe_identifier=order.id,
+            order_id=order_id,
         )
     except Exception as e:
         # TODO: try to update the db here if the id was added??
@@ -115,23 +115,23 @@ def create_workflow(
 
 
 class WorkflowDetailResponse(pydantic.BaseModel):
-    identifier: str
+    order_id: str
     status: OrderStatus
     timestamp: dt.datetime = pydantic.Field(default_factory=dt.datetime.now)
 
 
 @router.get(
-    "/{identifier}",
+    "/{order_id}",
     response_model=WorkflowDetailResponse,
 )
 def get_workflow(
-    identifier: str,
+    order_id: str,
     session: SessionDependency,
 ) -> WorkflowDetailResponse:
     """Check an OGDC workflow's status."""
-    status = get_order_status(session=session, order_id=identifier)
+    status = get_order_status(session=session, order_id=order_id)
     return WorkflowDetailResponse(
-        identifier=identifier,
+        order_id=order_id,
         status=status,
     )
 

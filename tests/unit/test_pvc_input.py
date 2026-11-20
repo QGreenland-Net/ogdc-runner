@@ -17,6 +17,7 @@ from ogdc_runner.inputs import _build_fetch_commands, make_pvc_listing_template
 from ogdc_runner.models.recipe_config import PvcMountInput, RecipeInput, UrlInput
 from ogdc_runner.partitioning import _extract_file_paths
 from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.service.orders import OrderId
 from ogdc_runner.workflow.shell import (
     _build_partition_processing_script,
     make_and_submit_shell_workflow,
@@ -260,7 +261,7 @@ def test_partition_script_supports_mounted_pvc_mode():
     assert 'export INPUT_FILE="$file"' in script
 
 
-def _render_shell_workflow(config: Any) -> dict[str, Any]:
+def _render_shell_workflow(config: Any, order_id: OrderId) -> dict[str, Any]:
     rendered_workflows: list[dict[str, Any]] = []
 
     def fake_submit(workflow: Any, wait: bool = False) -> str:
@@ -270,7 +271,10 @@ def _render_shell_workflow(config: Any) -> dict[str, Any]:
 
     with patch("ogdc_runner.workflow.shell.submit_workflow", fake_submit):
         assert (
-            make_and_submit_shell_workflow(recipe_config=config, identifier="test")
+            make_and_submit_shell_workflow(
+                recipe_config=config,
+                order_id=order_id,
+            )
             == "test-workflow"
         )
 
@@ -296,6 +300,7 @@ def _assert_references_existing_claims_only(workflow: dict[str, Any]) -> None:
 def test_sequential_shell_workflow_stages_pvc_inputs_as_symlinks(
     monkeypatch,
     test_shell_workflow_recipe_directory,
+    mock_order_id,
 ):
     monkeypatch.setenv("OGDC_ALLOWED_INPUT_PVCS", '["ogdc-test-pvc"]')
     config = get_recipe_config(
@@ -312,7 +317,7 @@ def test_sequential_shell_workflow_stages_pvc_inputs_as_symlinks(
         ]
     )
 
-    workflow = _render_shell_workflow(config)
+    workflow = _render_shell_workflow(config, mock_order_id)
     fetch_template = _template(workflow, f"{config.id}-fetch-template-")
     run_template = _template(workflow, "run-cmd-0")
 
@@ -327,6 +332,7 @@ def test_sequential_shell_workflow_stages_pvc_inputs_as_symlinks(
 def test_parallel_shell_workflow_renders_pvc_inputs(
     monkeypatch,
     test_shell_workflow_recipe_directory,
+    mock_order_id,
 ):
     monkeypatch.setenv("OGDC_ALLOWED_INPUT_PVCS", '["ogdc-test-pvc"]')
     config = get_recipe_config(
@@ -344,7 +350,7 @@ def test_parallel_shell_workflow_renders_pvc_inputs(
         ]
     )
 
-    workflow = _render_shell_workflow(config)
+    workflow = _render_shell_workflow(config, mock_order_id)
     tasks = _template(workflow, "main")["dag"]["tasks"]
 
     _assert_references_existing_claims_only(workflow)

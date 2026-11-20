@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from hashlib import sha256
 from typing import Any
 
+import hera.workflows.models as workflow_models
 from hera.shared import global_config
 from hera.workflows import (
     ConfigMapEnv,
@@ -17,11 +18,11 @@ from hera.workflows import (
     WorkflowsService,
     models,
 )
-from hera.workflows.models import LifecycleHook
 from loguru import logger
 
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig, OgdcWorkflowExecutionError
 from ogdc_runner.models.recipe_config import PvcMountInput, RecipeConfig
+from ogdc_runner.service.orders import OrderId
 
 # Kubernetes names must be no more than 63 characters.
 # Argo appends a 5-character random suffix to generate_name, so we reserve space for it.
@@ -398,45 +399,40 @@ ARGO_MANAGER: ArgoManager = ArgoManager()
 ARGO_WORKFLOW_SERVICE: WorkflowsService = ARGO_MANAGER.workflow_service
 
 
-def get_workflow_status(identifier: str) -> str | None:
-    """Return the given workflow's status (e.g., `'Succeeded'`)"""
-    # try fetching by name first (cheapest operation)
+def get_workflows_for_order(order_id: OrderId) -> list[workflow_models.Workflow]:
+    """Get a list of workflows associated with the given OrderID."""
+    workflows = ARGO_WORKFLOW_SERVICE.list_workflows(
+        label_selector=f"order_id={order_id}"
+    )
+    if workflows.items:
+        return workflows.items
+    return []
+
+
+def get_workflow_status(workflow_name: str) -> str | None:
+    """Return the named workflow's status (e.g., `'Succeeded'`).
+
+    Returns `None` if no matching workflow with a status is found.
+    """
     try:
-        workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=identifier)
+        workflow = ARGO_WORKFLOW_SERVICE.get_workflow(name=workflow_name)
         # Note: ignore the type-error here so we can catch the exception below
         # and try getting the workflow via label-selector instead.
         return workflow.status.phase  # type: ignore[union-attr]
     except Exception:
-        workflows = None
-
-        try:
-            workflows = ARGO_WORKFLOW_SERVICE.list_workflows(
-                label_selector=f"identifier={identifier}"
-            )
-        except Exception as e:
-            print(f"Argo API communication failed: {e}")
-            return None
-
-        # Now 'workflows' is guaranteed to exist (either as None or the response)
-        if (
-            workflows  # type: ignore[truthy-bool]
-            and workflows.items
-            and len(workflows.items) > 0
-            and workflows.items[0].status
-        ):
-            return workflows.items[0].status.phase
-
-    return None
+        return None
 
 
-def wait_for_workflow_completion(identifier: str) -> None:
+def wait_for_workflow_completion(workflow_name: str) -> None:
     while True:
-        status = get_workflow_status(identifier)
+        status = get_workflow_status(workflow_name)
         if status:
             logger.info(f"Workflow status: {status}")
             # Terminal states
             if status == "Failed":
-                raise OgdcWorkflowExecutionError(f"Workflow with {identifier=} failed.")
+                raise OgdcWorkflowExecutionError(
+                    f"Workflow with name '{workflow_name}' failed."
+                )
             if status == "Succeeded":
                 return
         time.sleep(5)
@@ -492,7 +488,7 @@ def OgdcWorkflow(
     *,
     recipe_config: RecipeConfig,
     name: str,
-    identifier: str | None = None,
+    order_id: OrderId,
     archive_workflow: bool = False,
     **kwargs: Any,
 ) -> Generator[Workflow]:
@@ -528,17 +524,16 @@ def OgdcWorkflow(
         "ogdc/persist-workflow-in-archive": "true" if archive_workflow else "false",
     }
 
-    if identifier:
-        labels["identifier"] = identifier
-        status_template = _update_status_template(order_id=identifier)
-        kwargs["hooks"] = {
-            "running": LifecycleHook(
-                expression='workflow.status == "Running"',
-                template=status_template.name,
-            ),
-            "exit": LifecycleHook(template=status_template.name),
-        }
-        kwargs["templates"] = [status_template]
+    labels["order_id"] = order_id
+    status_template = _update_status_template(order_id=order_id)
+    kwargs["hooks"] = {
+        "running": workflow_models.LifecycleHook(
+            expression='workflow.status == "Running"',
+            template=status_template.name,
+        ),
+        "exit": workflow_models.LifecycleHook(template=status_template.name),
+    }
+    kwargs["templates"] = [status_template]
 
     workflow_kwargs = {
         # user kwargs first. This ensures that configurations set by this

@@ -37,6 +37,7 @@ from ogdc_runner.models.recipe_config import (
     RecipeConfig,
     TemporaryRecipeOutput,
 )
+from ogdc_runner.service.orders import OrderId
 from ogdc_runner.storage_links import build_signed_url
 
 
@@ -125,12 +126,14 @@ def make_publish_template(
 
 def remove_existing_published_data(
     *,
+    order_id: OrderId,
     recipe_config: RecipeConfig,
 ) -> None:
     """Executes an argo workflow that removes published data for a recipe if it
     exists."""
     with OgdcWorkflow(
         recipe_config=recipe_config,
+        order_id=order_id,
         archive_workflow=False,
         name="remove-existing-data",
         entrypoint="steps",
@@ -157,6 +160,7 @@ def remove_existing_published_data(
 
 def check_for_existing_pvc_published_data(
     *,
+    order_id: OrderId,
     recipe_config: RecipeConfig,
 ) -> bool:
     """Execute argo workflow that checks if the given recipe has published data to PVC.
@@ -166,6 +170,7 @@ def check_for_existing_pvc_published_data(
     """
     with OgdcWorkflow(
         recipe_config=recipe_config,
+        order_id=order_id,
         archive_workflow=False,
         name="check-published",
         entrypoint="steps",
@@ -230,6 +235,7 @@ def check_for_existing_pvc_published_data(
 def check_for_existing_published_data(
     *,
     recipe_config: RecipeConfig,
+    order_id: OrderId,
 ) -> bool:
     """Execute argo workflow that checks if the given recipe has published data.
 
@@ -237,7 +243,9 @@ def check_for_existing_published_data(
     otherwise `False`.
     """
     if recipe_config.output.type == "pvc":
-        return check_for_existing_pvc_published_data(recipe_config=recipe_config)
+        return check_for_existing_pvc_published_data(
+            recipe_config=recipe_config, order_id=order_id
+        )
     if recipe_config.output.type == "temporary":
         # TODO: implement check for temporary output status. This cannot be
         # derived from the recipe_config alone, because the temporary output
@@ -256,6 +264,7 @@ def check_for_existing_published_data(
 def data_already_published(
     *,
     recipe_config: RecipeConfig,
+    order_id: OrderId,
     overwrite: bool,
 ) -> bool:
     """Check for the existence of published data for the given
@@ -277,11 +286,13 @@ def data_already_published(
         # If `overwrite` is True, remove the existing data and return `False`.
         remove_existing_published_data(
             recipe_config=recipe_config,
+            order_id=order_id,
         )
         return False
 
     return check_for_existing_published_data(
         recipe_config=recipe_config,
+        order_id=order_id,
     )
 
 

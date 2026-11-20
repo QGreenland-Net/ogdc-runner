@@ -37,6 +37,7 @@ from ogdc_runner.partition_manifests import (
 )
 from ogdc_runner.partitioning import create_partitions
 from ogdc_runner.publish import make_publish_template
+from ogdc_runner.service.orders import OrderId
 
 
 def _build_partition_processing_script(
@@ -512,13 +513,13 @@ def _create_sequential_workflow(
 def make_and_submit_shell_workflow(
     *,
     recipe_config: RecipeConfig,
-    identifier: str | None,
+    order_id: OrderId,
 ) -> str:
     """Create and submit an argo workflow based on a shell recipe.
 
     Args:
         recipe_config: Recipe configuration containing workflow details
-        identifier: string representing workflow's identifier label.
+        order_id: string representing the order's ID.
 
     Returns:
         Workflow name
@@ -532,7 +533,7 @@ def make_and_submit_shell_workflow(
 
     with OgdcWorkflow(
         name="shell",
-        identifier=identifier,
+        order_id=order_id,
         recipe_config=recipe_config,
         archive_workflow=True,
         entrypoint="main",
