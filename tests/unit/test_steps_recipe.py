@@ -10,6 +10,8 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from ogdc_runner import api
+from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.models.steps import StepsRecipeConfig
@@ -143,3 +145,24 @@ def test_shared_script_cannot_escape_templates_dir(tmp_path):
             str(repo / "recipes/sea-ice-conc"),
             ["templates/raster/compress-overviews.yml"],
         )
+
+
+@pytest.fixture
+def no_execution(monkeypatch):
+    """Fail the test if a recipe reaches publication checks or a builder."""
+
+    def boom(**_kwargs: Any) -> None:
+        msg = "steps recipe reached execution"
+        raise AssertionError(msg)
+
+    for name in (
+        "data_already_published",
+        "make_and_submit_shell_workflow",
+        "make_and_submit_viz_workflow",
+    ):
+        monkeypatch.setattr(api, name, boom)
+
+
+def test_submit_rejects_steps_recipe(no_execution):  # noqa: ARG001
+    with pytest.raises(OgdcInvalidRecipeConfig, match="not executable yet"):
+        submit_ogdc_recipe(recipe_dir=RECIPE_DIR, wait=False, overwrite=False)

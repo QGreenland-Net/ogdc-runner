@@ -101,3 +101,19 @@ def test_submit_unexpected_error_is_sanitized_500(submit_client):
     assert "secret-token-abc" not in detail
     request_id = response.headers["X-Request-ID"]
     assert request_id in detail
+
+
+def test_submit_steps_recipe_is_422_not_executable(mock_db, monkeypatch):  # noqa: ARG001
+    recipe_dir = (
+        Path(__file__).parents[1] / "test_steps_recipe_repo/recipes/sea-ice-conc"
+    )
+
+    @contextmanager
+    def fake_stage(_location):
+        yield recipe_dir
+
+    monkeypatch.setattr(auth_routes, "stage_ogdc_recipe", fake_stage)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = _post(client)
+    assert response.status_code == 422
+    assert "not executable yet" in response.json()["detail"]
