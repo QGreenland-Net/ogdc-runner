@@ -7,7 +7,7 @@ authors = [
   { name = "Robyn Marowitz", email = "robyn.marowitz@colorado.edu" },
   { name = "Jeanette Clark", email = "clark@nceas.ucsb.edu" },
 ]
-version = "0.4.2"
+version = "0.5.0"
 description = "Defines OGDC recipe API(s) and submits recipes to OGDC for execution"
 readme = "README.md"
 license.file = "LICENSE"
@@ -45,12 +45,11 @@ dependencies = [
   # s3 API
   "boto3 >=1.42",
   "itsdangerous>=2.2.0",
-  "dataone-auth @ git+https://github.com/dataoneorg/dataone-auth.git@0.1.0",
+  "dataone-auth",
 ]
 
 [project.optional-dependencies]
 
-# NOTE: "test" and "dev" are duplicated; why do we need both?
 test = [
   "mypy ~=1.15",
   "pytest >=6",
@@ -61,12 +60,7 @@ test = [
   "nox",
 ]
 dev = [
-  "mypy ~=1.10.0",
-  "pytest >=6",
-  "pytest-cov >=3",
-  "types-pyyaml",
-  "types-requests",
-  "nox",
+  "ogdc-runner[test]"
 ]
 docs = [
   "sphinx>=7.0",
@@ -94,7 +88,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.bumpversion]
-current_version = "0.4.2"
+current_version = "0.5.0"
 commit = false
 tag = false
 
