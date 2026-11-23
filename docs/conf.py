@@ -7,7 +7,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import botocore.client
+
 sys.path.insert(0, str(Path("../src/").resolve()))
+
+# botocore generates S3 client classes dynamically at runtime; stub it so
+# sphinx-autodoc-typehints can resolve annotations referencing botocore.client.S3
+if not hasattr(botocore.client, "S3"):
+    botocore.client.S3 = type("S3", (), {"__module__": "botocore.client"})  # type: ignore[attr-defined]
+
 
 project = "ogdc-runner"
 copyright = f"{dt.date.today().year}, NSIDC and ADC"
@@ -82,6 +90,9 @@ nitpick_ignore = [
     # <unknown>:1: WARNING: py:class reference target not found: list[dict[str [ref.class]
     # There is no other context except that warning
     ("py:class", "list[dict[str"),
+    ("py:class", "botocore.client.S3"),
+    ("py:class", "botocore.client.BaseClient"),
+    ("py:class", "fastapi.responses.StreamingResponse"),
 ]
 
 autodoc_default_options = {

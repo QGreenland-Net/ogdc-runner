@@ -4,7 +4,7 @@ import json
 import logging
 import os
 from collections.abc import Callable
-from typing import Any, TypeAlias, cast
+from typing import Any, cast
 
 from hera.workflows import (
     DAG,
@@ -52,8 +52,8 @@ from ogdc_runner.partitioning import create_partitions
 # ruff: noqa: PLC0415
 
 logger = logging.getLogger(__name__)
-WorkflowTask: TypeAlias = Any
-WorkflowScript: TypeAlias = Callable[..., WorkflowTask]
+WorkflowTask = Any
+WorkflowScript = Callable[..., WorkflowTask]
 
 # Viz worker container image.  Override via VIZ_WORKFLOW_IMAGE env var.
 VIZ_WORKFLOW_IMAGE: str = os.environ.get(

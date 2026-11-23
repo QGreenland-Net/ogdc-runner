@@ -33,7 +33,7 @@ def stage_ogdc_recipe(recipe_location: str):  # type: ignore[no-untyped-def]
 
 
 @contextmanager
-def clone_recipes_repo(repo_url: str, ref: str = "main") -> Generator[Path, None, None]:
+def clone_recipes_repo(repo_url: str, ref: str = "main") -> Generator[Path]:
     """Clone a git repository at a specific ref.
 
     Args:
