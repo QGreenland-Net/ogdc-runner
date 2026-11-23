@@ -6,10 +6,11 @@ Structure only. Steps recipes are validated but not yet executable.
 from __future__ import annotations
 
 import re
-from pathlib import PurePosixPath
+from functools import cached_property
+from pathlib import Path, PurePosixPath
 from typing import Annotated, Any, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, computed_field, field_validator, model_validator
 
 from ogdc_runner.models.base import OgdcBaseModel
 from ogdc_runner.models.recipe_config import (
@@ -17,6 +18,7 @@ from ogdc_runner.models.recipe_config import (
     PvcRecipeOutput,
     RecipeInput,
     TemporaryRecipeOutput,
+    _read_config_json,
 )
 
 # Cap on steps per recipe.
@@ -238,3 +240,38 @@ class StepsMeta(OgdcBaseModel):
         if isinstance(by_name[self.recipe.steps[-1].template].output, JsonOutput):
             msg = "the final step must produce files"
             raise ValueError(msg)  # noqa: TRY004
+
+
+class StepsRecipeConfig(StepsMeta):
+    """A steps recipe plus the directory it was loaded from."""
+
+    recipe_directory: Path
+
+    @computed_field  # type: ignore[prop-decorator]
+    @cached_property
+    def id(self) -> str:
+        """Kubernetes-friendly slug of `name`, as for legacy recipes."""
+        return self.name.lower().replace(" ", "-")
+
+    @model_validator(mode="after")
+    def _check_local_files(self) -> StepsRecipeConfig:
+        """Local template files exist; the graph is final without shared templates."""
+        for template in self.templates:
+            filename = (
+                template.sh_file
+                if isinstance(template, ShellTemplate)
+                else template.config_file
+            )
+            if filename is None:
+                continue
+            path = self.recipe_directory / filename
+            if not path.is_file():
+                msg = f"{template.name}: {filename} is not present in the recipe directory"
+                raise ValueError(msg)
+            if filename.endswith(".json"):
+                _read_config_json(path)
+        # Shared templates aren't loaded here, so the graph can only be
+        # checked now when the recipe has none.
+        if not self.templates_from:
+            self.check_graph([])
+        return self

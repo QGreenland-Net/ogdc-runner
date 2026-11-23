@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from ogdc_runner.constants import RECIPE_CONFIG_FILENAME
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig, OgdcInvalidRecipeDir
 from ogdc_runner.models.recipe_config import RecipeConfig
+from ogdc_runner.models.steps import StepsRecipeConfig
 
 
 @contextmanager
@@ -80,6 +81,34 @@ def get_recipe_config(
     )
 
     return config
+
+
+def load_recipe_config(
+    recipe_directory: Path, *, check_urls: bool = False
+) -> RecipeConfig | StepsRecipeConfig:
+    """Load a legacy or (experimental) steps recipe, chosen by its top-level keys.
+
+    A `recipe` key selects the steps form. Anything else takes the unchanged
+    legacy path, so a recipe that mixes `workflow` and `recipe` is rejected by
+    the steps schema.
+    """
+    meta_path = recipe_directory / RECIPE_CONFIG_FILENAME
+    try:
+        config_dict = yaml.safe_load(meta_path.read_text())
+    except OSError as err:
+        raise OgdcInvalidRecipeDir(
+            f"Recipe directory not found: {recipe_directory}"
+        ) from err
+
+    # `recipe` only exists in the steps form.
+    if isinstance(config_dict, dict) and "recipe" in config_dict:
+        return StepsRecipeConfig.model_validate(
+            dict(**config_dict, recipe_directory=recipe_directory),
+            context={"check_urls": check_urls},
+        )
+
+    # Legacy recipe: unchanged path.
+    return get_recipe_config(recipe_directory, check_urls=check_urls)
 
 
 def find_recipe_dirs(recipes_dir: Path) -> list[Path]:
