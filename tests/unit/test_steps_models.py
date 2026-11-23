@@ -9,7 +9,7 @@ import pytest
 import yaml
 from pydantic import TypeAdapter, ValidationError
 
-from ogdc_runner.models.steps import StepsMeta, Template, VizTemplate
+from ogdc_runner.models.steps import ParamSpec, StepsMeta, Template, VizTemplate
 
 REPO = Path(__file__).parents[1] / "test_steps_recipe_repo"
 TEMPLATES = TypeAdapter(list[Template])
@@ -86,3 +86,50 @@ def test_structural_rejections(mutate):
     mutate(doc)
     with pytest.raises(ValidationError):
         StepsMeta.model_validate(doc)
+
+
+def shared() -> list[Any]:
+    doc = yaml.safe_load((REPO / "templates/raster/compress-overviews.yml").read_text())
+    return TEMPLATES.validate_python(doc["templates"])
+
+
+def test_fixture_graph_is_valid():
+    StepsMeta.model_validate(base_doc()).check_graph(shared())
+
+
+def _json_tpl(name: str = "stats") -> dict[str, Any]:
+    return {
+        "name": name,
+        "type": "visualization",
+        "call": {"function": "pdgraster.operations:calculate_ranges"},
+        "output": {"type": "json"},
+    }
+
+
+@pytest.mark.parametrize(
+    ("mutate", "msg"),
+    [
+        (lambda d: d["recipe"]["steps"][1]["input"].update({"from": "package.output"}), "earlier-step"),
+        (lambda d: d["recipe"]["steps"][1]["input"].update({"from": "reproject.output"}), "earlier-step"),
+        (lambda d: d["recipe"]["steps"][1]["input"].update({"from": "to-percent.input"}), "earlier-step"),
+        (lambda d: d["recipe"]["steps"][2].update(template="nope"), "unknown template"),
+        (lambda d: d["recipe"]["steps"][2].update({"with": {"BOGUS": 1}}), r"unknown parameters=\['BOGUS'\]"),
+        (lambda d: d["recipe"]["steps"].append(dict(d["recipe"]["steps"][0])), "duplicate step"),
+        (lambda d: d["templates"].append({"name": "compress-overviews", "type": "shell", "sh_file": "x.sh"}), "duplicate template"),
+        (lambda d: d["recipe"]["steps"][2]["input"].update({"from": "to-percent.output"}), "never used"),
+        (lambda d: (d["templates"].append(_json_tpl()), d["recipe"]["steps"][2].update(template="stats", **{"with": {}})), "must produce files"),
+    ],
+)  # fmt: skip
+def test_graph_rejections(mutate, msg):
+    doc = base_doc()
+    mutate(doc)
+    with pytest.raises(ValueError, match=msg):
+        StepsMeta.model_validate(doc).check_graph(shared())
+
+
+def test_graph_required_parameter_must_be_supplied():
+    tpl = shared()[0].model_copy(
+        update={"parameters": {"LEVEL": ParamSpec(required=True)}}
+    )
+    with pytest.raises(ValueError, match=r"missing parameters=\['LEVEL'\]"):
+        StepsMeta.model_validate(base_doc()).check_graph([tpl])

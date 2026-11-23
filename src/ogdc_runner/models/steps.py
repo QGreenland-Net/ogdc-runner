@@ -183,3 +183,58 @@ class StepsMeta(OgdcBaseModel):
             if not _TEMPLATE_REF.match(ref) or ".." in ref.split("/"):
                 raise ValueError(f"template ref must be templates/<file>.yml: {ref!r}")
         return refs
+
+    def check_graph(self, shared: list[ShellTemplate | VizTemplate]) -> None:
+        """Check step wiring against local + resolved shared templates.
+
+        Pure: reads no files and resolves no inputs. Raises `ValueError`.
+        """
+        # Template names must be unique across local and shared templates.
+        all_templates = [*self.templates, *shared]
+        names = [t.name for t in all_templates]
+        if len(names) != len(set(names)):
+            msg = "duplicate template names across local and shared templates"
+            raise ValueError(msg)
+        by_name = {t.name: t for t in all_templates}
+
+        # `seen` holds earlier step names; `consumed` those whose output is read.
+        seen: list[str] = []
+        consumed: set[str] = set()
+        for step in self.recipe.steps:
+            if step.name in seen:
+                msg = f"duplicate step name: {step.name}"
+                raise ValueError(msg)
+            # A step may only read the recipe input or an earlier step's output.
+            source = step.input.from_
+            if source != "recipe.input":
+                ref, _, attr = source.partition(".")
+                if attr != "output" or ref not in seen:
+                    msg = f"{step.name}: input must be recipe.input or <earlier-step>.output"
+                    raise ValueError(msg)
+                consumed.add(ref)
+            template = by_name.get(step.template)
+            if template is None:
+                msg = f"{step.name}: unknown template {step.template!r}"
+                raise ValueError(msg)
+            # `with` must name declared parameters and cover the required ones.
+            unknown = set(step.with_) - set(template.parameters)
+            missing = {k for k, p in template.parameters.items() if p.required} - set(
+                step.with_
+            )
+            if unknown or missing:
+                msg = (
+                    f"{step.name}: unknown parameters={sorted(unknown)}"
+                    f" missing parameters={sorted(missing)}"
+                )
+                raise ValueError(msg)
+            seen.append(step.name)
+
+        # Every step except the last must feed a later step.
+        unused = set(seen[:-1]) - consumed
+        if unused:
+            msg = f"steps whose output is never used: {sorted(unused)}"
+            raise ValueError(msg)
+        # The last step's output is the recipe result, so it must be files.
+        if isinstance(by_name[self.recipe.steps[-1].template].output, JsonOutput):
+            msg = "the final step must produce files"
+            raise ValueError(msg)  # noqa: TRY004
