@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -9,9 +10,14 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from ogdc_runner.exceptions import OgdcInvalidRecipeConfig
 from ogdc_runner.models.recipe_config import RecipeConfig
 from ogdc_runner.models.steps import StepsRecipeConfig
-from ogdc_runner.recipe import load_recipe_config
+from ogdc_runner.recipe import (
+    check_steps_recipe,
+    load_recipe_config,
+    load_shared_templates,
+)
 
 REPO = Path(__file__).parents[1] / "test_steps_recipe_repo"
 RECIPE_DIR = REPO / "recipes/sea-ice-conc"
@@ -62,3 +68,78 @@ def test_graph_is_checked_when_all_templates_are_local(tmp_path):
     )
     with pytest.raises(ValidationError, match="earlier-step"):
         load_recipe_config(recipe_dir)
+
+
+def _load_steps(recipe_dir: Path) -> StepsRecipeConfig:
+    config = load_recipe_config(recipe_dir)
+    assert isinstance(config, StepsRecipeConfig)
+    return config
+
+
+def _repo_copy(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    shutil.copytree(REPO, repo)
+    return repo
+
+
+def test_shared_templates_resolve_and_graph_is_valid():
+    config = load_recipe_config(RECIPE_DIR)
+    assert isinstance(config, StepsRecipeConfig)
+    shared = load_shared_templates(str(RECIPE_DIR), config.templates_from)
+    assert [t.name for t in shared] == ["compress-overviews"]
+    check_steps_recipe(config, str(RECIPE_DIR))
+
+
+def test_two_recipes_reuse_one_shared_template(tmp_path):
+    repo = _repo_copy(tmp_path)
+    shutil.copytree(repo / "recipes/sea-ice-conc", repo / "recipes/other")
+    for name in ("sea-ice-conc", "other"):
+        recipe_dir = repo / "recipes" / name
+        config = load_recipe_config(recipe_dir)
+        assert isinstance(config, StepsRecipeConfig)
+        check_steps_recipe(config, str(recipe_dir))
+
+
+def test_missing_shared_template_file(tmp_path):
+    repo = _repo_copy(tmp_path)
+    (repo / "templates/raster/compress-overviews.yml").unlink()
+    config = _load_steps(repo / "recipes/sea-ice-conc")
+    with pytest.raises(OgdcInvalidRecipeConfig, match="not found"):
+        check_steps_recipe(config, str(repo / "recipes/sea-ice-conc"))
+
+
+def test_shared_template_script_must_exist(tmp_path):
+    repo = _repo_copy(tmp_path)
+    (repo / "templates/raster/compress-overviews.sh").unlink()
+    config = _load_steps(repo / "recipes/sea-ice-conc")
+    with pytest.raises(OgdcInvalidRecipeConfig, match=r"compress-overviews\.sh"):
+        check_steps_recipe(config, str(repo / "recipes/sea-ice-conc"))
+
+
+def test_nested_includes_are_rejected(tmp_path):
+    repo = _repo_copy(tmp_path)
+    path = repo / "templates/raster/compress-overviews.yml"
+    path.write_text(path.read_text() + "templates_from: [templates/x.yml]\n")
+    config = _load_steps(repo / "recipes/sea-ice-conc")
+    with pytest.raises(OgdcInvalidRecipeConfig, match="Invalid shared template"):
+        check_steps_recipe(config, str(repo / "recipes/sea-ice-conc"))
+
+
+def test_shared_templates_need_repo_layout(tmp_path):
+    with pytest.raises(OgdcInvalidRecipeConfig, match="<root>/recipes/<name>"):
+        load_shared_templates(str(tmp_path), ["templates/a.yml"])
+
+
+def test_shared_script_cannot_escape_templates_dir(tmp_path):
+    repo = _repo_copy(tmp_path)
+    path = repo / "templates/raster/compress-overviews.yml"
+    path.write_text(
+        path.read_text().replace(
+            '"compress-overviews.sh"', '"../../recipes/sea-ice-conc/to-percent.sh"'
+        )
+    )
+    with pytest.raises(OgdcInvalidRecipeConfig, match="Invalid shared template"):
+        load_shared_templates(
+            str(repo / "recipes/sea-ice-conc"),
+            ["templates/raster/compress-overviews.yml"],
+        )

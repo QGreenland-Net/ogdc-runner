@@ -144,6 +144,12 @@ class VizTemplate(OgdcBaseModel):
 Template = Annotated[ShellTemplate | VizTemplate, Field(discriminator="type")]
 
 
+class SharedTemplates(OgdcBaseModel):
+    """A shared template file under the repository's `templates/` directory."""
+
+    templates: list[Template]
+
+
 class StepInput(OgdcBaseModel):
     """Where a step reads from: `recipe.input` or `<earlier-step>.output`."""
 

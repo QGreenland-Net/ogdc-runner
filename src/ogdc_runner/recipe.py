@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import posixpath
 import subprocess
 import sys
 import tempfile
@@ -15,7 +16,12 @@ from pydantic import ValidationError
 from ogdc_runner.constants import RECIPE_CONFIG_FILENAME
 from ogdc_runner.exceptions import OgdcInvalidRecipeConfig, OgdcInvalidRecipeDir
 from ogdc_runner.models.recipe_config import RecipeConfig
-from ogdc_runner.models.steps import StepsRecipeConfig
+from ogdc_runner.models.steps import (
+    SharedTemplates,
+    ShellTemplate,
+    StepsRecipeConfig,
+    VizTemplate,
+)
 
 
 @contextmanager
@@ -109,6 +115,72 @@ def load_recipe_config(
 
     # Legacy recipe: unchanged path.
     return get_recipe_config(recipe_directory, check_urls=check_urls)
+
+
+def _templates_root(recipe_fs_path: str) -> str:
+    """Return `<root>/templates` for a recipe path shaped `<root>/recipes/<name>`."""
+    parent, name = posixpath.split(recipe_fs_path.rstrip("/"))
+    root, recipes = posixpath.split(parent)
+    if recipes != "recipes" or not name:
+        msg = "shared templates need a recipe path shaped <root>/recipes/<name>"
+        raise OgdcInvalidRecipeConfig(msg)
+    return posixpath.join(root, "templates")
+
+
+def load_shared_templates(
+    recipe_location: str, refs: list[str]
+) -> list[ShellTemplate | VizTemplate]:
+    """Read the `templates_from` files that live next to the recipe's `recipes/`.
+
+    Offline validation only: no commit pinning or snapshotting happens here.
+    """
+    fs, recipe_fs_path = fsspec.core.url_to_fs(recipe_location)
+    templates_root = _templates_root(recipe_fs_path)
+    loaded: list[ShellTemplate | VizTemplate] = []
+    for ref in refs:
+        # Resolve the ref against the repo root and keep it inside `templates/`.
+        file_path = posixpath.normpath(
+            posixpath.join(posixpath.dirname(templates_root), ref)
+        )
+        if not file_path.startswith(templates_root + "/"):
+            raise OgdcInvalidRecipeConfig(f"Template escapes templates/: {ref!r}")
+        try:
+            doc = yaml.safe_load(fs.cat_file(file_path))
+        except FileNotFoundError as err:
+            raise OgdcInvalidRecipeConfig(f"Shared template not found: {ref}") from err
+        try:
+            templates = SharedTemplates.model_validate(doc).templates
+        except ValidationError as err:
+            raise OgdcInvalidRecipeConfig(
+                f"Invalid shared template {ref}: {err}"
+            ) from err
+        # Each template's script/config file must sit next to its template file.
+        for template in templates:
+            script = (
+                template.sh_file
+                if isinstance(template, ShellTemplate)
+                else template.config_file
+            )
+            if script is None:
+                continue
+            # The schema rejects absolute paths and `..`, so this stays below
+            # the template file's directory (inside `templates/`).
+            script_path = posixpath.join(posixpath.dirname(file_path), script)
+            if not fs.isfile(script_path):
+                raise OgdcInvalidRecipeConfig(
+                    f"{template.name}: {script} not found next to {ref}"
+                )
+        loaded.extend(templates)
+    return loaded
+
+
+def check_steps_recipe(config: StepsRecipeConfig, recipe_location: str) -> None:
+    """Resolve shared templates and check the full step graph."""
+    shared = load_shared_templates(recipe_location, config.templates_from)
+    try:
+        config.check_graph(shared)
+    except ValueError as err:
+        raise OgdcInvalidRecipeConfig(str(err)) from err
 
 
 def find_recipe_dirs(recipes_dir: Path) -> list[Path]:
