@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ogdc_runner.exceptions import OgdcDataAlreadyPublished
+from ogdc_runner.exceptions import OgdcDataAlreadyPublished, OgdcInvalidRecipeConfig
+from ogdc_runner.models.steps import StepsRecipeConfig
 from ogdc_runner.publish import data_already_published
-from ogdc_runner.recipe import get_recipe_config
+from ogdc_runner.recipe import load_recipe_config
 from ogdc_runner.workflow.shell import make_and_submit_shell_workflow
 from ogdc_runner.workflow.viz_workflow import make_and_submit_viz_workflow
 
@@ -25,9 +26,18 @@ def submit_ogdc_recipe(
         overwrite: Whether to overwrite existing published data
 
     Returns the name of the OGDC shell recipe submitted to Argo.
+
+    Raises `OgdcInvalidRecipeConfig` for invalid recipes, and for steps recipes,
+    which cannot be executed yet.
     """
     # Get the recipe configuration
-    recipe_config = get_recipe_config(recipe_dir)
+    recipe_config = load_recipe_config(recipe_dir)
+
+    # Steps recipes are validated but have no executor yet. Never let them
+    # fall through to the shell workflow builder. Slice 3 removes this gate.
+    if isinstance(recipe_config, StepsRecipeConfig):
+        msg = "steps recipes are not executable yet"
+        raise OgdcInvalidRecipeConfig(msg)
 
     # Check if the user-submitted workflow has already been published
     if data_already_published(
