@@ -280,14 +280,13 @@ def stage_file_parallel() -> None:
                 len(input_files),
                 local_path,
             )
-        except Exception as e:
-            log.error(
-                "partition=%s [%d/%d] FAILED %s error=%s",
+        except Exception:
+            log.exception(
+                "partition=%s [%d/%d] FAILED %s",
                 partition_id,
                 idx + 1,
                 len(input_files),
                 local_path,
-                e,
             )
             sys.exit(1)
 
@@ -594,8 +593,8 @@ def rasterize_max_z_parallel() -> None:
         try:
             workflow.rasterize_vector(tile_path)
             log.info("done %s", tile_path)
-        except Exception as e:
-            log.error("FAILED %s error=%s", tile_path, e)
+        except Exception:
+            log.exception("FAILED %s", tile_path)
             sys.exit(1)
 
 
@@ -653,8 +652,8 @@ def create_composite_z_parallel() -> None:
             parent_tile = workflow.tiles.tile_from_path(parent_path)
             raster_tiler.parent_geotiff_from_children(parent_tile)
             log.info("z=%d done %s", z_level, parent_path)
-        except Exception as e:
-            log.error("z=%d FAILED %s error=%s", z_level, parent_path, e)
+        except Exception:
+            log.exception("z=%d FAILED %s", z_level, parent_path)
             sys.exit(1)
 
 
@@ -712,14 +711,14 @@ def create_web_tile_parallel() -> None:
             geotiff_path = str(item)
             try:
                 z_level = int(workflow.tiles.dict_from_path(geotiff_path)["z"])
-            except Exception:
+            except (KeyError, ValueError, TypeError):
                 z_level = -1
         log.info("creating web tile z=%d %s", z_level, geotiff_path)
         try:
             raster_tiler.webtile_from_geotiff(geotiff_path)
             log.info("done z=%d %s", z_level, geotiff_path)
-        except Exception as e:
-            log.error("FAILED z=%d %s error=%s", z_level, geotiff_path, e)
+        except Exception:
+            log.exception("FAILED z=%d %s", z_level, geotiff_path)
             sys.exit(1)
 
 
@@ -772,8 +771,8 @@ def create_3dtile_parallel() -> None:
         try:
             workflow.staged_to_3dtile(staged_path)
             log.info("done %s", staged_path)
-        except Exception as e:
-            log.error("FAILED %s error=%s", staged_path, e)
+        except Exception:
+            log.exception("FAILED %s", staged_path)
             sys.exit(1)
 
 
@@ -859,8 +858,8 @@ def run_viz_serial() -> None:
             or workflow.config.is_web_tiles_enabled()
         ):
             workflow.generate_wmts_capabilities()
-    except Exception as e:
-        log.error("serial viz workflow FAILED error=%s", e)
+    except Exception:
+        log.exception("serial viz workflow FAILED")
         sys.exit(1)
 
 
