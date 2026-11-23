@@ -1,4 +1,5 @@
 ## NEXT_VERSION
+
 - `POST /workflows` now returns `422` for invalid recipes (schema validation,
   invalid config, or invalid recipe directory). Unexpected errors return a
   generic `500` with a request ID (also sent as `X-Request-ID`); full details

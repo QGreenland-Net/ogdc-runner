@@ -4,8 +4,8 @@ templates:
     mode: "map"
     sh_file: "compress-overviews.sh"
     parameters:
-      COMPRESS: {default: "DEFLATE"}
-      PREDICTOR: {default: "2"}
-      RESAMPLING: {default: "average"}
-      OVERVIEW_LEVELS: {default: "2 4 8 16"}
-    output: {type: "files", glob: "*.tif"}
+      COMPRESS: { default: "DEFLATE" }
+      PREDICTOR: { default: "2" }
+      RESAMPLING: { default: "average" }
+      OVERVIEW_LEVELS: { default: "2 4 8 16" }
+    output: { type: "files", glob: "*.tif" }

@@ -245,7 +245,7 @@ class StepsMeta(OgdcBaseModel):
         # The last step's output is the recipe result, so it must be files.
         if isinstance(by_name[self.recipe.steps[-1].template].output, JsonOutput):
             msg = "the final step must produce files"
-            raise ValueError(msg)  # noqa: TRY004
+            raise ValueError(msg)
 
 
 class StepsRecipeConfig(StepsMeta):

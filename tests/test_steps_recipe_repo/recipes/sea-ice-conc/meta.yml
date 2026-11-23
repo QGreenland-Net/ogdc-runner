@@ -10,14 +10,14 @@ recipe:
   steps:
     - name: "to-percent"
       template: "to-percent"
-      input: {from: "recipe.input"}
+      input: { from: "recipe.input" }
     - name: "reproject"
       template: "reproject-3413"
-      input: {from: "to-percent.output"}
+      input: { from: "to-percent.output" }
     - name: "package"
       template: "compress-overviews"
-      input: {from: "reproject.output"}
-      with: {COMPRESS: "DEFLATE", PREDICTOR: 2}
+      input: { from: "reproject.output" }
+      with: { COMPRESS: "DEFLATE", PREDICTOR: 2 }
 templates_from:
   - "templates/raster/compress-overviews.yml"
 templates:
