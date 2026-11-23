@@ -1,0 +1,29 @@
+name: "September 2023 Sea Ice Concentration Average"
+input:
+  params:
+    - type: "url"
+      value: "https://noaadata.apps.nsidc.org/NOAA/G02135/north/monthly/geotiff/09_Sep/N_202309_concentration_v4.0.tif"
+output:
+  type: "temporary"
+recipe:
+  type: "steps"
+  steps:
+    - name: "to-percent"
+      template: "to-percent"
+      input: {from: "recipe.input"}
+    - name: "reproject"
+      template: "reproject-3413"
+      input: {from: "to-percent.output"}
+    - name: "package"
+      template: "compress-overviews"
+      input: {from: "reproject.output"}
+      with: {COMPRESS: "DEFLATE", PREDICTOR: 2}
+templates_from:
+  - "templates/raster/compress-overviews.yml"
+templates:
+  - name: "to-percent"
+    type: "shell"
+    sh_file: "to-percent.sh"
+  - name: "reproject-3413"
+    type: "shell"
+    sh_file: "reproject-3413.sh"
