@@ -1,5 +1,9 @@
 ## NEXT_VERSION
 
+- `POST /workflows` now returns `422` for invalid recipes (schema validation,
+  invalid config, or invalid recipe directory). Unexpected errors return a
+  generic `500` with a request ID (also sent as `X-Request-ID`); full details
+  are logged server-side only.
 - Configure the S3 client with generic `S3_ENDPOINT_URL`, `S3_BUCKET`,
   `S3_REGION`, and `S3_ADDRESSING_STYLE` envvars.
 - Serve temporary output links from the service under `/storage/...` using

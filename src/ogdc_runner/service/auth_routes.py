@@ -4,14 +4,21 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import uuid
 
 import pydantic
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
+from loguru import logger
 
 from ogdc_runner.api import submit_ogdc_recipe
 from ogdc_runner.argo import get_workflow_status
-from ogdc_runner.exceptions import OgdcOutputDataRetrievalError
+from ogdc_runner.exceptions import (
+    OgdcInvalidRecipeConfig,
+    OgdcInvalidRecipeDir,
+    OgdcOutputDataRetrievalError,
+    OgdcRunnerException,
+)
 from ogdc_runner.publish import get_temporary_output_data_url
 from ogdc_runner.recipe import stage_ogdc_recipe
 from ogdc_runner.service.auth import auth_client
@@ -65,10 +72,31 @@ def create_workflow(payload: WorkflowSubmitRequest) -> WorkflowSubmitResponse:
                 message=f"Successfully submitted recipe with {recipe_workflow_name=}",
                 recipe_workflow_name=recipe_workflow_name,
             )
-    except Exception as e:
+    except (
+        pydantic.ValidationError,
+        OgdcInvalidRecipeConfig,
+        OgdcInvalidRecipeDir,
+    ) as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid recipe: {e}",
+        ) from e
+    except OgdcRunnerException as e:
+        # Known runner errors (e.g., already published) carry user-facing
+        # messages; their status mapping is handled separately.
         raise HTTPException(
             status_code=500,
             detail=f"Failed to submit recipe with error: {e}.",
+        ) from e
+    except Exception as e:
+        # Unexpected: log everything server-side, but tell the caller only a
+        # request ID so internal details do not leak.
+        request_id = uuid.uuid4().hex
+        logger.exception(f"Unexpected error submitting recipe ({request_id=})")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to submit recipe due to an internal error (request ID: {request_id}).",
+            headers={"X-Request-ID": request_id},
         ) from e
 
 
