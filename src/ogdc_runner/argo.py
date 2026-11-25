@@ -403,7 +403,7 @@ ARGO_WORKFLOW_SERVICE: WorkflowsService = ARGO_MANAGER.workflow_service
 def get_workflows_for_order(order_id: OrderId) -> list[workflow_models.Workflow]:
     """Get a list of workflows associated with the given OrderID."""
     workflows = ARGO_WORKFLOW_SERVICE.list_workflows(
-        label_selector=f"order_id={order_id}"
+        label_selector=f"ogdc/order_id={order_id}"
     )
     if workflows.items:
         return workflows.items
@@ -418,7 +418,7 @@ def get_recipe_workflows_for_order(order_id: OrderId) -> list[workflow_models.Wo
     recipe.
     """
     workflows = ARGO_WORKFLOW_SERVICE.list_workflows(
-        label_selector=f"order_id={order_id},ogdc/recipe-workflow=true"
+        label_selector=f"ogdc/order_id={order_id},ogdc/recipe-workflow=true"
     )
     if workflows.items:
         return workflows.items
@@ -529,8 +529,7 @@ def OgdcWorkflow(
     """
     labels = {
         **kwargs.pop("labels", {}),
-        # TODO: preface this with `ogdc/`?
-        "order_id": order_id,
+        "ogdc/order_id": order_id,
     }
 
     workflow_kwargs = {
