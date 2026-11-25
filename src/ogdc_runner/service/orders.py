@@ -6,7 +6,7 @@ import uuid
 from typing import NewType, Self, cast
 
 from loguru import logger
-from sqlmodel import Field, Session, SQLModel
+from sqlmodel import Field, Session, SQLModel, col, select, update
 
 
 class OrderStatus(enum.StrEnum):
@@ -29,6 +29,22 @@ class OrderStatus(enum.StrEnum):
         if isinstance(value, str) and value.lower() == "error":
             return cls.FAILED
         return None
+
+
+ALLOWED_STATUS_TRANSITIONS: dict[OrderStatus, frozenset[OrderStatus]] = {
+    OrderStatus.SUBMITTED: frozenset(
+        {OrderStatus.RUNNING, OrderStatus.SUCCEEDED, OrderStatus.FAILED}
+    ),
+    OrderStatus.RUNNING: frozenset(
+        {OrderStatus.SUCCEEDED, OrderStatus.FAILED, OrderStatus.UNKNOWN}
+    ),
+    # Terminal conditions
+    OrderStatus.SUCCEEDED: frozenset(),
+    OrderStatus.FAILED: frozenset(),
+    # UNknown is unlikely to be encountered, and would occur if the exit handler
+    # is given an unexpected status message. This could be a failure.
+    OrderStatus.UNKNOWN: frozenset(),
+}
 
 
 # TODO: is "order" the right word here? Use of "Workflow" maybe should be
@@ -76,20 +92,57 @@ def create_order(*, session: Session) -> OrderId:
 
 
 def update_order_status(
-    *, session: Session, order_id: str, order_status: OrderStatus
-) -> None:
+    *,
+    session: Session,
+    order_id: str,
+    order_status: OrderStatus,
+) -> bool:
+    """Update the order with `order_status` if the status transition is allowed.
+
+    Returns `True` if the update requested by this function succeeded or was
+    already applied, otherwise `False`. A `False` return indicates that an
+    invalid status transition was requested (likely due to a race condition).
+    """
     try:
-        order_record = _get_order(session=session, order_id=order_id)
-        # TODO: check state transition? E.g., ensure that a workflow can't
-        # go from `Succeeded` to `Running`? It might be possible that the
-        # "Running" lifecycle hook runs after the "on-exit" handler?
-        order_record.status = order_status
+        valid_from = [
+            current
+            for current, targets in ALLOWED_STATUS_TRANSITIONS.items()
+            if order_status in targets
+        ]
+
+        result = session.exec(
+            update(Order)
+            .where(
+                col(Order.id) == order_id,
+                col(Order.status).in_(valid_from),
+            )
+            .values(status=order_status)
+        )
         session.commit()
+
+        if result.rowcount == 1:
+            logger.info(f"Order {order_id} updated with status {order_status}")
+            return True
+
+        # Nothing updated: either the order is missing, already in this status,
+        # or the transition is stale.
+        current_status = session.exec(
+            select(Order.status).where(Order.id == order_id)
+        ).one_or_none()
+        if current_status is None:
+            err_msg = f"Order with {order_id=} not found."
+            raise RuntimeError(err_msg)
+        if current_status == order_status:
+            logger.debug(f"Order {order_id} already has status {order_status}")
+            return True
+
+        logger.warning(
+            f"Ignoring stale status transition for order {order_id}: {current_status} -> {order_status}"
+        )
+        return False
     except Exception as e:
         logger.error(f"Failed to update {order_id} with status {order_status}: {e}")
         raise e
-
-    logger.info(f"Order {order_id} updated with status {order_status}")
 
 
 def get_order_status(*, session: Session, order_id: str) -> OrderStatus:

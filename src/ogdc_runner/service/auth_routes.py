@@ -66,9 +66,6 @@ def _submit_recipe_and_clean(
             overwrite=overwrite,
             order_id=order_id,
         )
-        # TODO: this update could technically happen after "success" is achieved
-        # in submission above, although unlikely. Should guard against
-        # unexpected status transitions.
         with get_db_session() as session:
             update_order_status(
                 order_id=order_id,
